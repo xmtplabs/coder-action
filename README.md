@@ -48,8 +48,7 @@ jobs:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
           prompt: |
             You are an autonomous AI agent. Resolve the GitHub issue below.
             Read the issue, develop a plan, post it as a comment, then implement and open a PR.
@@ -66,8 +65,7 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   pr-comment:
     runs-on: ubuntu-latest
@@ -84,8 +82,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   issue-comment:
     runs-on: ubuntu-latest
@@ -101,8 +98,7 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 ```
 
 ### `.github/workflows/coder-failed-checks.yml`
@@ -134,8 +130,7 @@ jobs:
           action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 ```
 
 ## Inputs
@@ -171,10 +166,8 @@ jobs:
 |--------|-------------|
 | `CODER_URL` | Coder deployment URL (e.g., `https://sandbox.xmtp.team`) |
 | `CODER_TOKEN` | Coder API token with task creation and send permissions |
-| `CODER_USERNAME` | Coder username for the agent (e.g., `xmtp-coder-agent`) |
-| `CODER_GH_PAT` | GitHub PAT with `repo` and `read:org` scopes |
 
-The default `GITHUB_TOKEN` lacks org membership read permissions, so a PAT (`CODER_GH_PAT`) is required.
+The `github-token` input uses the default `${{ github.token }}` provided by GitHub Actions. The `coder-username` defaults to `xmtp-coder-agent`. A GitHub PAT for git operations is configured in the Coder task template, not needed at the workflow level.
 
 ## How It Works
 

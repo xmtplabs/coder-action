@@ -27,8 +27,7 @@ jobs:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
           prompt: |
             You are an autonomous AI agent. Resolve the GitHub issue below.
             Read the issue, develop a plan, post it as a comment, then implement and open a PR.
@@ -47,8 +46,7 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   # ─── PR Comment Forwarding ─────────────────────────────────────
   # Triggered when someone comments on a PR authored by the coder agent
@@ -67,8 +65,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   # ─── Issue Comment Forwarding ──────────────────────────────────
   # Triggered when someone comments on an issue (not a PR)
@@ -86,5 +83,4 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}

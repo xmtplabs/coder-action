@@ -25,8 +25,7 @@ jobs:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
           prompt: |
             You are an autonomous AI agent. Resolve the GitHub issue below.
             Read the issue, develop a plan, post it as a comment, then implement and open a PR.
@@ -43,8 +42,7 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   pr-comment:
     runs-on: ubuntu-latest
@@ -61,8 +59,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
 
   issue-comment:
     runs-on: ubuntu-latest
@@ -78,5 +75,4 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
