@@ -97,6 +97,12 @@ describe("parseInputs", () => {
 		}
 	});
 
+	test("applies default coder username when not provided", () => {
+		const { coderUsername: _, ...rest } = baseInputs;
+		const result = parseInputs(rest as unknown);
+		expect(result.coderUsername).toBe("xmtp-coder-agent");
+	});
+
 	test("applies default prefix when not provided", () => {
 		const { coderTaskNamePrefix: _, ...rest } = baseInputs;
 		const result = parseInputs(rest as unknown);
