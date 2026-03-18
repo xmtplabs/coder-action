@@ -31,8 +31,8 @@ async function run(): Promise<void> {
 			coderTemplatePreset: core.getInput("coder-template-preset") || undefined,
 			coderOrganization: core.getInput("coder-organization") || undefined,
 			prompt: core.getInput("prompt") || undefined,
-			githubToken: core.getInput("github-token", { required: true }),
-			githubOrg: core.getInput("github-org") || undefined,
+			githubToken:
+				core.getInput("github-token") || process.env.GITHUB_TOKEN || "",
 			coderGithubUsername: core.getInput("coder-github-username") || undefined,
 		};
 

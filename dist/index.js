@@ -26233,20 +26233,19 @@ class GitHubClient {
   constructor(octokit) {
     this.octokit = octokit;
   }
-  async checkOrgMembership(org, username) {
+  async checkActorPermission(owner, repo, username) {
     try {
-      await this.octokit.rest.orgs.checkMembershipForUser({
-        org,
+      const { data } = await this.octokit.rest.repos.getCollaboratorPermissionLevel({
+        owner,
+        repo,
         username
       });
-      return true;
+      const allowed = new Set(["admin", "write"]);
+      return allowed.has(data.permission);
     } catch (error2) {
       const err = error2;
       if (err?.status === 404)
         return false;
-      if (err?.status === 403) {
-        throw new Error(`Insufficient permissions to check org membership for ${org}. ` + `Ensure the github-token has read:org scope.`);
-      }
       throw error2;
     }
   }
@@ -26350,7 +26349,6 @@ var BaseInputsSchema = exports_external.object({
   coderUsername: exports_external.string().min(1).default("xmtp-coder-agent"),
   coderTaskNamePrefix: exports_external.string().min(1).default("gh"),
   githubToken: exports_external.string().min(1),
-  githubOrg: exports_external.string().min(1).default("xmtp"),
   coderGithubUsername: exports_external.string().min(1).default("xmtp-coder-agent")
 });
 var CreateTaskInputsSchema = BaseInputsSchema.extend({
@@ -26427,10 +26425,10 @@ class CreateTaskHandler {
     this.context = context3;
   }
   async run() {
-    const isMember = await this.github.checkOrgMembership(this.inputs.githubOrg, this.context.senderLogin);
-    if (!isMember) {
-      error(`Actor ${this.context.senderLogin} is not a member of ${this.inputs.githubOrg}, skipping task creation`);
-      return { skipped: true, skipReason: "non-org-member" };
+    const hasAccess = await this.github.checkActorPermission(this.context.owner, this.context.repo, this.context.senderLogin);
+    if (!hasAccess) {
+      error(`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`);
+      return { skipped: true, skipReason: "insufficient-permissions" };
     }
     const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);
     info(`Task name: ${taskName}`);
@@ -26745,8 +26743,7 @@ async function run() {
       coderTemplatePreset: getInput("coder-template-preset") || undefined,
       coderOrganization: getInput("coder-organization") || undefined,
       prompt: getInput("prompt") || undefined,
-      githubToken: getInput("github-token", { required: true }),
-      githubOrg: getInput("github-org") || undefined,
+      githubToken: getInput("github-token") || process.env.GITHUB_TOKEN || "",
       coderGithubUsername: getInput("coder-github-username") || undefined
     };
     setSecret(rawInputs.coderToken);

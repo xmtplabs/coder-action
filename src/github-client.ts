@@ -24,22 +24,23 @@ export interface PRInfo {
 export class GitHubClient {
 	constructor(private readonly octokit: Octokit) {}
 
-	async checkOrgMembership(org: string, username: string): Promise<boolean> {
+	async checkActorPermission(
+		owner: string,
+		repo: string,
+		username: string,
+	): Promise<boolean> {
 		try {
-			await this.octokit.rest.orgs.checkMembershipForUser({
-				org,
-				username,
-			});
-			return true;
+			const { data } =
+				await this.octokit.rest.repos.getCollaboratorPermissionLevel({
+					owner,
+					repo,
+					username,
+				});
+			const allowed = new Set(["admin", "write"]);
+			return allowed.has(data.permission);
 		} catch (error: unknown) {
 			const err = error as { status?: number };
 			if (err?.status === 404) return false;
-			if (err?.status === 403) {
-				throw new Error(
-					`Insufficient permissions to check org membership for ${org}. ` +
-						`Ensure the github-token has read:org scope.`,
-				);
-			}
 			throw error;
 		}
 	}

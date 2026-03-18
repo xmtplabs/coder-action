@@ -16,7 +16,6 @@ const baseInputs: IssueCommentInputs = {
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
 	githubToken: "ghp_123",
-	githubOrg: "xmtp",
 	coderGithubUsername: "xmtp-coder-agent",
 };
 

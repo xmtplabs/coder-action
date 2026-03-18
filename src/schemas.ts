@@ -8,7 +8,6 @@ const BaseInputsSchema = z.object({
 	coderUsername: z.string().min(1).default("xmtp-coder-agent"),
 	coderTaskNamePrefix: z.string().min(1).default("gh"),
 	githubToken: z.string().min(1),
-	githubOrg: z.string().min(1).default("xmtp"),
 	coderGithubUsername: z.string().min(1).default("xmtp-coder-agent"),
 });
 

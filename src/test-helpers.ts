@@ -78,7 +78,7 @@ export function createMockGitHubClient(): {
 	[K in keyof GitHubClient]: ReturnType<typeof mock>;
 } {
 	return {
-		checkOrgMembership: mock(() => Promise.resolve(true)),
+		checkActorPermission: mock(() => Promise.resolve(true)),
 		findLinkedIssues: mock(() =>
 			Promise.resolve([
 				{
