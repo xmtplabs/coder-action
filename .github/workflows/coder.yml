@@ -5,8 +5,12 @@ on:
     types: [assigned, closed]
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: ["CI"]  # Change this to match your CI workflow names
+    types: [completed]
 
 permissions:
+  actions: read
   issues: write
   pull-requests: read
   contents: read
@@ -71,6 +75,20 @@ jobs:
         uses: xmtplabs/coder-action@main
         with:
           action: issue_comment
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
+
+  failed-check:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Forward Failed Check to Coder Task
+        uses: xmtplabs/coder-action@main
+        with:
+          action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
           github-token: ${{ github.token }}
