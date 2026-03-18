@@ -37,6 +37,10 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 				),
 				...(overrides.actions as Record<string, unknown>),
 			},
+			reactions: {
+				createForIssueComment: mock(() => Promise.resolve({ data: { id: 1 } })),
+				...(overrides.reactions as Record<string, unknown>),
+			},
 		},
 		graphql: mock(() => Promise.resolve({})),
 		...overrides,
@@ -240,6 +244,22 @@ describe("GitHubClient", () => {
 			expect(jobs).toHaveLength(2);
 			expect(jobs[0].name).toBe("build");
 			expect(jobs[1].name).toBe("test");
+		});
+	});
+
+	describe("addReactionToComment", () => {
+		test("adds eyes reaction to comment", async () => {
+			const octokit = createMockOctokit();
+			const client = new GitHubClient(octokit);
+			await client.addReactionToComment("org", "repo", 42);
+			expect(
+				octokit.rest.reactions.createForIssueComment,
+			).toHaveBeenCalledWith({
+				owner: "org",
+				repo: "repo",
+				comment_id: 42,
+				content: "eyes",
+			});
 		});
 	});
 

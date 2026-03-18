@@ -11,6 +11,7 @@ export interface PRCommentContext {
 	prNumber: number;
 	prAuthor: string;
 	commenterLogin: string;
+	commentId: number;
 	commentUrl: string;
 	commentBody: string;
 	commentCreatedAt: string;
@@ -81,6 +82,12 @@ export class PRCommentHandler {
 		});
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Comment forwarded to task ${taskName}`);
+
+		await this.github.addReactionToComment(
+			this.context.owner,
+			this.context.repo,
+			this.context.commentId,
+		);
 
 		return { taskName, taskStatus: task.status, skipped: false };
 	}
