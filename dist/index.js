@@ -26125,7 +26125,8 @@ class RealCoderClient {
     });
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new CoderAPIError(`Coder API error: ${response.statusText}`, response.status, body);
+      const detail = body ? `: ${body}` : "";
+      throw new CoderAPIError(`Coder API error ${response.status} ${response.statusText} (${url})${detail}`, response.status, body);
     }
     if (response.status === 204 || response.headers?.get("content-length") === "0") {
       return;

@@ -193,8 +193,9 @@ export class RealCoderClient implements CoderClient {
 
 		if (!response.ok) {
 			const body = await response.text().catch(() => "");
+			const detail = body ? `: ${body}` : "";
 			throw new CoderAPIError(
-				`Coder API error: ${response.statusText}`,
+				`Coder API error ${response.status} ${response.statusText} (${url})${detail}`,
 				response.status,
 				body,
 			);
