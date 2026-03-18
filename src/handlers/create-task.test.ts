@@ -100,8 +100,8 @@ describe("CreateTaskHandler", () => {
 		);
 	});
 
-	// AC #4: Default prompt when none provided
-	test("uses default prompt when none provided", async () => {
+	// AC #4: Only issue URL when no prompt provided
+	test("uses only issue URL when no prompt provided", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
@@ -118,7 +118,7 @@ describe("CreateTaskHandler", () => {
 			string,
 			{ input: string },
 		];
-		expect(createCall[1].input).toContain(issueContext.issueUrl);
+		expect(createCall[1].input).toBe(issueContext.issueUrl);
 	});
 
 	// AC #5: Existing running task
