@@ -18,7 +18,8 @@ inputs:
     required: true
   coder-username:
     description: "Coder username that owns tasks (the designated agent user)"
-    required: true
+    required: false
+    default: "xmtp-coder-agent"
   coder-task-name-prefix:
     description: "Prefix for deterministic task names"
     required: false
