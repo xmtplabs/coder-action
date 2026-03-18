@@ -30,7 +30,6 @@ jobs:
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
           github-token: ${{ github.token }}
-          prompt: " "
 
   close-task:
     runs-on: ubuntu-latest
