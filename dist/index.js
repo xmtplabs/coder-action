@@ -26347,7 +26347,7 @@ class GitHubClient {
 var BaseInputsSchema = exports_external.object({
   coderURL: exports_external.string().url(),
   coderToken: exports_external.string().min(1),
-  coderUsername: exports_external.string().min(1),
+  coderUsername: exports_external.string().min(1).default("xmtp-coder-agent"),
   coderTaskNamePrefix: exports_external.string().min(1).default("gh"),
   githubToken: exports_external.string().min(1),
   githubOrg: exports_external.string().min(1).default("xmtp"),
@@ -26739,7 +26739,7 @@ async function run() {
       action: getInput("action", { required: true }),
       coderURL: getInput("coder-url", { required: true }),
       coderToken: getInput("coder-token", { required: true }),
-      coderUsername: getInput("coder-username", { required: true }),
+      coderUsername: getInput("coder-username") || undefined,
       coderTaskNamePrefix: getInput("coder-task-name-prefix") || undefined,
       coderTemplateName: getInput("coder-template-name") || undefined,
       coderTemplatePreset: getInput("coder-template-preset") || undefined,

@@ -25,7 +25,7 @@ async function run(): Promise<void> {
 			action: core.getInput("action", { required: true }),
 			coderURL: core.getInput("coder-url", { required: true }),
 			coderToken: core.getInput("coder-token", { required: true }),
-			coderUsername: core.getInput("coder-username", { required: true }),
+			coderUsername: core.getInput("coder-username") || undefined,
 			coderTaskNamePrefix: core.getInput("coder-task-name-prefix") || undefined,
 			coderTemplateName: core.getInput("coder-template-name") || undefined,
 			coderTemplatePreset: core.getInput("coder-template-preset") || undefined,

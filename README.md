@@ -140,7 +140,7 @@ jobs:
 | `action` | Yes | — | Mode: `create_task`, `close_task`, `pr_comment`, `issue_comment`, `failed_check` |
 | `coder-url` | Yes | — | Coder deployment URL |
 | `coder-token` | Yes | — | Coder API session token |
-| `coder-username` | Yes | — | Coder username that owns tasks |
+| `coder-username` | No | `xmtp-coder-agent` | Coder username that owns tasks |
 | `github-token` | Yes | — | GitHub token for API operations |
 | `coder-task-name-prefix` | No | `gh` | Prefix for deterministic task names |
 | `coder-template-name` | No | `task-template` | Coder template for workspace creation (`create_task` only) |

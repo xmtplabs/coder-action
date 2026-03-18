@@ -5,7 +5,7 @@ import { z } from "zod";
 const BaseInputsSchema = z.object({
 	coderURL: z.string().url(),
 	coderToken: z.string().min(1),
-	coderUsername: z.string().min(1),
+	coderUsername: z.string().min(1).default("xmtp-coder-agent"),
 	coderTaskNamePrefix: z.string().min(1).default("gh"),
 	githubToken: z.string().min(1),
 	githubOrg: z.string().min(1).default("xmtp"),
