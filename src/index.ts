@@ -48,21 +48,30 @@ async function run(): Promise<void> {
 		const octokit = github.getOctokit(inputs.githubToken);
 		const gh = new GitHubClient(octokit);
 
-		// Resolve the Coder username from the GitHub sender's ID.
-		// The sender is the person who triggered the workflow (e.g. assigned the issue).
-		// Their GitHub account is linked to Coder via GitHub OAuth.
-		const sender = requirePayload(context.payload.sender, "sender");
-		const senderGithubId = sender.id as number;
-		core.info(
-			`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`,
-		);
-		const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
-		core.info(`Resolved Coder username: ${coderUser.username}`);
+		// Determine the Coder username to use for task operations.
+		// If coder-username is explicitly configured, use it directly — this is
+		// necessary when the GitHub event sender (e.g. a bot) has no Coder account.
+		// Otherwise, resolve it dynamically from the GitHub sender's linked Coder account.
+		const coderUsernameInput = core.getInput("coder-username") || undefined;
+		let coderUsername: string;
+		if (coderUsernameInput) {
+			core.info(`Using configured Coder username: ${coderUsernameInput}`);
+			coderUsername = coderUsernameInput;
+		} else {
+			const sender = requirePayload(context.payload.sender, "sender");
+			const senderGithubId = sender.id as number;
+			core.info(
+				`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`,
+			);
+			const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
+			core.info(`Resolved Coder username: ${coderUser.username}`);
+			coderUsername = coderUser.username;
+		}
 
-		// Override coderUsername with the resolved value
+		// Build resolved inputs with the determined Coder username
 		const resolvedInputs: ResolvedInputs = {
 			...inputs,
-			coderUsername: coderUser.username,
+			coderUsername,
 		};
 
 		let result: ActionOutputs;

@@ -26748,14 +26748,22 @@ async function run() {
     const coder = new RealCoderClient(inputs.coderURL, inputs.coderToken);
     const octokit = getOctokit(inputs.githubToken);
     const gh = new GitHubClient(octokit);
-    const sender = requirePayload(context3.payload.sender, "sender");
-    const senderGithubId = sender.id;
-    info(`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`);
-    const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
-    info(`Resolved Coder username: ${coderUser.username}`);
+    const coderUsernameInput = getInput("coder-username") || undefined;
+    let coderUsername;
+    if (coderUsernameInput) {
+      info(`Using configured Coder username: ${coderUsernameInput}`);
+      coderUsername = coderUsernameInput;
+    } else {
+      const sender2 = requirePayload(context3.payload.sender, "sender");
+      const senderGithubId = sender2.id;
+      info(`Resolving Coder user for GitHub user ${sender2.login} (ID: ${senderGithubId})`);
+      const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
+      info(`Resolved Coder username: ${coderUser.username}`);
+      coderUsername = coderUser.username;
+    }
     const resolvedInputs = {
       ...inputs,
-      coderUsername: coderUser.username
+      coderUsername
     };
     let result;
     switch (resolvedInputs.action) {
