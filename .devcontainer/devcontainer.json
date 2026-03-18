@@ -1,0 +1,25 @@
+{
+	"name": "coder-action",
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/shyim/devcontainers-features/bun:0": {}
+	},
+	"postCreateCommand": "bun install",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"biomejs.biome",
+				"oven.bun-vscode"
+			],
+			"settings": {
+				"editor.defaultFormatter": "biomejs.biome",
+				"editor.formatOnSave": true,
+				"editor.tabSize": 2,
+				"[typescript]": {
+					"editor.defaultFormatter": "biomejs.biome"
+				}
+			}
+		}
+	}
+}
