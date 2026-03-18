@@ -184,4 +184,17 @@ export class GitHubClient {
 		if (lines.length <= maxLines) return log;
 		return lines.slice(-maxLines).join("\n");
 	}
+
+	async addReactionToComment(
+		owner: string,
+		repo: string,
+		commentId: number,
+	): Promise<void> {
+		await this.octokit.rest.reactions.createForIssueComment({
+			owner,
+			repo,
+			comment_id: commentId,
+			content: "eyes",
+		});
+	}
 }

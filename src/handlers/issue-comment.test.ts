@@ -23,6 +23,7 @@ const validContext: IssueCommentContext = {
 	owner: "xmtp",
 	repo: "libxmtp",
 	issueNumber: 42,
+	commentId: 1,
 	commenterLogin: "author",
 	commentUrl: "https://github.com/xmtp/libxmtp/issues/42#issuecomment-1",
 	commentBody: "Actually, the requirement changed",
@@ -56,6 +57,52 @@ describe("IssueCommentHandler", () => {
 		)[2];
 		expect(sentMessage).toContain("New Comment on Issue:");
 		expect(sentMessage).toContain("Actually, the requirement changed");
+	});
+
+	// Issue #23: React with 👀 when comment is forwarded to agent
+	test("adds 👀 reaction when comment is forwarded to agent", async () => {
+		const handler = new IssueCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			validContext,
+		);
+		await handler.run();
+
+		expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
+		expect(github.addReactionToComment).toHaveBeenCalledWith(
+			"xmtp",
+			"libxmtp",
+			1,
+		);
+	});
+
+	// Issue #23: No reaction when comment is skipped
+	test("does not add reaction when comment is skipped (self-comment)", async () => {
+		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
+		const handler = new IssueCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+		);
+		await handler.run();
+
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
+	});
+
+	// Issue #23: No reaction when task not found
+	test("does not add reaction when task is not found", async () => {
+		coder.getTask.mockResolvedValue(null);
+		const handler = new IssueCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			validContext,
+		);
+		await handler.run();
+
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
 	});
 
 	// AC #21: Self-comment

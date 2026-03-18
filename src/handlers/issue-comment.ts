@@ -9,6 +9,7 @@ export interface IssueCommentContext {
 	owner: string;
 	repo: string;
 	issueNumber: number;
+	commentId: number;
 	commenterLogin: string;
 	commentUrl: string;
 	commentBody: string;
@@ -18,7 +19,7 @@ export interface IssueCommentContext {
 export class IssueCommentHandler {
 	constructor(
 		private readonly coder: CoderClient,
-		_github: GitHubClient,
+		private readonly github: GitHubClient,
 		private readonly inputs: IssueCommentInputs,
 		private readonly context: IssueCommentContext,
 	) {}
@@ -55,6 +56,12 @@ export class IssueCommentHandler {
 		});
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Comment forwarded to task ${taskName}`);
+
+		await this.github.addReactionToComment(
+			this.context.owner,
+			this.context.repo,
+			this.context.commentId,
+		);
 
 		return { taskName, taskStatus: task.status, skipped: false };
 	}

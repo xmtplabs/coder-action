@@ -25,6 +25,7 @@ const validContext: PRCommentContext = {
 	prNumber: 5,
 	prAuthor: "xmtp-coder-agent",
 	commenterLogin: "reviewer",
+	commentId: 1,
 	commentUrl: "https://github.com/xmtp/libxmtp/pull/5#issuecomment-1",
 	commentBody: "Please fix the typo",
 	commentCreatedAt: "2026-03-17T12:00:00Z",
@@ -66,6 +67,38 @@ describe("PRCommentHandler", () => {
 		)[2];
 		expect(sentMessage).toContain("New Comment on PR:");
 		expect(sentMessage).toContain("Please fix the typo");
+	});
+
+	// Issue #23: React with 👀 when comment is forwarded to agent
+	test("adds 👀 reaction when comment is forwarded to agent", async () => {
+		const handler = new PRCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			validContext,
+		);
+		await handler.run();
+
+		expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
+		expect(github.addReactionToComment).toHaveBeenCalledWith(
+			"xmtp",
+			"libxmtp",
+			1,
+		);
+	});
+
+	// Issue #23: No reaction when comment is skipped
+	test("does not add reaction when PR not by coder agent", async () => {
+		const ctx = { ...validContext, prAuthor: "other-user" };
+		const handler = new PRCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+		);
+		await handler.run();
+
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
 	});
 
 	// AC #11: PR not by agent
