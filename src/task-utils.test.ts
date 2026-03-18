@@ -52,7 +52,7 @@ describe("lookupAndEnsureActiveTask", () => {
 			"gh-repo-42",
 		);
 		expect(result).not.toBeNull();
-		expect(result?.id).toBe("uuid");
+		expect(String(result?.id)).toBe("uuid");
 		expect(mockCoder.waitForTaskActive).not.toHaveBeenCalled();
 	});
 
