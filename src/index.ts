@@ -75,12 +75,13 @@ async function run(): Promise<void> {
 		switch (resolvedInputs.action) {
 			case "create_task": {
 				const issue = requirePayload(context.payload.issue, "issue");
+				const taskSender = requirePayload(context.payload.sender, "sender");
 				const handler = new CreateTaskHandler(coder, gh, resolvedInputs, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					issueNumber: issue.number,
 					issueUrl: issue.html_url as string,
-					senderLogin: sender.login as string,
+					senderLogin: taskSender.login as string,
 				});
 				result = await handler.run();
 				break;
