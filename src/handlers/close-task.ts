@@ -57,6 +57,13 @@ export class CloseTaskHandler {
 			core.warning(`Failed to delete workspace: ${error}`);
 		}
 
+		// Delete task — continue even if this fails
+		try {
+			await this.coder.deleteTask(this.inputs.coderUsername, task.id);
+		} catch (error) {
+			core.warning(`Failed to delete task: ${error}`);
+		}
+
 		await this.github.commentOnIssue(
 			this.context.owner,
 			this.context.repo,

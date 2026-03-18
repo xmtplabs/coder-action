@@ -163,6 +163,7 @@ export interface CoderClient {
 	getWorkspace(workspaceId: string): Promise<Workspace>;
 	stopWorkspace(workspaceId: string): Promise<void>;
 	deleteWorkspace(workspaceId: string): Promise<void>;
+	deleteTask(owner: string, taskId: TaskId): Promise<void>;
 }
 
 // RealCoderClient provides a minimal set of methods for interacting with the Coder API.
@@ -405,6 +406,16 @@ export class RealCoderClient implements CoderClient {
 				method: "POST",
 				body: JSON.stringify({ transition: "delete" }),
 			},
+		);
+	}
+
+	/**
+	 * deleteTask deletes a task via Coder's experimental Tasks API.
+	 */
+	async deleteTask(owner: string, taskId: TaskId): Promise<void> {
+		await this.request(
+			`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`,
+			{ method: "DELETE" },
 		);
 	}
 }

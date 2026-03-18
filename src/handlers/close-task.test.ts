@@ -34,8 +34,8 @@ describe("CloseTaskHandler", () => {
 		github = createMockGitHubClient();
 	});
 
-	// AC #7: Stop and delete workspace
-	test("stops and deletes workspace when task exists", async () => {
+	// AC #7: Stop and delete workspace, then delete task
+	test("stops and deletes workspace and task when task exists", async () => {
 		coder.getTask.mockResolvedValue({
 			...mockTask,
 			workspace_id: "ws-1",
@@ -52,6 +52,10 @@ describe("CloseTaskHandler", () => {
 		expect(result.skipped).toBe(false);
 		expect(coder.stopWorkspace).toHaveBeenCalledWith("ws-1");
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
+		expect(coder.deleteTask).toHaveBeenCalledWith(
+			baseInputs.coderUsername,
+			mockTask.id,
+		);
 		expect(github.commentOnIssue).toHaveBeenCalledWith(
 			closeContext.owner,
 			closeContext.repo,
@@ -78,7 +82,7 @@ describe("CloseTaskHandler", () => {
 		expect(coder.deleteWorkspace).not.toHaveBeenCalled();
 	});
 
-	// AC #9: Stop fails, still deletes
+	// AC #9: Stop fails, still deletes workspace and task
 	test("attempts delete even when stop fails", async () => {
 		coder.getTask.mockResolvedValue({
 			...mockTask,
@@ -96,6 +100,33 @@ describe("CloseTaskHandler", () => {
 
 		expect(result.skipped).toBe(false);
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
+		expect(coder.deleteTask).toHaveBeenCalledWith(
+			baseInputs.coderUsername,
+			mockTask.id,
+		);
+	});
+
+	// Edge case: deleteTask fails, still completes
+	test("completes successfully even when deleteTask fails", async () => {
+		coder.getTask.mockResolvedValue({
+			...mockTask,
+			workspace_id: "ws-1",
+		} as never);
+		coder.deleteTask.mockRejectedValue(new CoderAPIError("Not found", 404));
+
+		const handler = new CloseTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			closeContext,
+		);
+		const result = await handler.run();
+
+		expect(result.skipped).toBe(false);
+		expect(coder.deleteTask).toHaveBeenCalledWith(
+			baseInputs.coderUsername,
+			mockTask.id,
+		);
 	});
 
 	// Edge case: already-deleted workspace
