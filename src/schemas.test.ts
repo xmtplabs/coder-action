@@ -10,7 +10,6 @@ describe("parseInputs", () => {
 		action: "create_task",
 		coderURL: "https://coder.example.com",
 		coderToken: "token-123",
-		coderUsername: "coder-agent",
 		coderTaskNamePrefix: "gh",
 		githubToken: "ghp_123",
 		coderGithubUsername: "xmtp-coder-agent",
@@ -94,12 +93,6 @@ describe("parseInputs", () => {
 		if (result.action === "create_task") {
 			expect(result.coderTemplateName).toBe("task-template");
 		}
-	});
-
-	test("applies default coder username when not provided", () => {
-		const { coderUsername: _, ...rest } = baseInputs;
-		const result = parseInputs(rest as unknown);
-		expect(result.coderUsername).toBe("xmtp-coder-agent");
 	});
 
 	test("applies default prefix when not provided", () => {

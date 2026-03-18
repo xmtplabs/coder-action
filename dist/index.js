@@ -26347,7 +26347,6 @@ class GitHubClient {
 var BaseInputsSchema = exports_external.object({
   coderURL: exports_external.string().url(),
   coderToken: exports_external.string().min(1),
-  coderUsername: exports_external.string().min(1).default("xmtp-coder-agent"),
   coderTaskNamePrefix: exports_external.string().min(1).default("gh"),
   githubToken: exports_external.string().min(1),
   coderGithubUsername: exports_external.string().min(1).default("xmtp-coder-agent")
@@ -26738,7 +26737,6 @@ async function run() {
       action: getInput("action", { required: true }),
       coderURL: getInput("coder-url", { required: true }),
       coderToken: getInput("coder-token", { required: true }),
-      coderUsername: getInput("coder-username") || undefined,
       coderTaskNamePrefix: getInput("coder-task-name-prefix") || undefined,
       coderTemplateName: getInput("coder-template-name") || undefined,
       coderTemplatePreset: getInput("coder-template-preset") || undefined,
@@ -26753,12 +26751,20 @@ async function run() {
     const coder = new RealCoderClient(inputs.coderURL, inputs.coderToken);
     const octokit = getOctokit(inputs.githubToken);
     const gh = new GitHubClient(octokit);
+    const sender = requirePayload(context3.payload.sender, "sender");
+    const senderGithubId = sender.id;
+    info(`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`);
+    const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
+    info(`Resolved Coder username: ${coderUser.username}`);
+    const resolvedInputs = {
+      ...inputs,
+      coderUsername: coderUser.username
+    };
     let result;
-    switch (inputs.action) {
+    switch (resolvedInputs.action) {
       case "create_task": {
         const issue2 = requirePayload(context3.payload.issue, "issue");
-        const sender = requirePayload(context3.payload.sender, "sender");
-        const handler2 = new CreateTaskHandler(coder, gh, inputs, {
+        const handler2 = new CreateTaskHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           issueNumber: issue2.number,
@@ -26770,7 +26776,7 @@ async function run() {
       }
       case "close_task": {
         const issue2 = requirePayload(context3.payload.issue, "issue");
-        const handler2 = new CloseTaskHandler(coder, gh, inputs, {
+        const handler2 = new CloseTaskHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           issueNumber: issue2.number
@@ -26781,7 +26787,7 @@ async function run() {
       case "pr_comment": {
         const issue2 = requirePayload(context3.payload.issue, "issue");
         const comment = requirePayload(context3.payload.comment, "comment");
-        const handler2 = new PRCommentHandler(coder, gh, inputs, {
+        const handler2 = new PRCommentHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           prNumber: issue2.number,
@@ -26797,7 +26803,7 @@ async function run() {
       case "issue_comment": {
         const issue2 = requirePayload(context3.payload.issue, "issue");
         const comment = requirePayload(context3.payload.comment, "comment");
-        const handler2 = new IssueCommentHandler(coder, gh, inputs, {
+        const handler2 = new IssueCommentHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           issueNumber: issue2.number,
@@ -26811,7 +26817,7 @@ async function run() {
       }
       case "failed_check": {
         const workflowRun = requirePayload(context3.payload.workflow_run, "workflow_run");
-        const handler2 = new FailedCheckHandler(coder, gh, inputs, {
+        const handler2 = new FailedCheckHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           runId: workflowRun.id,

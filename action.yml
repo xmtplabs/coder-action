@@ -16,10 +16,6 @@ inputs:
   coder-token:
     description: "Coder session token"
     required: true
-  coder-username:
-    description: "Coder username that owns tasks (the designated agent user)"
-    required: false
-    default: "xmtp-coder-agent"
   coder-task-name-prefix:
     description: "Prefix for deterministic task names"
     required: false

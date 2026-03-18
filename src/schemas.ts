@@ -5,7 +5,6 @@ import { z } from "zod";
 const BaseInputsSchema = z.object({
 	coderURL: z.string().url(),
 	coderToken: z.string().min(1),
-	coderUsername: z.string().min(1).default("xmtp-coder-agent"),
 	coderTaskNamePrefix: z.string().min(1).default("gh"),
 	githubToken: z.string().min(1),
 	coderGithubUsername: z.string().min(1).default("xmtp-coder-agent"),
@@ -48,11 +47,25 @@ const ActionInputsSchema = z.discriminatedUnion("action", [
 ]);
 
 export type ActionInputs = z.infer<typeof ActionInputsSchema>;
-export type CreateTaskInputs = z.infer<typeof CreateTaskInputsSchema>;
-export type CloseTaskInputs = z.infer<typeof CloseTaskInputsSchema>;
-export type PRCommentInputs = z.infer<typeof PRCommentInputsSchema>;
-export type IssueCommentInputs = z.infer<typeof IssueCommentInputsSchema>;
-export type FailedCheckInputs = z.infer<typeof FailedCheckInputsSchema>;
+
+// Resolved types include coderUsername, which is resolved at runtime from GitHub sender ID
+type WithCoderUsername<T> = T & { coderUsername: string };
+export type CreateTaskInputs = WithCoderUsername<
+	z.infer<typeof CreateTaskInputsSchema>
+>;
+export type CloseTaskInputs = WithCoderUsername<
+	z.infer<typeof CloseTaskInputsSchema>
+>;
+export type PRCommentInputs = WithCoderUsername<
+	z.infer<typeof PRCommentInputsSchema>
+>;
+export type IssueCommentInputs = WithCoderUsername<
+	z.infer<typeof IssueCommentInputsSchema>
+>;
+export type FailedCheckInputs = WithCoderUsername<
+	z.infer<typeof FailedCheckInputsSchema>
+>;
+export type ResolvedInputs = WithCoderUsername<ActionInputs>;
 
 export function parseInputs(raw: unknown): ActionInputs {
 	return ActionInputsSchema.parse(raw);
