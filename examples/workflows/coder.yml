@@ -5,8 +5,14 @@ on:
     types: [assigned, closed]
   issue_comment:
     types: [created]
+  workflow_run:
+    # List the exact names of CI workflows to monitor.
+    # These must match the `name:` field in each workflow file.
+    workflows: ["CI", "Tests", "Lint"]
+    types: [completed]
 
 permissions:
+  actions: read
   issues: write
   pull-requests: read
   contents: read
@@ -81,6 +87,22 @@ jobs:
         uses: xmtplabs/coder-action@v0
         with:
           action: issue_comment
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
+
+  # ─── Failed Check Forwarding ────────────────────────────────────
+  # Triggered when a monitored CI workflow fails
+  failed-check:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Forward Failed Check to Coder Task
+        uses: xmtplabs/coder-action@v0
+        with:
+          action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
           github-token: ${{ github.token }}
