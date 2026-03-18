@@ -4,9 +4,11 @@ import { GitHubClient } from "./github-client";
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {
 		rest: {
-			orgs: {
-				checkMembershipForUser: mock(() => Promise.resolve({ status: 204 })),
-				...(overrides.orgs as Record<string, unknown>),
+			repos: {
+				getCollaboratorPermissionLevel: mock(() =>
+					Promise.resolve({ data: { permission: "write" } }),
+				),
+				...(overrides.repos as Record<string, unknown>),
 			},
 			issues: {
 				listComments: mock(() => Promise.resolve({ data: [] })),
@@ -42,35 +44,59 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 }
 
 describe("GitHubClient", () => {
-	describe("checkOrgMembership", () => {
-		test("returns true for org members", async () => {
+	describe("checkActorPermission", () => {
+		test("returns true for users with write access", async () => {
 			const octokit = createMockOctokit();
 			const client = new GitHubClient(octokit);
-			const result = await client.checkOrgMembership("xmtp", "member-user");
+			const result = await client.checkActorPermission("org", "repo", "writer");
 			expect(result).toBe(true);
 		});
 
-		test("returns false for non-members (404)", async () => {
+		test("returns true for admins", async () => {
 			const octokit = createMockOctokit({
-				orgs: {
-					checkMembershipForUser: mock(() => Promise.reject({ status: 404 })),
+				repos: {
+					getCollaboratorPermissionLevel: mock(() =>
+						Promise.resolve({ data: { permission: "admin" } }),
+					),
 				},
 			});
 			const client = new GitHubClient(octokit);
-			const result = await client.checkOrgMembership("xmtp", "outsider");
+			const result = await client.checkActorPermission(
+				"org",
+				"repo",
+				"admin-user",
+			);
+			expect(result).toBe(true);
+		});
+
+		test("returns false for read-only users", async () => {
+			const octokit = createMockOctokit({
+				repos: {
+					getCollaboratorPermissionLevel: mock(() =>
+						Promise.resolve({ data: { permission: "read" } }),
+					),
+				},
+			});
+			const client = new GitHubClient(octokit);
+			const result = await client.checkActorPermission("org", "repo", "reader");
 			expect(result).toBe(false);
 		});
 
-		test("throws on 403 (insufficient token permissions)", async () => {
+		test("returns false when user not found (404)", async () => {
 			const octokit = createMockOctokit({
-				orgs: {
-					checkMembershipForUser: mock(() => Promise.reject({ status: 403 })),
+				repos: {
+					getCollaboratorPermissionLevel: mock(() =>
+						Promise.reject({ status: 404 }),
+					),
 				},
 			});
 			const client = new GitHubClient(octokit);
-			expect(client.checkOrgMembership("xmtp", "user")).rejects.toThrow(
-				/insufficient permissions/i,
+			const result = await client.checkActorPermission(
+				"org",
+				"repo",
+				"outsider",
 			);
+			expect(result).toBe(false);
 		});
 	});
 

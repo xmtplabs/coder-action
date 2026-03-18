@@ -17,7 +17,6 @@ const baseInputs: CreateTaskInputs = {
 	coderTemplateName: "task-template",
 	coderOrganization: "default",
 	githubToken: "ghp_123",
-	githubOrg: "xmtp",
 	coderGithubUsername: "xmtp-coder-agent",
 };
 
@@ -40,7 +39,7 @@ describe("CreateTaskHandler", () => {
 
 	// AC #1: Create task and post comment
 	test("creates task and comments on issue for org member", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
 
@@ -58,9 +57,9 @@ describe("CreateTaskHandler", () => {
 		expect(github.commentOnIssue).toHaveBeenCalledTimes(1);
 	});
 
-	// AC #2: Non-org member rejected
-	test("skips for non-org member", async () => {
-		github.checkOrgMembership.mockResolvedValue(false);
+	// AC #2: Unauthorized actor rejected
+	test("skips for actor without write access", async () => {
+		github.checkActorPermission.mockResolvedValue(false);
 
 		const handler = new CreateTaskHandler(
 			coder,
@@ -71,13 +70,13 @@ describe("CreateTaskHandler", () => {
 		const result = await handler.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toBe("non-org-member");
+		expect(result.skipReason).toBe("insufficient-permissions");
 		expect(coder.createTask).not.toHaveBeenCalled();
 	});
 
 	// AC #4: Issue URL appended to prompt
 	test("appends issue URL to prompt", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
 
@@ -103,7 +102,7 @@ describe("CreateTaskHandler", () => {
 
 	// AC #4: Default prompt when none provided
 	test("uses default prompt when none provided", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
 
@@ -124,7 +123,7 @@ describe("CreateTaskHandler", () => {
 
 	// AC #5: Existing running task
 	test("skips creation when task already running", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(mockTask as never);
 
 		const handler = new CreateTaskHandler(
@@ -142,7 +141,7 @@ describe("CreateTaskHandler", () => {
 
 	// AC #6: Existing stopped task — restart
 	test("restarts stopped task", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(mockStoppedTask as never);
 
 		const handler = new CreateTaskHandler(
@@ -160,7 +159,7 @@ describe("CreateTaskHandler", () => {
 
 	// AC #25: Deterministic naming
 	test("uses deterministic task name", async () => {
-		github.checkOrgMembership.mockResolvedValue(true);
+		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
 

@@ -48,7 +48,6 @@ jobs:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
           prompt: |
             You are an autonomous AI agent. Resolve the GitHub issue below.
             Read the issue, develop a plan, post it as a comment, then implement and open a PR.
@@ -65,7 +64,6 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 
   pr-comment:
     runs-on: ubuntu-latest
@@ -82,7 +80,6 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 
   issue-comment:
     runs-on: ubuntu-latest
@@ -98,7 +95,6 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 ```
 
 ### `.github/workflows/coder-failed-checks.yml`
@@ -130,7 +126,6 @@ jobs:
           action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 ```
 
 ## Inputs
@@ -141,13 +136,12 @@ jobs:
 | `coder-url` | Yes | — | Coder deployment URL |
 | `coder-token` | Yes | — | Coder API session token |
 | `coder-username` | No | `xmtp-coder-agent` | Coder username that owns tasks |
-| `github-token` | Yes | — | GitHub token for API operations |
+| `github-token` | No | `GITHUB_TOKEN` | GitHub token for API operations (auto-detected from environment) |
 | `coder-task-name-prefix` | No | `gh` | Prefix for deterministic task names |
 | `coder-template-name` | No | `task-template` | Coder template for workspace creation (`create_task` only) |
 | `coder-template-preset` | No | — | Template preset to use (`create_task` only) |
 | `coder-organization` | No | `default` | Coder organization (`create_task` only) |
 | `prompt` | No | — | Custom prompt text — issue URL is always appended (`create_task` only) |
-| `github-org` | No | `xmtp` | GitHub org for membership validation (`create_task` only) |
 | `coder-github-username` | No | `xmtp-coder-agent` | GitHub username of the designated coder agent |
 
 ## Outputs
@@ -158,7 +152,7 @@ jobs:
 | `task-url` | URL to view the task in Coder |
 | `task-status` | Task status after the action completes |
 | `skipped` | `"true"` if the action was skipped |
-| `skip-reason` | Why the action was skipped (e.g., `non-org-member`, `self-comment`, `task-not-found`) |
+| `skip-reason` | Why the action was skipped (e.g., `insufficient-permissions`, `self-comment`, `task-not-found`) |
 
 ## Required Secrets
 
@@ -175,9 +169,9 @@ The `github-token` input uses the default `${{ github.token }}` provided by GitH
 
 Tasks use deterministic names: `{prefix}-{repo}-{issue_number}` (e.g., `gh-libxmtp-42`). This allows any mode to locate the correct task from just the repo name and issue number, without querying the Coder API first.
 
-### Org Membership Validation
+### Permission Validation
 
-When `create_task` runs, it verifies the actor (the person who assigned the issue) is a member of the configured GitHub org. Non-members are rejected with a clear log message. This prevents unauthorized users from spawning Coder tasks.
+When `create_task` runs, it verifies the actor (the person who assigned the issue) has write access to the repository. Users without write access are rejected with a clear log message. This prevents unauthorized users from spawning Coder tasks.
 
 ### Comment Forwarding
 

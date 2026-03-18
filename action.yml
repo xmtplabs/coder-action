@@ -39,12 +39,8 @@ inputs:
     description: "Custom prompt text — issue URL is always appended (create_task only)"
     required: false
   github-token:
-    description: "GitHub token for API operations"
-    required: true
-  github-org:
-    description: "GitHub org for membership validation (create_task only)"
+    description: "GitHub token for API operations. Defaults to the workflow's GITHUB_TOKEN."
     required: false
-    default: "xmtp"
   coder-github-username:
     description: "GitHub username of the designated coder agent"
     required: false

@@ -25,16 +25,17 @@ export class CreateTaskHandler {
 	) {}
 
 	async run(): Promise<ActionOutputs> {
-		// 1. Validate org membership
-		const isMember = await this.github.checkOrgMembership(
-			this.inputs.githubOrg,
+		// 1. Validate actor has write access to the repo
+		const hasAccess = await this.github.checkActorPermission(
+			this.context.owner,
+			this.context.repo,
 			this.context.senderLogin,
 		);
-		if (!isMember) {
+		if (!hasAccess) {
 			core.error(
-				`Actor ${this.context.senderLogin} is not a member of ${this.inputs.githubOrg}, skipping task creation`,
+				`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`,
 			);
-			return { skipped: true, skipReason: "non-org-member" };
+			return { skipped: true, skipReason: "insufficient-permissions" };
 		}
 
 		// 2. Compute task name
