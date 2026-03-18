@@ -1,0 +1,66 @@
+name: "XMTP Coder Action"
+description: "Manage Coder AI task lifecycle from GitHub events"
+author: "XMTP"
+
+branding:
+  icon: cpu
+  color: purple
+
+inputs:
+  action:
+    description: "Action to perform: create_task, close_task, pr_comment, issue_comment, failed_check"
+    required: true
+  coder-url:
+    description: "Coder deployment URL"
+    required: true
+  coder-token:
+    description: "Coder session token"
+    required: true
+  coder-username:
+    description: "Coder username that owns tasks (the designated agent user)"
+    required: true
+  coder-task-name-prefix:
+    description: "Prefix for deterministic task names"
+    required: false
+    default: "gh"
+  coder-template-name:
+    description: "Coder template for workspace creation (create_task only)"
+    required: false
+    default: "task-template"
+  coder-template-preset:
+    description: "Template preset to use (create_task only)"
+    required: false
+  coder-organization:
+    description: "Coder organization (create_task only)"
+    required: false
+    default: "default"
+  prompt:
+    description: "Custom prompt text — issue URL is always appended (create_task only)"
+    required: false
+  github-token:
+    description: "GitHub token for API operations"
+    required: true
+  github-org:
+    description: "GitHub org for membership validation (create_task only)"
+    required: false
+    default: "xmtp"
+  coder-github-username:
+    description: "GitHub username of the designated coder agent"
+    required: false
+    default: "xmtp-coder-agent"
+
+outputs:
+  task-name:
+    description: "The deterministic task name"
+  task-url:
+    description: "URL to view the task in Coder"
+  task-status:
+    description: "Task status after action completes"
+  skipped:
+    description: "Whether the action was skipped"
+  skip-reason:
+    description: "Reason the action was skipped, if applicable"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
