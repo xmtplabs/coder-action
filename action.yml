@@ -37,6 +37,7 @@ inputs:
   github-token:
     description: "GitHub token for API operations. Defaults to the workflow's GITHUB_TOKEN."
     required: false
+    default: ${{ github.token }}
   coder-github-username:
     description: "GitHub username of the designated coder agent"
     required: false
