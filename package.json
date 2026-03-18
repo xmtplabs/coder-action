@@ -1,0 +1,27 @@
+{
+	"name": "xmtp-coder-action",
+	"version": "0.1.0",
+	"description": "GitHub Action to manage Coder AI task lifecycle from GitHub events",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "bun build src/index.ts --outfile dist/index.js --target node --format cjs",
+		"test": "bun test",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint --error-on-warnings .",
+		"typecheck": "tsc --noEmit",
+		"check": "bun run typecheck && bun run lint && bun run format:check && bun test"
+	},
+	"dependencies": {
+		"@actions/core": "^3.0.0",
+		"@actions/github": "^9.0.0",
+		"@octokit/graphql": "^9.0.3",
+		"@octokit/rest": "^22.0.1",
+		"zod": "^3.25.76"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.7",
+		"@types/bun": "latest",
+		"typescript": "^5.9.3"
+	}
+}
