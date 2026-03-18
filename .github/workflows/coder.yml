@@ -26,9 +26,7 @@ jobs:
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
           github-token: ${{ github.token }}
-          prompt: |
-            You are an autonomous AI agent. Resolve the GitHub issue below.
-            Read the issue, develop a plan, post it as a comment, then implement and open a PR.
+          prompt: " "
 
   close-task:
     runs-on: ubuntu-latest
