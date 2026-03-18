@@ -39,6 +39,7 @@ describe("lookupAndEnsureActiveTask", () => {
 			getTask: mock(() =>
 				Promise.resolve({
 					id: "uuid",
+					owner_id: "owner-uuid",
 					name: "gh-repo-42",
 					status: "active",
 					current_state: { state: "idle" },
@@ -48,7 +49,7 @@ describe("lookupAndEnsureActiveTask", () => {
 		};
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
-			"user",
+			undefined,
 			"gh-repo-42",
 		);
 		expect(result).not.toBeNull();
@@ -63,7 +64,7 @@ describe("lookupAndEnsureActiveTask", () => {
 		};
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
-			"user",
+			undefined,
 			"gh-repo-99",
 		);
 		expect(result).toBeNull();
@@ -74,6 +75,7 @@ describe("lookupAndEnsureActiveTask", () => {
 			getTask: mock(() =>
 				Promise.resolve({
 					id: "uuid",
+					owner_id: "owner-uuid",
 					name: "gh-repo-42",
 					status: "paused",
 					current_state: null,
@@ -83,11 +85,15 @@ describe("lookupAndEnsureActiveTask", () => {
 		};
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
-			"user",
+			undefined,
 			"gh-repo-42",
 		);
 		expect(result).not.toBeNull();
-		expect(mockCoder.waitForTaskActive).toHaveBeenCalledTimes(1);
+		expect(mockCoder.waitForTaskActive).toHaveBeenCalledWith(
+			"owner-uuid",
+			"uuid",
+			expect.any(Function),
+		);
 	});
 
 	test("returns null when task is in error state", async () => {
@@ -95,6 +101,7 @@ describe("lookupAndEnsureActiveTask", () => {
 			getTask: mock(() =>
 				Promise.resolve({
 					id: "uuid",
+					owner_id: "owner-uuid",
 					name: "gh-repo-42",
 					status: "error",
 					current_state: null,
@@ -104,7 +111,7 @@ describe("lookupAndEnsureActiveTask", () => {
 		};
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
-			"user",
+			undefined,
 			"gh-repo-42",
 		);
 		expect(result).toBeNull();

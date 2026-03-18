@@ -26163,7 +26163,8 @@ class RealCoderClient {
   }
   async getTask(owner, taskName) {
     try {
-      const allTasksResponse = await this.request(`/api/experimental/tasks?q=${encodeURIComponent(`owner:${owner}`)}`);
+      const query = owner ? `?q=${encodeURIComponent(`owner:${owner}`)}` : "";
+      const allTasksResponse = await this.request(`/api/experimental/tasks${query}`);
       const allTasks = ExperimentalCoderSDKTaskListResponseSchema.parse(allTasksResponse);
       const task = allTasks.tasks.find((t) => t.name === taskName);
       return task ?? null;
@@ -26406,7 +26407,7 @@ async function lookupAndEnsureActiveTask(coder, coderUsername, taskName) {
     return task;
   }
   info(`Task ${taskName} is ${task.status}, waiting for active state...`);
-  await coder.waitForTaskActive(coderUsername, task.id, debug);
+  await coder.waitForTaskActive(task.owner_id, task.id, debug);
   return task;
 }
 
@@ -26616,7 +26617,7 @@ class PRCommentHandler {
       timestamp: this.context.commentCreatedAt,
       body: this.context.commentBody
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26649,7 +26650,7 @@ class IssueCommentHandler {
       timestamp: this.context.commentCreatedAt,
       body: this.context.commentBody
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26715,7 +26716,7 @@ class FailedCheckHandler {
       workflowFile: this.context.workflowFile,
       failedJobs: jobsWithLogs
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Failed check details forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26748,12 +26749,8 @@ async function run() {
     const coder = new RealCoderClient(inputs.coderURL, inputs.coderToken);
     const octokit = getOctokit(inputs.githubToken);
     const gh = new GitHubClient(octokit);
-    const coderUsernameInput = getInput("coder-username") || undefined;
     let coderUsername;
-    if (coderUsernameInput) {
-      info(`Using configured Coder username: ${coderUsernameInput}`);
-      coderUsername = coderUsernameInput;
-    } else {
+    if (inputs.action === "create_task") {
       const sender2 = requirePayload(context3.payload.sender, "sender");
       const senderGithubId = sender2.id;
       info(`Resolving Coder user for GitHub user ${sender2.login} (ID: ${senderGithubId})`);

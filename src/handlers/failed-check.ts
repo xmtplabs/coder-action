@@ -123,7 +123,7 @@ export class FailedCheckHandler {
 			workflowFile: this.context.workflowFile,
 			failedJobs: jobsWithLogs,
 		});
-		await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Failed check details forwarded to task ${taskName}`);
 
 		return { taskName, taskStatus: task.status, skipped: false };

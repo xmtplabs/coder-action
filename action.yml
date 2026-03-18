@@ -42,9 +42,6 @@ inputs:
     description: "GitHub username of the designated coder agent"
     required: false
     default: "xmtp-coder-agent"
-  coder-username:
-    description: "Coder username to use for task operations. If not provided, it will be resolved from the GitHub sender's linked Coder account."
-    required: false
 
 outputs:
   task-name:

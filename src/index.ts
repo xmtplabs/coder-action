@@ -48,16 +48,13 @@ async function run(): Promise<void> {
 		const octokit = github.getOctokit(inputs.githubToken);
 		const gh = new GitHubClient(octokit);
 
-		// Determine the Coder username to use for task operations.
-		// If coder-username is explicitly configured, use it directly — this is
-		// necessary when the GitHub event sender (e.g. a bot) has no Coder account.
-		// Otherwise, resolve it dynamically from the GitHub sender's linked Coder account.
-		const coderUsernameInput = core.getInput("coder-username") || undefined;
-		let coderUsername: string;
-		if (coderUsernameInput) {
-			core.info(`Using configured Coder username: ${coderUsernameInput}`);
-			coderUsername = coderUsernameInput;
-		} else {
+		// Resolve the Coder username only for create_task, where the task must be
+		// created under a specific user's account. For all other actions the task
+		// owner is determined from the task object itself after lookup, so no
+		// upfront user resolution is needed — and the GitHub sender may be a bot
+		// with no Coder account.
+		let coderUsername: string | undefined;
+		if (inputs.action === "create_task") {
 			const sender = requirePayload(context.payload.sender, "sender");
 			const senderGithubId = sender.id as number;
 			core.info(
@@ -68,7 +65,6 @@ async function run(): Promise<void> {
 			coderUsername = coderUser.username;
 		}
 
-		// Build resolved inputs with the determined Coder username
 		const resolvedInputs: ResolvedInputs = {
 			...inputs,
 			coderUsername,

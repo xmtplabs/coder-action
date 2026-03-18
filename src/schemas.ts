@@ -48,8 +48,10 @@ const ActionInputsSchema = z.discriminatedUnion("action", [
 
 export type ActionInputs = z.infer<typeof ActionInputsSchema>;
 
-// Resolved types include coderUsername, which is resolved at runtime from GitHub sender ID
-type WithCoderUsername<T> = T & { coderUsername: string };
+// Resolved types include coderUsername, which is resolved at runtime from GitHub sender ID.
+// It is only required for create_task (where the task is created under a specific user's account);
+// other actions derive the owner from the task itself after lookup.
+type WithCoderUsername<T> = T & { coderUsername?: string };
 export type CreateTaskInputs = WithCoderUsername<
 	z.infer<typeof CreateTaskInputsSchema>
 >;
