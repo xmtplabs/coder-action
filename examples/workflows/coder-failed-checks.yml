@@ -27,5 +27,4 @@ jobs:
           action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-username: ${{ secrets.CODER_USERNAME }}
-          github-token: ${{ secrets.CODER_GH_PAT }}
+          github-token: ${{ github.token }}
