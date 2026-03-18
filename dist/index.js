@@ -26227,6 +26227,12 @@ class RealCoderClient {
       body: JSON.stringify({ transition: "delete" })
     });
   }
+  async deleteTask(owner, taskId) {
+    if (!owner) {
+      throw new Error("Cannot delete task: owner username is unknown");
+    }
+    await this.request(`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+  }
 }
 
 // src/github-client.ts
@@ -26519,6 +26525,11 @@ class CloseTaskHandler {
       await this.coder.deleteWorkspace(workspaceId);
     } catch (error2) {
       warning(`Failed to delete workspace: ${error2}`);
+    }
+    try {
+      await this.coder.deleteTask(this.inputs.coderUsername, task.id);
+    } catch (error2) {
+      warning(`Failed to delete task: ${error2}`);
     }
     await this.github.commentOnIssue(this.context.owner, this.context.repo, this.context.issueNumber, "Task completed.", "Task created:");
     return { taskName, taskStatus: "deleted", skipped: false };
