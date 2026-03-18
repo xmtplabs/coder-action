@@ -42,7 +42,6 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 
   pr-comment:
     runs-on: ubuntu-latest
@@ -59,7 +58,6 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
 
   issue-comment:
     runs-on: ubuntu-latest
@@ -75,4 +73,3 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-          github-token: ${{ github.token }}
