@@ -26228,6 +26228,9 @@ class RealCoderClient {
     });
   }
   async deleteTask(owner, taskId) {
+    if (!owner) {
+      throw new Error("Cannot delete task: owner username is unknown");
+    }
     await this.request(`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`, { method: "DELETE" });
   }
 }
