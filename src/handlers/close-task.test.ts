@@ -52,7 +52,13 @@ describe("CloseTaskHandler", () => {
 		expect(result.skipped).toBe(false);
 		expect(coder.stopWorkspace).toHaveBeenCalledWith("ws-1");
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
-		expect(github.commentOnIssue).toHaveBeenCalledTimes(1);
+		expect(github.commentOnIssue).toHaveBeenCalledWith(
+			closeContext.owner,
+			closeContext.repo,
+			closeContext.issueNumber,
+			"Task completed.",
+			"Task created:",
+		);
 	});
 
 	// AC #8: No task found

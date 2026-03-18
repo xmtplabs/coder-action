@@ -61,8 +61,8 @@ export class CloseTaskHandler {
 			this.context.owner,
 			this.context.repo,
 			this.context.issueNumber,
-			`Coder task ${taskName} cleaned up.`,
-			"Coder task",
+			"Task completed.",
+			"Task created:",
 		);
 
 		return { taskName, taskStatus: "deleted", skipped: false };
