@@ -13,9 +13,6 @@ export interface IssueContext {
 	senderLogin: string;
 }
 
-const DEFAULT_PROMPT =
-	"Resolve the GitHub issue linked below. Read the issue, develop a plan, post it as a comment, then implement and open a PR.";
-
 export class CreateTaskHandler {
 	constructor(
 		private readonly coder: CoderClient,
@@ -79,8 +76,9 @@ export class CreateTaskHandler {
 		}
 
 		// 4. Build prompt
-		const promptText = this.inputs.prompt ?? DEFAULT_PROMPT;
-		const fullPrompt = `${promptText}\n\n${this.context.issueUrl}`;
+		const fullPrompt = this.inputs.prompt
+			? `${this.inputs.prompt}\n\n${this.context.issueUrl}`
+			: this.context.issueUrl;
 
 		// 5. Get template and create task
 		const template = await this.coder.getTemplateByOrganizationAndName(

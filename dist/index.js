@@ -26411,8 +26411,6 @@ async function lookupAndEnsureActiveTask(coder, coderUsername, taskName) {
 }
 
 // src/handlers/create-task.ts
-var DEFAULT_PROMPT = "Resolve the GitHub issue linked below. Read the issue, develop a plan, post it as a comment, then implement and open a PR.";
-
 class CreateTaskHandler {
   coder;
   github;
@@ -26447,10 +26445,9 @@ class CreateTaskHandler {
         skipped: false
       };
     }
-    const promptText = this.inputs.prompt ?? DEFAULT_PROMPT;
-    const fullPrompt = `${promptText}
+    const fullPrompt = this.inputs.prompt ? `${this.inputs.prompt}
 
-${this.context.issueUrl}`;
+${this.context.issueUrl}` : this.context.issueUrl;
     const template = await this.coder.getTemplateByOrganizationAndName(this.inputs.coderOrganization, this.inputs.coderTemplateName);
     const presets = await this.coder.getTemplateVersionPresets(template.active_version_id);
     let presetId;
