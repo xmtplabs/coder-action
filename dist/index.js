@@ -26163,7 +26163,8 @@ class RealCoderClient {
   }
   async getTask(owner, taskName) {
     try {
-      const allTasksResponse = await this.request(`/api/experimental/tasks?q=${encodeURIComponent(`owner:${owner}`)}`);
+      const query = owner ? `?q=${encodeURIComponent(`owner:${owner}`)}` : "";
+      const allTasksResponse = await this.request(`/api/experimental/tasks${query}`);
       const allTasks = ExperimentalCoderSDKTaskListResponseSchema.parse(allTasksResponse);
       const task = allTasks.tasks.find((t) => t.name === taskName);
       return task ?? null;
@@ -26406,7 +26407,7 @@ async function lookupAndEnsureActiveTask(coder, coderUsername, taskName) {
     return task;
   }
   info(`Task ${taskName} is ${task.status}, waiting for active state...`);
-  await coder.waitForTaskActive(coderUsername, task.id, debug);
+  await coder.waitForTaskActive(task.owner_id, task.id, debug);
   return task;
 }
 
@@ -26423,6 +26424,10 @@ class CreateTaskHandler {
     this.context = context3;
   }
   async run() {
+    const coderUsername = this.inputs.coderUsername;
+    if (!coderUsername) {
+      throw new Error("coderUsername is required for create_task");
+    }
     const hasAccess = await this.github.checkActorPermission(this.context.owner, this.context.repo, this.context.senderLogin);
     if (!hasAccess) {
       error(`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`);
@@ -26431,13 +26436,13 @@ class CreateTaskHandler {
     const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);
     info(`Task name: ${taskName}`);
     const parsedName = TaskNameSchema.parse(taskName);
-    const existingTask = await this.coder.getTask(this.inputs.coderUsername, parsedName);
+    const existingTask = await this.coder.getTask(coderUsername, parsedName);
     if (existingTask) {
       info(`Task ${taskName} already exists (status: ${existingTask.status})`);
       if (existingTask.status !== "active" || existingTask.current_state?.state !== "idle") {
-        await this.coder.waitForTaskActive(this.inputs.coderUsername, existingTask.id, debug);
+        await this.coder.waitForTaskActive(coderUsername, existingTask.id, debug);
       }
-      const taskUrl2 = this.generateTaskUrl(String(existingTask.id));
+      const taskUrl2 = this.generateTaskUrl(coderUsername, String(existingTask.id));
       return {
         taskName,
         taskUrl: taskUrl2,
@@ -26460,13 +26465,13 @@ ${this.context.issueUrl}` : this.context.issueUrl;
       const defaultPreset = presets.find((p) => p.Default);
       presetId = defaultPreset?.ID;
     }
-    const createdTask = await this.coder.createTask(this.inputs.coderUsername, {
+    const createdTask = await this.coder.createTask(coderUsername, {
       name: taskName,
       template_version_id: template.active_version_id,
       template_version_preset_id: presetId,
       input: fullPrompt
     });
-    const taskUrl = this.generateTaskUrl(String(createdTask.id));
+    const taskUrl = this.generateTaskUrl(coderUsername, String(createdTask.id));
     info(`Task created: ${taskUrl}`);
     await this.github.commentOnIssue(this.context.owner, this.context.repo, this.context.issueNumber, `Task created: ${taskUrl}`, "Task created:");
     return {
@@ -26476,9 +26481,9 @@ ${this.context.issueUrl}` : this.context.issueUrl;
       skipped: false
     };
   }
-  generateTaskUrl(taskId) {
+  generateTaskUrl(coderUsername, taskId) {
     const baseURL = this.inputs.coderURL.replace(/\/$/, "");
-    return `${baseURL}/tasks/${this.inputs.coderUsername}/${taskId}`;
+    return `${baseURL}/tasks/${coderUsername}/${taskId}`;
   }
 }
 
@@ -26616,7 +26621,7 @@ class PRCommentHandler {
       timestamp: this.context.commentCreatedAt,
       body: this.context.commentBody
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26649,7 +26654,7 @@ class IssueCommentHandler {
       timestamp: this.context.commentCreatedAt,
       body: this.context.commentBody
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26715,7 +26720,7 @@ class FailedCheckHandler {
       workflowFile: this.context.workflowFile,
       failedJobs: jobsWithLogs
     });
-    await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Failed check details forwarded to task ${taskName}`);
     return { taskName, taskStatus: task.status, skipped: false };
   }
@@ -26748,25 +26753,30 @@ async function run() {
     const coder = new RealCoderClient(inputs.coderURL, inputs.coderToken);
     const octokit = getOctokit(inputs.githubToken);
     const gh = new GitHubClient(octokit);
-    const sender = requirePayload(context3.payload.sender, "sender");
-    const senderGithubId = sender.id;
-    info(`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`);
-    const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
-    info(`Resolved Coder username: ${coderUser.username}`);
+    let coderUsername;
+    if (inputs.action === "create_task") {
+      const sender = requirePayload(context3.payload.sender, "sender");
+      const senderGithubId = sender.id;
+      info(`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`);
+      const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
+      info(`Resolved Coder username: ${coderUser.username}`);
+      coderUsername = coderUser.username;
+    }
     const resolvedInputs = {
       ...inputs,
-      coderUsername: coderUser.username
+      coderUsername
     };
     let result;
     switch (resolvedInputs.action) {
       case "create_task": {
         const issue2 = requirePayload(context3.payload.issue, "issue");
+        const taskSender = requirePayload(context3.payload.sender, "sender");
         const handler2 = new CreateTaskHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           issueNumber: issue2.number,
           issueUrl: issue2.html_url,
-          senderLogin: sender.login
+          senderLogin: taskSender.login
         });
         result = await handler2.run();
         break;

@@ -145,7 +145,7 @@ export interface CoderClient {
 		templateVersionId: string,
 	): Promise<CoderSDKTemplateVersionPresetsResponse>;
 	getTask(
-		owner: string,
+		owner: string | undefined,
 		taskName: TaskName,
 	): Promise<ExperimentalCoderSDKTask | null>;
 	getTaskById(owner: string, taskId: TaskId): Promise<ExperimentalCoderSDKTask>;
@@ -272,12 +272,13 @@ export class RealCoderClient implements CoderClient {
 	 * Returns null if the task does not exist.
 	 */
 	async getTask(
-		owner: string,
+		owner: string | undefined,
 		taskName: TaskName,
 	): Promise<ExperimentalCoderSDKTask | null> {
 		try {
+			const query = owner ? `?q=${encodeURIComponent(`owner:${owner}`)}` : "";
 			const allTasksResponse = await this.request<unknown>(
-				`/api/experimental/tasks?q=${encodeURIComponent(`owner:${owner}`)}`,
+				`/api/experimental/tasks${query}`,
 			);
 			const allTasks =
 				ExperimentalCoderSDKTaskListResponseSchema.parse(allTasksResponse);

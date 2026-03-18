@@ -53,7 +53,7 @@ export class IssueCommentHandler {
 			timestamp: this.context.commentCreatedAt,
 			body: this.context.commentBody,
 		});
-		await this.coder.sendTaskInput(this.inputs.coderUsername, task.id, message);
+		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Comment forwarded to task ${taskName}`);
 
 		return { taskName, taskStatus: task.status, skipped: false };

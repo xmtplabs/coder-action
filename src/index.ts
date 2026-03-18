@@ -48,21 +48,26 @@ async function run(): Promise<void> {
 		const octokit = github.getOctokit(inputs.githubToken);
 		const gh = new GitHubClient(octokit);
 
-		// Resolve the Coder username from the GitHub sender's ID.
-		// The sender is the person who triggered the workflow (e.g. assigned the issue).
-		// Their GitHub account is linked to Coder via GitHub OAuth.
-		const sender = requirePayload(context.payload.sender, "sender");
-		const senderGithubId = sender.id as number;
-		core.info(
-			`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`,
-		);
-		const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
-		core.info(`Resolved Coder username: ${coderUser.username}`);
+		// Resolve the Coder username only for create_task, where the task must be
+		// created under a specific user's account. For all other actions the task
+		// owner is determined from the task object itself after lookup, so no
+		// upfront user resolution is needed — and the GitHub sender may be a bot
+		// with no Coder account.
+		let coderUsername: string | undefined;
+		if (inputs.action === "create_task") {
+			const sender = requirePayload(context.payload.sender, "sender");
+			const senderGithubId = sender.id as number;
+			core.info(
+				`Resolving Coder user for GitHub user ${sender.login} (ID: ${senderGithubId})`,
+			);
+			const coderUser = await coder.getCoderUserByGitHubId(senderGithubId);
+			core.info(`Resolved Coder username: ${coderUser.username}`);
+			coderUsername = coderUser.username;
+		}
 
-		// Override coderUsername with the resolved value
 		const resolvedInputs: ResolvedInputs = {
 			...inputs,
-			coderUsername: coderUser.username,
+			coderUsername,
 		};
 
 		let result: ActionOutputs;
@@ -70,12 +75,13 @@ async function run(): Promise<void> {
 		switch (resolvedInputs.action) {
 			case "create_task": {
 				const issue = requirePayload(context.payload.issue, "issue");
+				const taskSender = requirePayload(context.payload.sender, "sender");
 				const handler = new CreateTaskHandler(coder, gh, resolvedInputs, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					issueNumber: issue.number,
 					issueUrl: issue.html_url as string,
-					senderLogin: sender.login as string,
+					senderLogin: taskSender.login as string,
 				});
 				result = await handler.run();
 				break;

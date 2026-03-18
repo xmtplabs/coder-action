@@ -28,7 +28,7 @@ export function parseIssueURL(url: string): {
 
 export async function lookupAndEnsureActiveTask(
 	coder: CoderClient,
-	coderUsername: string,
+	coderUsername: string | undefined,
 	taskName: string,
 ): Promise<ExperimentalCoderSDKTask | null> {
 	const parsedName = TaskNameSchema.parse(taskName);
@@ -46,7 +46,9 @@ export async function lookupAndEnsureActiveTask(
 		return task;
 	}
 
+	// Use task.owner_id (UUID) as the owner identifier — Coder accepts both
+	// usernames and UUIDs for user-scoped API paths.
 	core.info(`Task ${taskName} is ${task.status}, waiting for active state...`);
-	await coder.waitForTaskActive(coderUsername, task.id, core.debug);
+	await coder.waitForTaskActive(task.owner_id, task.id, core.debug);
 	return task;
 }
