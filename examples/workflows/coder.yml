@@ -1,0 +1,90 @@
+name: Coder Agent
+
+on:
+  issues:
+    types: [assigned, closed]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  # ─── Task Creation ─────────────────────────────────────────────
+  # Triggered when an issue is assigned to the coder agent
+  create-task:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'issues'
+      && github.event.action == 'assigned'
+      && github.event.assignee.login == 'xmtp-coder-agent'
+    steps:
+      - name: Create Coder Task
+        uses: xmtplabs/coder-action@v0
+        with:
+          action: create_task
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          coder-username: ${{ secrets.CODER_USERNAME }}
+          github-token: ${{ secrets.CODER_GH_PAT }}
+          prompt: |
+            You are an autonomous AI agent. Resolve the GitHub issue below.
+            Read the issue, develop a plan, post it as a comment, then implement and open a PR.
+
+  # ─── Task Cleanup ───────────────────────────────────────────────
+  # Triggered when an issue is closed — stops and deletes the Coder task
+  close-task:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'issues'
+      && github.event.action == 'closed'
+    steps:
+      - name: Close Coder Task
+        uses: xmtplabs/coder-action@v0
+        with:
+          action: close_task
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          coder-username: ${{ secrets.CODER_USERNAME }}
+          github-token: ${{ secrets.CODER_GH_PAT }}
+
+  # ─── PR Comment Forwarding ─────────────────────────────────────
+  # Triggered when someone comments on a PR authored by the coder agent
+  pr-comment:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'issue_comment'
+      && github.event.action == 'created'
+      && github.event.issue.pull_request
+      && github.event.issue.user.login == 'xmtp-coder-agent'
+      && github.event.comment.user.login != 'xmtp-coder-agent'
+    steps:
+      - name: Forward PR Comment to Coder Task
+        uses: xmtplabs/coder-action@v0
+        with:
+          action: pr_comment
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          coder-username: ${{ secrets.CODER_USERNAME }}
+          github-token: ${{ secrets.CODER_GH_PAT }}
+
+  # ─── Issue Comment Forwarding ──────────────────────────────────
+  # Triggered when someone comments on an issue (not a PR)
+  issue-comment:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'issue_comment'
+      && github.event.action == 'created'
+      && !github.event.issue.pull_request
+      && github.event.comment.user.login != 'xmtp-coder-agent'
+    steps:
+      - name: Forward Issue Comment to Coder Task
+        uses: xmtplabs/coder-action@v0
+        with:
+          action: issue_comment
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          coder-username: ${{ secrets.CODER_USERNAME }}
+          github-token: ${{ secrets.CODER_GH_PAT }}
