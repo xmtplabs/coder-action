@@ -26054,7 +26054,7 @@ var CoderSDKTemplateVersionPresetSchema = exports_external.object({
   Name: exports_external.string(),
   Default: exports_external.boolean()
 });
-var CoderSDKTemplateVersionPresetsResponseSchema = exports_external.array(CoderSDKTemplateVersionPresetSchema);
+var CoderSDKTemplateVersionPresetsResponseSchema = exports_external.array(CoderSDKTemplateVersionPresetSchema).nullable().transform((v) => v ?? []);
 var ExperimentalCoderSDKCreateTaskRequestSchema = exports_external.object({
   name: exports_external.string().min(1),
   template_version_id: exports_external.string().min(1),

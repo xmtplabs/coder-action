@@ -46,9 +46,10 @@ export type CoderSDKTemplateVersionPreset = z.infer<
 >;
 
 // CoderSDKTemplateVersionPresetsResponseSchema is the schema for []codersdk.Preset.
-export const CoderSDKTemplateVersionPresetsResponseSchema = z.array(
-	CoderSDKTemplateVersionPresetSchema,
-);
+export const CoderSDKTemplateVersionPresetsResponseSchema = z
+	.array(CoderSDKTemplateVersionPresetSchema)
+	.nullable()
+	.transform((v) => v ?? []);
 export type CoderSDKTemplateVersionPresetsResponse = z.infer<
 	typeof CoderSDKTemplateVersionPresetsResponseSchema
 >;
