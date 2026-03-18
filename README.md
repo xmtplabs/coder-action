@@ -14,11 +14,11 @@ A GitHub Action that manages [Coder](https://coder.com) AI task lifecycle from G
 
 ## Quick Start
 
-Add two workflow files to your repository. Together they handle the full lifecycle.
+Add one workflow file to your repository. It handles the full lifecycle.
 
 ### `.github/workflows/coder.yml`
 
-Handles issue assignment, closure, and comment forwarding.
+Handles issue assignment, closure, comment forwarding, and CI failure detection. **Customize the `workflows` list** under `workflow_run` to match the `name:` field of your CI workflow files.
 
 ```yaml
 name: Coder Agent
@@ -28,8 +28,12 @@ on:
     types: [assigned, closed]
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: ["CI"]  # Change this to match your CI workflow names
+    types: [completed]
 
 permissions:
+  actions: read
   issues: write
   pull-requests: read
   contents: read
@@ -95,30 +99,12 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
-```
 
-### `.github/workflows/coder-failed-checks.yml`
-
-Monitors CI workflows and forwards failures to the agent. **Customize the `workflows` list** to match the `name:` field of your CI workflow files.
-
-```yaml
-name: Coder Failed Check Forwarding
-
-on:
-  workflow_run:
-    workflows: ["CI"]  # Change this to match your CI workflow names
-    types: [completed]
-
-permissions:
-  actions: read
-  issues: write
-  pull-requests: read
-  contents: read
-
-jobs:
   failed-check:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'failure'
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'failure'
     steps:
       - name: Forward Failed Check to Coder Task
         uses: xmtplabs/coder-action@v0
