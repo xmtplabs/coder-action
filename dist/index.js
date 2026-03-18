@@ -26348,6 +26348,14 @@ class GitHubClient {
     return lines.slice(-maxLines).join(`
 `);
   }
+  async addReactionToComment(owner, repo, commentId) {
+    await this.octokit.rest.reactions.createForIssueComment({
+      owner,
+      repo,
+      comment_id: commentId,
+      content: "eyes"
+    });
+  }
 }
 
 // src/schemas.ts
@@ -26634,6 +26642,7 @@ class PRCommentHandler {
     });
     await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
+    await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
     return { taskName, taskStatus: task.status, skipped: false };
   }
 }
@@ -26641,10 +26650,12 @@ class PRCommentHandler {
 // src/handlers/issue-comment.ts
 class IssueCommentHandler {
   coder;
+  github;
   inputs;
   context;
-  constructor(coder, _github, inputs, context3) {
+  constructor(coder, github, inputs, context3) {
     this.coder = coder;
+    this.github = github;
     this.inputs = inputs;
     this.context = context3;
   }
@@ -26667,6 +26678,7 @@ class IssueCommentHandler {
     });
     await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
+    await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
     return { taskName, taskStatus: task.status, skipped: false };
   }
 }
@@ -26811,6 +26823,7 @@ async function run() {
           prNumber: issue2.number,
           prAuthor: issue2.user.login,
           commenterLogin: comment.user.login,
+          commentId: comment.id,
           commentUrl: comment.html_url,
           commentBody: comment.body,
           commentCreatedAt: comment.created_at
@@ -26826,6 +26839,7 @@ async function run() {
           repo: context3.repo.repo,
           issueNumber: issue2.number,
           commenterLogin: comment.user.login,
+          commentId: comment.id,
           commentUrl: comment.html_url,
           commentBody: comment.body,
           commentCreatedAt: comment.created_at
