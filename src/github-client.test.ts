@@ -252,14 +252,14 @@ describe("GitHubClient", () => {
 			const octokit = createMockOctokit();
 			const client = new GitHubClient(octokit);
 			await client.addReactionToComment("org", "repo", 42);
-			expect(
-				octokit.rest.reactions.createForIssueComment,
-			).toHaveBeenCalledWith({
-				owner: "org",
-				repo: "repo",
-				comment_id: 42,
-				content: "eyes",
-			});
+			expect(octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith(
+				{
+					owner: "org",
+					repo: "repo",
+					comment_id: 42,
+					content: "eyes",
+				},
+			);
 		});
 	});
 
