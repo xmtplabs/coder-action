@@ -261,6 +261,20 @@ describe("GitHubClient", () => {
 				},
 			);
 		});
+
+		test("does not throw when reaction API fails", async () => {
+			const octokit = createMockOctokit({
+				reactions: {
+					createForIssueComment: mock(() =>
+						Promise.reject(new Error("Resource not accessible by integration")),
+					),
+				},
+			});
+			const client = new GitHubClient(octokit);
+			await expect(
+				client.addReactionToComment("org", "repo", 42),
+			).resolves.toBeUndefined();
+		});
 	});
 
 	describe("getJobLogs", () => {

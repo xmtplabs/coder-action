@@ -26349,12 +26349,16 @@ class GitHubClient {
 `);
   }
   async addReactionToComment(owner, repo, commentId) {
-    await this.octokit.rest.reactions.createForIssueComment({
-      owner,
-      repo,
-      comment_id: commentId,
-      content: "eyes"
-    });
+    try {
+      await this.octokit.rest.reactions.createForIssueComment({
+        owner,
+        repo,
+        comment_id: commentId,
+        content: "eyes"
+      });
+    } catch (error2) {
+      warning(`Failed to add reaction to comment ${commentId}: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    }
   }
 }
 
