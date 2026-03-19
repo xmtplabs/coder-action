@@ -1,13 +1,6 @@
-const MAX_FAILED_JOBS = 5;
+export const MAX_FAILED_JOBS = 5;
 
-interface PRCommentParams {
-	commentUrl: string;
-	commenter: string;
-	timestamp: string;
-	body: string;
-}
-
-interface IssueCommentParams {
+interface CommentMessageParams {
 	commentUrl: string;
 	commenter: string;
 	timestamp: string;
@@ -22,7 +15,7 @@ interface FailedCheckParams {
 	failedJobs: Array<{ name: string; logs: string }>;
 }
 
-export function formatPRCommentMessage(params: PRCommentParams): string {
+export function formatPRCommentMessage(params: CommentMessageParams): string {
 	return `New Comment on PR: ${params.commentUrl}
 Commenter: ${params.commenter}
 Timestamp: ${params.timestamp}
@@ -39,7 +32,9 @@ If no changes are needed or the comment is invalid, reply to the comment with a 
 ${params.body}`;
 }
 
-export function formatIssueCommentMessage(params: IssueCommentParams): string {
+export function formatIssueCommentMessage(
+	params: CommentMessageParams,
+): string {
 	return `New Comment on Issue: ${params.commentUrl}
 Commenter: ${params.commenter}
 Timestamp: ${params.timestamp}

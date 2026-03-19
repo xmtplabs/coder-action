@@ -173,6 +173,8 @@ export interface CoderClient {
 
 // RealCoderClient provides a minimal set of methods for interacting with the Coder API.
 export class RealCoderClient implements CoderClient {
+	private static readonly POLL_INTERVAL_MS = 2000;
+
 	private readonly headers: Record<string, string>;
 	private readonly fetchFn: typeof fetch;
 
@@ -290,7 +292,7 @@ export class RealCoderClient implements CoderClient {
 				ExperimentalCoderSDKTaskListResponseSchema.parse(allTasksResponse);
 			const task = allTasks.tasks.find((t) => t.name === taskName);
 			return task ?? null;
-		} catch (error) {
+		} catch (error: unknown) {
 			if (error instanceof CoderAPIError && error.statusCode === 404) {
 				return null;
 			}
@@ -329,15 +331,19 @@ export class RealCoderClient implements CoderClient {
 	 * sendTaskInput sends input to an existing task via Coder's experimental Tasks API.
 	 */
 	async sendTaskInput(
-		ownerUsername: string,
+		owner: string,
 		taskId: TaskId,
 		input: string,
 	): Promise<void> {
-		const endpoint = `/api/experimental/tasks/${ownerUsername}/${taskId}/send`;
+		const endpoint = `/api/experimental/tasks/${owner}/${taskId}/send`;
 		await this.request<unknown>(endpoint, {
 			method: "POST",
 			body: JSON.stringify({ input }),
 		});
+	}
+
+	private static sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	/**
@@ -350,7 +356,6 @@ export class RealCoderClient implements CoderClient {
 		timeoutMs = 120000,
 	): Promise<void> {
 		const startTime = Date.now();
-		const pollIntervalMs = 2000;
 
 		while (Date.now() - startTime < timeoutMs) {
 			const task = await this.getTaskById(owner, taskId);
@@ -369,7 +374,7 @@ export class RealCoderClient implements CoderClient {
 				return;
 			}
 
-			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+			await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
 		}
 
 		throw new CoderAPIError(
@@ -416,7 +421,6 @@ export class RealCoderClient implements CoderClient {
 			"deleted",
 		]);
 		const startTime = Date.now();
-		const pollIntervalMs = 2000;
 
 		while (Date.now() - startTime < timeoutMs) {
 			const workspace = await this.getWorkspace(workspaceId);
@@ -427,7 +431,7 @@ export class RealCoderClient implements CoderClient {
 			if (terminalStatuses.has(status)) {
 				return;
 			}
-			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+			await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
 		}
 
 		throw new CoderAPIError(
