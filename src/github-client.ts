@@ -1,3 +1,4 @@
+import * as core from "@actions/core";
 import type { getOctokit } from "@actions/github";
 
 export type Octokit = ReturnType<typeof getOctokit>;
@@ -190,11 +191,17 @@ export class GitHubClient {
 		repo: string,
 		commentId: number,
 	): Promise<void> {
-		await this.octokit.rest.reactions.createForIssueComment({
-			owner,
-			repo,
-			comment_id: commentId,
-			content: "eyes",
-		});
+		try {
+			await this.octokit.rest.reactions.createForIssueComment({
+				owner,
+				repo,
+				comment_id: commentId,
+				content: "eyes",
+			});
+		} catch (error: unknown) {
+			core.warning(
+				`Failed to add reaction to comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
 	}
 }
