@@ -162,6 +162,11 @@ export interface CoderClient {
 	): Promise<void>;
 	getWorkspace(workspaceId: string): Promise<Workspace>;
 	stopWorkspace(workspaceId: string): Promise<void>;
+	waitForWorkspaceStopped(
+		workspaceId: string,
+		logFn: (msg: string) => void,
+		timeoutMs?: number,
+	): Promise<void>;
 	deleteWorkspace(workspaceId: string): Promise<void>;
 	deleteTask(owner: string | undefined, taskId: TaskId): Promise<void>;
 }
@@ -393,6 +398,41 @@ export class RealCoderClient implements CoderClient {
 				method: "POST",
 				body: JSON.stringify({ transition: "stop" }),
 			},
+		);
+	}
+
+	/**
+	 * waitForWorkspaceStopped polls the workspace until it reaches a terminal stopped state or times out.
+	 */
+	async waitForWorkspaceStopped(
+		workspaceId: string,
+		logFn: (msg: string) => void,
+		timeoutMs = 120000,
+	): Promise<void> {
+		const terminalStatuses = new Set([
+			"stopped",
+			"failed",
+			"canceled",
+			"deleted",
+		]);
+		const startTime = Date.now();
+		const pollIntervalMs = 2000;
+
+		while (Date.now() - startTime < timeoutMs) {
+			const workspace = await this.getWorkspace(workspaceId);
+			const status = workspace.latest_build.status;
+			logFn(
+				`waitForWorkspaceStopped: workspace_id: ${workspaceId} status: ${status}`,
+			);
+			if (terminalStatuses.has(status)) {
+				return;
+			}
+			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+		}
+
+		throw new CoderAPIError(
+			`Timeout waiting for workspace to stop (waited ${timeoutMs}ms)`,
+			408,
 		);
 	}
 

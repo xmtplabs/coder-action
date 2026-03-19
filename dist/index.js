@@ -26221,6 +26221,26 @@ class RealCoderClient {
       body: JSON.stringify({ transition: "stop" })
     });
   }
+  async waitForWorkspaceStopped(workspaceId, logFn, timeoutMs = 120000) {
+    const terminalStatuses = new Set([
+      "stopped",
+      "failed",
+      "canceled",
+      "deleted"
+    ]);
+    const startTime = Date.now();
+    const pollIntervalMs = 2000;
+    while (Date.now() - startTime < timeoutMs) {
+      const workspace = await this.getWorkspace(workspaceId);
+      const status = workspace.latest_build.status;
+      logFn(`waitForWorkspaceStopped: workspace_id: ${workspaceId} status: ${status}`);
+      if (terminalStatuses.has(status)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+    throw new CoderAPIError(`Timeout waiting for workspace to stop (waited ${timeoutMs}ms)`, 408);
+  }
   async deleteWorkspace(workspaceId) {
     await this.request(`/api/v2/workspaces/${encodeURIComponent(workspaceId)}/builds`, {
       method: "POST",
@@ -26528,10 +26548,19 @@ class CloseTaskHandler {
     }
     const workspaceId = task.workspace_id;
     info(`Stopping workspace ${workspaceId} for task ${taskName}`);
+    let stopSucceeded = false;
     try {
       await this.coder.stopWorkspace(workspaceId);
+      stopSucceeded = true;
     } catch (error2) {
       warning(`Failed to stop workspace: ${error2}`);
+    }
+    if (stopSucceeded) {
+      try {
+        await this.coder.waitForWorkspaceStopped(workspaceId, info);
+      } catch (error2) {
+        warning(`Timed out waiting for workspace to stop: ${error2}`);
+      }
     }
     try {
       await this.coder.deleteWorkspace(workspaceId);

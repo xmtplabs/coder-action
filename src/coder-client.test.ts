@@ -148,4 +148,60 @@ describe("RealCoderClient", () => {
 			expect(client.getWorkspace("ws-id")).rejects.toThrow(CoderAPIError);
 		});
 	});
+
+	describe("waitForWorkspaceStopped", () => {
+		test("resolves immediately when workspace is already stopped", async () => {
+			const ws = {
+				id: "ws-id",
+				latest_build: { status: "stopped", transition: "stop" },
+			};
+			mockFetch.mockResolvedValueOnce(createMockResponse(ws));
+			const logs: string[] = [];
+			await client.waitForWorkspaceStopped("ws-id", (msg) => logs.push(msg));
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+		});
+
+		test("resolves after workspace transitions to stopped", async () => {
+			const stopping = {
+				id: "ws-id",
+				latest_build: { status: "stopping", transition: "stop" },
+			};
+			const stopped = {
+				id: "ws-id",
+				latest_build: { status: "stopped", transition: "stop" },
+			};
+			mockFetch
+				.mockResolvedValueOnce(createMockResponse(stopping))
+				.mockResolvedValueOnce(createMockResponse(stopped));
+			const logs: string[] = [];
+			await client.waitForWorkspaceStopped(
+				"ws-id",
+				(msg) => logs.push(msg),
+				10000,
+			);
+			expect(mockFetch).toHaveBeenCalledTimes(2);
+		});
+
+		test("resolves when workspace reaches failed status", async () => {
+			const ws = {
+				id: "ws-id",
+				latest_build: { status: "failed", transition: "stop" },
+			};
+			mockFetch.mockResolvedValueOnce(createMockResponse(ws));
+			await client.waitForWorkspaceStopped("ws-id", () => {});
+			expect(mockFetch).toHaveBeenCalledTimes(1);
+		});
+
+		test("throws CoderAPIError on timeout", async () => {
+			const stopping = {
+				id: "ws-id",
+				latest_build: { status: "stopping", transition: "stop" },
+			};
+			// Always return stopping so it times out
+			mockFetch.mockResolvedValue(createMockResponse(stopping));
+			await expect(
+				client.waitForWorkspaceStopped("ws-id", () => {}, 100),
+			).rejects.toThrow(CoderAPIError);
+		});
+	});
 });
