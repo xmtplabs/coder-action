@@ -105,5 +105,6 @@ export function createMockGitHubClient(): {
 		),
 		getJobLogs: mock(() => Promise.resolve("Error: test failed")),
 		addReactionToComment: mock(() => Promise.resolve()),
+		addReactionToReviewComment: mock(() => Promise.resolve()),
 	} as unknown as { [K in keyof GitHubClient]: ReturnType<typeof mock> };
 }

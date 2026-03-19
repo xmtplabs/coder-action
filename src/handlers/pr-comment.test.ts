@@ -198,4 +198,57 @@ describe("PRCommentHandler", () => {
 		)[1];
 		expect(String(taskNameArg)).toBe("gh-libxmtp-42");
 	});
+
+	// Issue #46: PR review comments (inline code comments)
+	describe("review comments (isReviewComment: true)", () => {
+		const reviewContext: PRCommentContext = {
+			...validContext,
+			commentUrl: "https://github.com/xmtp/libxmtp/pull/5/changes#r2962833476",
+			isReviewComment: true,
+		};
+
+		test("forwards review comment to task", async () => {
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				reviewContext,
+			);
+			const result = await handler.run();
+
+			expect(result.skipped).toBe(false);
+			expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+		});
+
+		test("adds 👀 reaction via review comment endpoint", async () => {
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				reviewContext,
+			);
+			await handler.run();
+
+			expect(github.addReactionToReviewComment).toHaveBeenCalledTimes(1);
+			expect(github.addReactionToReviewComment).toHaveBeenCalledWith(
+				"xmtp",
+				"libxmtp",
+				1,
+			);
+			expect(github.addReactionToComment).not.toHaveBeenCalled();
+		});
+
+		test("uses issue comment endpoint for regular PR comments", async () => {
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				validContext,
+			);
+			await handler.run();
+
+			expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
+			expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
+		});
+	});
 });
