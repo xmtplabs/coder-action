@@ -44,10 +44,21 @@ export class CloseTaskHandler {
 		core.info(`Stopping workspace ${workspaceId} for task ${taskName}`);
 
 		// Stop workspace — continue even if this fails
+		let stopSucceeded = false;
 		try {
 			await this.coder.stopWorkspace(workspaceId);
+			stopSucceeded = true;
 		} catch (error) {
 			core.warning(`Failed to stop workspace: ${error}`);
+		}
+
+		// Wait for workspace to reach stopped state before deleting — continue even if this times out
+		if (stopSucceeded) {
+			try {
+				await this.coder.waitForWorkspaceStopped(workspaceId, core.info);
+			} catch (error) {
+				core.warning(`Timed out waiting for workspace to stop: ${error}`);
+			}
 		}
 
 		// Delete workspace — continue even if this fails

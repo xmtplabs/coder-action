@@ -69,6 +69,7 @@ export class MockCoderClient implements CoderClient {
 		}),
 	);
 	stopWorkspace = mock(() => Promise.resolve());
+	waitForWorkspaceStopped = mock(() => Promise.resolve());
 	deleteWorkspace = mock(() => Promise.resolve());
 	deleteTask = mock(() => Promise.resolve());
 }
