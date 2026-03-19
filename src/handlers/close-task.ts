@@ -48,7 +48,7 @@ export class CloseTaskHandler {
 		try {
 			await this.coder.stopWorkspace(workspaceId);
 			stopSucceeded = true;
-		} catch (error) {
+		} catch (error: unknown) {
 			core.warning(`Failed to stop workspace: ${error}`);
 		}
 
@@ -56,7 +56,7 @@ export class CloseTaskHandler {
 		if (stopSucceeded) {
 			try {
 				await this.coder.waitForWorkspaceStopped(workspaceId, core.info);
-			} catch (error) {
+			} catch (error: unknown) {
 				core.warning(`Timed out waiting for workspace to stop: ${error}`);
 			}
 		}
@@ -64,14 +64,14 @@ export class CloseTaskHandler {
 		// Delete workspace — continue even if this fails
 		try {
 			await this.coder.deleteWorkspace(workspaceId);
-		} catch (error) {
+		} catch (error: unknown) {
 			core.warning(`Failed to delete workspace: ${error}`);
 		}
 
 		// Delete task — continue even if this fails
 		try {
 			await this.coder.deleteTask(this.inputs.coderUsername, task.id);
-		} catch (error) {
+		} catch (error: unknown) {
 			core.warning(`Failed to delete task: ${error}`);
 		}
 

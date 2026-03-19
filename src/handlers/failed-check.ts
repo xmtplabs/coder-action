@@ -1,11 +1,10 @@
 import * as core from "@actions/core";
 import type { CoderClient } from "../coder-client";
 import type { GitHubClient, PRInfo } from "../github-client";
-import { formatFailedCheckMessage } from "../messages";
+import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../messages";
 import type { ActionOutputs, FailedCheckInputs } from "../schemas";
 import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
 
-const MAX_FAILED_JOBS = 5;
 const MAX_LOG_LINES = 100;
 
 export interface FailedCheckContext {

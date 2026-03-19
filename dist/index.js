@@ -26104,6 +26104,10 @@ class CoderAPIError extends Error {
     this.name = "CoderAPIError";
   }
 }
+var POLL_INTERVAL_MS = 2000;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 class RealCoderClient {
   serverURL;
@@ -26188,8 +26192,8 @@ class RealCoderClient {
     });
     return ExperimentalCoderSDKTaskSchema.parse(response);
   }
-  async sendTaskInput(ownerUsername, taskId, input) {
-    const endpoint2 = `/api/experimental/tasks/${ownerUsername}/${taskId}/send`;
+  async sendTaskInput(owner, taskId, input) {
+    const endpoint2 = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`;
     await this.request(endpoint2, {
       method: "POST",
       body: JSON.stringify({ input })
@@ -26197,7 +26201,6 @@ class RealCoderClient {
   }
   async waitForTaskActive(owner, taskId, logFn, timeoutMs = 120000) {
     const startTime = Date.now();
-    const pollIntervalMs = 2000;
     while (Date.now() - startTime < timeoutMs) {
       const task = await this.getTaskById(owner, taskId);
       if (task.status === "error") {
@@ -26207,7 +26210,7 @@ class RealCoderClient {
       if (task.status === "active" && task.current_state?.state === "idle") {
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await sleep(POLL_INTERVAL_MS);
     }
     throw new CoderAPIError(`Timeout waiting for task to reach active state (waited ${timeoutMs}ms)`, 408);
   }
@@ -26229,7 +26232,6 @@ class RealCoderClient {
       "deleted"
     ]);
     const startTime = Date.now();
-    const pollIntervalMs = 2000;
     while (Date.now() - startTime < timeoutMs) {
       const workspace = await this.getWorkspace(workspaceId);
       const status = workspace.latest_build.status;
@@ -26237,7 +26239,7 @@ class RealCoderClient {
       if (terminalStatuses.has(status)) {
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await sleep(POLL_INTERVAL_MS);
     }
     throw new CoderAPIError(`Timeout waiting for workspace to stop (waited ${timeoutMs}ms)`, 408);
   }
@@ -26713,7 +26715,6 @@ class IssueCommentHandler {
 }
 
 // src/handlers/failed-check.ts
-var MAX_FAILED_JOBS2 = 5;
 var MAX_LOG_LINES = 100;
 
 class FailedCheckHandler {
@@ -26760,7 +26761,7 @@ class FailedCheckHandler {
       return { skipped: true, skipReason: "task-not-found" };
     }
     const allFailedJobs = await this.github.getFailedJobs(this.context.owner, this.context.repo, this.context.runId);
-    const cappedJobs = allFailedJobs.slice(0, MAX_FAILED_JOBS2);
+    const cappedJobs = allFailedJobs.slice(0, MAX_FAILED_JOBS);
     const jobsWithLogs = await Promise.all(cappedJobs.map(async (job) => ({
       name: job.name,
       logs: await this.github.getJobLogs(this.context.owner, this.context.repo, job.id, MAX_LOG_LINES)
