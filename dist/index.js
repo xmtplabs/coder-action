@@ -26555,8 +26555,6 @@ function formatPRCommentMessage(params) {
 Commenter: ${params.commenter}
 Timestamp: ${params.timestamp}
 
-Immediately react to the comment with \uD83D\uDC40 emoji to show you have seen it.
-
 Validate whether the comment is useful feedback to improve the quality of the task output.
 
 For all valid suggestions in the comment, implement them, ensure the branch is still in a healthy state (all lint and tests continue to pass), then commit and push. Reply to the comment with a succinct and clear explanation of the changes you made.
@@ -26576,8 +26574,6 @@ Timestamp: ${params.timestamp}
 Review this comment on the issue you are working on. If it contains new requirements, clarifications, or feedback that affects your current work, adjust your approach accordingly.
 
 If the comment asks a question, reply directly on the issue.
-
-React to the comment with \uD83D\uDC40 emoji to acknowledge you have seen it.
 ---
 
 ${params.body}`;
