@@ -26448,7 +26448,7 @@ class CreateTaskHandler {
     }
     const hasAccess = await this.github.checkActorPermission(this.context.owner, this.context.repo, this.context.senderLogin);
     if (!hasAccess) {
-      error(`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`);
+      info(`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`);
       return { skipped: true, skipReason: "insufficient-permissions" };
     }
     const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);

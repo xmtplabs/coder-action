@@ -35,7 +35,7 @@ export class CreateTaskHandler {
 			this.context.senderLogin,
 		);
 		if (!hasAccess) {
-			core.error(
+			core.info(
 				`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`,
 			);
 			return { skipped: true, skipReason: "insufficient-permissions" };
