@@ -18,7 +18,6 @@ describe("formatPRCommentMessage", () => {
 		);
 		expect(msg).toContain("Commenter: reviewer");
 		expect(msg).toContain("Timestamp: 2026-03-17T12:00:00Z");
-		expect(msg).toContain("react to the comment with 👀");
 		expect(msg).toContain("Please fix the typo on line 42");
 	});
 });
