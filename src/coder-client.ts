@@ -171,10 +171,14 @@ export interface CoderClient {
 	deleteTask(owner: string | undefined, taskId: TaskId): Promise<void>;
 }
 
+const POLL_INTERVAL_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // RealCoderClient provides a minimal set of methods for interacting with the Coder API.
 export class RealCoderClient implements CoderClient {
-	private static readonly POLL_INTERVAL_MS = 2000;
-
 	private readonly headers: Record<string, string>;
 	private readonly fetchFn: typeof fetch;
 
@@ -335,15 +339,11 @@ export class RealCoderClient implements CoderClient {
 		taskId: TaskId,
 		input: string,
 	): Promise<void> {
-		const endpoint = `/api/experimental/tasks/${owner}/${taskId}/send`;
+		const endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`;
 		await this.request<unknown>(endpoint, {
 			method: "POST",
 			body: JSON.stringify({ input }),
 		});
-	}
-
-	private static sleep(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	/**
@@ -374,7 +374,7 @@ export class RealCoderClient implements CoderClient {
 				return;
 			}
 
-			await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
+			await sleep(POLL_INTERVAL_MS);
 		}
 
 		throw new CoderAPIError(
@@ -431,7 +431,7 @@ export class RealCoderClient implements CoderClient {
 			if (terminalStatuses.has(status)) {
 				return;
 			}
-			await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
+			await sleep(POLL_INTERVAL_MS);
 		}
 
 		throw new CoderAPIError(

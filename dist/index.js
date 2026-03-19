@@ -26104,10 +26104,13 @@ class CoderAPIError extends Error {
     this.name = "CoderAPIError";
   }
 }
+var POLL_INTERVAL_MS = 2000;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 class RealCoderClient {
   serverURL;
-  static POLL_INTERVAL_MS = 2000;
   headers;
   fetchFn;
   constructor(serverURL, apiToken, fetchFn) {
@@ -26190,14 +26193,11 @@ class RealCoderClient {
     return ExperimentalCoderSDKTaskSchema.parse(response);
   }
   async sendTaskInput(owner, taskId, input) {
-    const endpoint2 = `/api/experimental/tasks/${owner}/${taskId}/send`;
+    const endpoint2 = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`;
     await this.request(endpoint2, {
       method: "POST",
       body: JSON.stringify({ input })
     });
-  }
-  static sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
   async waitForTaskActive(owner, taskId, logFn, timeoutMs = 120000) {
     const startTime = Date.now();
@@ -26210,7 +26210,7 @@ class RealCoderClient {
       if (task.status === "active" && task.current_state?.state === "idle") {
         return;
       }
-      await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
+      await sleep(POLL_INTERVAL_MS);
     }
     throw new CoderAPIError(`Timeout waiting for task to reach active state (waited ${timeoutMs}ms)`, 408);
   }
@@ -26239,7 +26239,7 @@ class RealCoderClient {
       if (terminalStatuses.has(status)) {
         return;
       }
-      await RealCoderClient.sleep(RealCoderClient.POLL_INTERVAL_MS);
+      await sleep(POLL_INTERVAL_MS);
     }
     throw new CoderAPIError(`Timeout waiting for workspace to stop (waited ${timeoutMs}ms)`, 408);
   }
