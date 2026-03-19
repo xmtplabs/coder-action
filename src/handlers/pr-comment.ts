@@ -15,6 +15,7 @@ export interface PRCommentContext {
 	commentUrl: string;
 	commentBody: string;
 	commentCreatedAt: string;
+	isReviewComment?: boolean;
 }
 
 export class PRCommentHandler {
@@ -83,11 +84,19 @@ export class PRCommentHandler {
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Comment forwarded to task ${taskName}`);
 
-		await this.github.addReactionToComment(
-			this.context.owner,
-			this.context.repo,
-			this.context.commentId,
-		);
+		if (this.context.isReviewComment) {
+			await this.github.addReactionToReviewComment(
+				this.context.owner,
+				this.context.repo,
+				this.context.commentId,
+			);
+		} else {
+			await this.github.addReactionToComment(
+				this.context.owner,
+				this.context.repo,
+				this.context.commentId,
+			);
+		}
 
 		return { taskName, taskStatus: task.status, skipped: false };
 	}

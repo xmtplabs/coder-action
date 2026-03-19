@@ -26380,6 +26380,18 @@ class GitHubClient {
       warning(`Failed to add reaction to comment ${commentId}: ${error2 instanceof Error ? error2.message : String(error2)}`);
     }
   }
+  async addReactionToReviewComment(owner, repo, commentId) {
+    try {
+      await this.octokit.rest.reactions.createForPullRequestReviewComment({
+        owner,
+        repo,
+        comment_id: commentId,
+        content: "eyes"
+      });
+    } catch (error2) {
+      warning(`Failed to add reaction to review comment ${commentId}: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    }
+  }
 }
 
 // src/schemas.ts
@@ -26671,7 +26683,11 @@ class PRCommentHandler {
     });
     await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
-    await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
+    if (this.context.isReviewComment) {
+      await this.github.addReactionToReviewComment(this.context.owner, this.context.repo, this.context.commentId);
+    } else {
+      await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
+    }
     return { taskName, taskStatus: task.status, skipped: false };
   }
 }
@@ -26844,18 +26860,20 @@ async function run() {
         break;
       }
       case "pr_comment": {
-        const issue2 = requirePayload(context3.payload.issue, "issue");
+        const isReviewComment = context3.eventName === "pull_request_review_comment";
+        const pr = isReviewComment ? requirePayload(context3.payload.pull_request, "pull_request") : requirePayload(context3.payload.issue, "issue");
         const comment = requirePayload(context3.payload.comment, "comment");
         const handler2 = new PRCommentHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
-          prNumber: issue2.number,
-          prAuthor: issue2.user.login,
+          prNumber: pr.number,
+          prAuthor: pr.user.login,
           commenterLogin: comment.user.login,
           commentId: comment.id,
           commentUrl: comment.html_url,
           commentBody: comment.body,
-          commentCreatedAt: comment.created_at
+          commentCreatedAt: comment.created_at,
+          isReviewComment
         });
         result = await handler2.run();
         break;

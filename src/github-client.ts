@@ -204,4 +204,23 @@ export class GitHubClient {
 			);
 		}
 	}
+
+	async addReactionToReviewComment(
+		owner: string,
+		repo: string,
+		commentId: number,
+	): Promise<void> {
+		try {
+			await this.octokit.rest.reactions.createForPullRequestReviewComment({
+				owner,
+				repo,
+				comment_id: commentId,
+				content: "eyes",
+			});
+		} catch (error: unknown) {
+			core.warning(
+				`Failed to add reaction to review comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
 }

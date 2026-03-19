@@ -97,18 +97,23 @@ async function run(): Promise<void> {
 				break;
 			}
 			case "pr_comment": {
-				const issue = requirePayload(context.payload.issue, "issue");
+				const isReviewComment =
+					context.eventName === "pull_request_review_comment";
+				const pr = isReviewComment
+					? requirePayload(context.payload.pull_request, "pull_request")
+					: requirePayload(context.payload.issue, "issue");
 				const comment = requirePayload(context.payload.comment, "comment");
 				const handler = new PRCommentHandler(coder, gh, resolvedInputs, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
-					prNumber: issue.number,
-					prAuthor: issue.user.login,
+					prNumber: pr.number,
+					prAuthor: pr.user.login,
 					commenterLogin: comment.user.login,
 					commentId: comment.id,
 					commentUrl: comment.html_url,
 					commentBody: comment.body,
 					commentCreatedAt: comment.created_at,
+					isReviewComment,
 				});
 				result = await handler.run();
 				break;
