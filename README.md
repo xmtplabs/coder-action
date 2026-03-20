@@ -49,7 +49,7 @@ jobs:
       && github.event.assignee.login == 'xmtp-coder-agent'
     steps:
       - name: Create Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
@@ -65,7 +65,7 @@ jobs:
       && github.event.action == 'closed'
     steps:
       - name: Close Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
@@ -81,7 +81,7 @@ jobs:
       && github.event.comment.user.login != 'xmtp-coder-agent'
     steps:
       - name: Forward PR Comment to Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
@@ -96,7 +96,7 @@ jobs:
       && github.event.comment.user.login != 'xmtp-coder-agent'
     steps:
       - name: Forward PR Review Comment to Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
@@ -111,7 +111,7 @@ jobs:
       && github.event.comment.user.login != 'xmtp-coder-agent'
     steps:
       - name: Forward Issue Comment to Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
@@ -124,7 +124,7 @@ jobs:
       && github.event.workflow_run.conclusion == 'failure'
     steps:
       - name: Forward Failed Check to Coder Task
-        uses: xmtplabs/coder-action@v0
+        uses: xmtplabs/coder-action@main
         with:
           action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
