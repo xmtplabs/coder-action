@@ -26218,6 +26218,12 @@ class RealCoderClient {
     const response = await this.request(`/api/v2/workspaces/${encodeURIComponent(workspaceId)}`);
     return WorkspaceSchema.parse(response);
   }
+  async startWorkspace(workspaceId) {
+    await this.request(`/api/v2/workspaces/${encodeURIComponent(workspaceId)}/builds`, {
+      method: "POST",
+      body: JSON.stringify({ transition: "start" })
+    });
+  }
   async stopWorkspace(workspaceId) {
     await this.request(`/api/v2/workspaces/${encodeURIComponent(workspaceId)}/builds`, {
       method: "POST",
@@ -26459,6 +26465,10 @@ async function lookupAndEnsureActiveTask(coder, coderUsername, taskName) {
     return task;
   }
   info(`Task ${taskName} is ${task.status}, waiting for active state...`);
+  if (task.status === "paused") {
+    info(`Resuming paused task ${taskName}...`);
+    await coder.startWorkspace(task.workspace_id);
+  }
   await coder.waitForTaskActive(task.owner_id, task.id, debug);
   return task;
 }
