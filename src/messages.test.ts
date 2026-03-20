@@ -20,6 +20,34 @@ describe("formatPRCommentMessage", () => {
 		expect(msg).toContain("Timestamp: 2026-03-17T12:00:00Z");
 		expect(msg).toContain("Please fix the typo on line 42");
 	});
+
+	test("separates instructions from comment body with delimiters", () => {
+		const msg = formatPRCommentMessage({
+			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
+			commenter: "reviewer",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "Please fix the typo on line 42",
+		});
+		expect(msg).toContain("[INSTRUCTIONS]");
+		expect(msg).toContain("[END INSTRUCTIONS]");
+		expect(msg).toContain("[COMMENT]");
+		expect(msg).toContain("[END COMMENT]");
+		// Instructions must appear before comment body
+		const instrIdx = msg.indexOf("[INSTRUCTIONS]");
+		const commentIdx = msg.indexOf("[COMMENT]");
+		expect(instrIdx).toBeLessThan(commentIdx);
+	});
+
+	test("instructs agent to react with 👍 for automated non-actionable comments", () => {
+		const msg = formatPRCommentMessage({
+			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
+			commenter: "bot",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "Approvability check passed",
+		});
+		expect(msg).toContain("👍");
+		expect(msg).toContain("automated");
+	});
 });
 
 describe("formatIssueCommentMessage", () => {
@@ -33,6 +61,34 @@ describe("formatIssueCommentMessage", () => {
 		expect(msg).toContain("New Comment on Issue:");
 		expect(msg).toContain("Commenter: author");
 		expect(msg).toContain("Actually, the requirement changed");
+	});
+
+	test("separates instructions from comment body with delimiters", () => {
+		const msg = formatIssueCommentMessage({
+			commentUrl: "https://github.com/org/repo/issues/42#comment-1",
+			commenter: "author",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "Actually, the requirement changed",
+		});
+		expect(msg).toContain("[INSTRUCTIONS]");
+		expect(msg).toContain("[END INSTRUCTIONS]");
+		expect(msg).toContain("[COMMENT]");
+		expect(msg).toContain("[END COMMENT]");
+		// Instructions must appear before comment body
+		const instrIdx = msg.indexOf("[INSTRUCTIONS]");
+		const commentIdx = msg.indexOf("[COMMENT]");
+		expect(instrIdx).toBeLessThan(commentIdx);
+	});
+
+	test("instructs agent to react with 👍 for automated non-actionable comments", () => {
+		const msg = formatIssueCommentMessage({
+			commentUrl: "https://github.com/org/repo/issues/42#comment-1",
+			commenter: "github-actions",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "Task created: https://coder.example.com/tasks/123",
+		});
+		expect(msg).toContain("👍");
+		expect(msg).toContain("automated");
 	});
 });
 

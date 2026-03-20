@@ -20,16 +20,21 @@ export function formatPRCommentMessage(params: CommentMessageParams): string {
 Commenter: ${params.commenter}
 Timestamp: ${params.timestamp}
 
-Validate whether the comment is useful feedback to improve the quality of the task output.
+[INSTRUCTIONS]
+First, determine whether this comment requires action.
 
-For all valid suggestions in the comment, implement them, ensure the branch is still in a healthy state (all lint and tests continue to pass), then commit and push. Reply to the comment with a succinct and clear explanation of the changes you made.
+If the comment is automated and does not require code changes or a reply — for example: bot status updates, approvability checks, CI notifications, merge conflict warnings, or other non-human automated comments — react to the comment with a 👍 emoji and take no further action.
+
+If the comment contains valid suggestions or feedback from a human reviewer, implement them, ensure the branch is still in a healthy state (all lint and tests continue to pass), then commit and push. Reply to the comment with a succinct and clear explanation of the changes you made.
 
 If you have questions or need clarification, ask them directly in the comment thread and wait for further feedback.
 
-If no changes are needed or the comment is invalid, reply to the comment with a succinct and clear explanation why no action was taken.
----
+If no changes are needed or the comment is invalid feedback, reply to the comment with a succinct and clear explanation why no action was taken.
+[END INSTRUCTIONS]
 
-${params.body}`;
+[COMMENT]
+${params.body}
+[END COMMENT]`;
 }
 
 export function formatIssueCommentMessage(
@@ -39,12 +44,19 @@ export function formatIssueCommentMessage(
 Commenter: ${params.commenter}
 Timestamp: ${params.timestamp}
 
-Review this comment on the issue you are working on. If it contains new requirements, clarifications, or feedback that affects your current work, adjust your approach accordingly.
+[INSTRUCTIONS]
+First, determine whether this comment requires action.
+
+If the comment is automated and does not contain actionable information — for example: bot status updates, CI notifications, task tracking comments, or other non-human automated comments — react to the comment with a 👍 emoji and take no further action.
+
+If the comment contains new requirements, clarifications, or feedback that affects your current work, adjust your approach accordingly.
 
 If the comment asks a question, reply directly on the issue.
----
+[END INSTRUCTIONS]
 
-${params.body}`;
+[COMMENT]
+${params.body}
+[END COMMENT]`;
 }
 
 export function formatFailedCheckMessage(params: FailedCheckParams): string {
