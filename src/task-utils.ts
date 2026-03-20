@@ -49,6 +49,10 @@ export async function lookupAndEnsureActiveTask(
 	// Use task.owner_id (UUID) as the owner identifier — Coder accepts both
 	// usernames and UUIDs for user-scoped API paths.
 	core.info(`Task ${taskName} is ${task.status}, waiting for active state...`);
+	if (task.status === "paused") {
+		core.info(`Resuming paused task ${taskName}...`);
+		await coder.startWorkspace(task.workspace_id);
+	}
 	await coder.waitForTaskActive(task.owner_id, task.id, core.debug);
 	return task;
 }

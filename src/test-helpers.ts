@@ -68,6 +68,7 @@ export class MockCoderClient implements CoderClient {
 			latest_build: { status: "running", transition: "start" },
 		}),
 	);
+	startWorkspace = mock(() => Promise.resolve());
 	stopWorkspace = mock(() => Promise.resolve());
 	waitForWorkspaceStopped = mock(() => Promise.resolve());
 	deleteWorkspace = mock(() => Promise.resolve());

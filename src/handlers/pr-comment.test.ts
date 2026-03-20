@@ -162,8 +162,8 @@ describe("PRCommentHandler", () => {
 		expect(result.skipReason).toContain("task-not-found");
 	});
 
-	// AC #15: Restart stopped task
-	test("restarts stopped task before sending", async () => {
+	// AC #15: Restart stopped (paused) task
+	test("resumes paused task before sending", async () => {
 		coder.getTask.mockResolvedValue(mockStoppedTask as never);
 		const handler = new PRCommentHandler(
 			coder,
@@ -174,6 +174,10 @@ describe("PRCommentHandler", () => {
 		const result = await handler.run();
 
 		expect(result.skipped).toBe(false);
+		expect(coder.startWorkspace).toHaveBeenCalledTimes(1);
+		expect(coder.startWorkspace).toHaveBeenCalledWith(
+			mockStoppedTask.workspace_id,
+		);
 		expect(coder.waitForTaskActive).toHaveBeenCalledTimes(1);
 		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
 	});

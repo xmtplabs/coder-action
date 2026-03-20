@@ -136,8 +136,8 @@ describe("IssueCommentHandler", () => {
 		expect(result.skipReason).toContain("task-not-found");
 	});
 
-	// Edge: restart stopped task
-	test("restarts stopped task before sending", async () => {
+	// Edge: restart stopped (paused) task
+	test("resumes paused task before sending", async () => {
 		coder.getTask.mockResolvedValue(mockStoppedTask as never);
 		const handler = new IssueCommentHandler(
 			coder,
@@ -148,6 +148,10 @@ describe("IssueCommentHandler", () => {
 		const result = await handler.run();
 
 		expect(result.skipped).toBe(false);
+		expect(coder.startWorkspace).toHaveBeenCalledTimes(1);
+		expect(coder.startWorkspace).toHaveBeenCalledWith(
+			mockStoppedTask.workspace_id,
+		);
 		expect(coder.waitForTaskActive).toHaveBeenCalledTimes(1);
 		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
 	});

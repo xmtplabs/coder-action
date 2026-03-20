@@ -70,17 +70,19 @@ describe("lookupAndEnsureActiveTask", () => {
 		expect(result).toBeNull();
 	});
 
-	test("waits for task to become active when stopped", async () => {
+	test("resumes paused task and waits for active state", async () => {
 		const mockCoder = {
 			getTask: mock(() =>
 				Promise.resolve({
 					id: "uuid",
 					owner_id: "owner-uuid",
+					workspace_id: "ws-uuid",
 					name: "gh-repo-42",
 					status: "paused",
 					current_state: null,
 				}),
 			),
+			startWorkspace: mock(() => Promise.resolve()),
 			waitForTaskActive: mock(() => Promise.resolve()),
 		};
 		const result = await lookupAndEnsureActiveTask(
@@ -89,6 +91,7 @@ describe("lookupAndEnsureActiveTask", () => {
 			"gh-repo-42",
 		);
 		expect(result).not.toBeNull();
+		expect(mockCoder.startWorkspace).toHaveBeenCalledWith("ws-uuid");
 		expect(mockCoder.waitForTaskActive).toHaveBeenCalledWith(
 			"owner-uuid",
 			"uuid",

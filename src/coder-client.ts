@@ -161,6 +161,7 @@ export interface CoderClient {
 		timeoutMs?: number,
 	): Promise<void>;
 	getWorkspace(workspaceId: string): Promise<Workspace>;
+	startWorkspace(workspaceId: string): Promise<void>;
 	stopWorkspace(workspaceId: string): Promise<void>;
 	waitForWorkspaceStopped(
 		workspaceId: string,
@@ -391,6 +392,19 @@ export class RealCoderClient implements CoderClient {
 			`/api/v2/workspaces/${encodeURIComponent(workspaceId)}`,
 		);
 		return WorkspaceSchema.parse(response);
+	}
+
+	/**
+	 * startWorkspace initiates a start transition for the given workspace (resumes a paused task).
+	 */
+	async startWorkspace(workspaceId: string): Promise<void> {
+		await this.request(
+			`/api/v2/workspaces/${encodeURIComponent(workspaceId)}/builds`,
+			{
+				method: "POST",
+				body: JSON.stringify({ transition: "start" }),
+			},
+		);
 	}
 
 	/**
