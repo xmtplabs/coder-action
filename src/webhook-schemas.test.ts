@@ -80,8 +80,7 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 	});
 
 	test("issue-comment-on-issue has issue.pull_request falsy", () => {
-		const result =
-			IssueCommentCreatedPayloadSchema.parse(issueCommentOnIssue);
+		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnIssue);
 		expect(result.issue.pull_request).toBeFalsy();
 	});
 
@@ -131,24 +130,20 @@ describe("PRReviewSubmittedPayloadSchema", () => {
 	});
 
 	test("parses pr-review-submitted-empty fixture (null body)", () => {
-		const result =
-			PRReviewSubmittedPayloadSchema.parse(prReviewSubmittedEmpty);
+		const result = PRReviewSubmittedPayloadSchema.parse(prReviewSubmittedEmpty);
 		expect(result.action).toBe("submitted");
 		expect(result.review.body).toBeNull();
 	});
 
 	test("rejects fixture with missing required field", () => {
 		const { action: _action, ...withoutAction } = prReviewSubmitted;
-		expect(() =>
-			PRReviewSubmittedPayloadSchema.parse(withoutAction),
-		).toThrow();
+		expect(() => PRReviewSubmittedPayloadSchema.parse(withoutAction)).toThrow();
 	});
 });
 
 describe("WorkflowRunCompletedPayloadSchema", () => {
 	test("parses workflow-run-failure fixture", () => {
-		const result =
-			WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
+		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
 		expect(result.action).toBe("completed");
 		expect(result.workflow_run.conclusion).toBe("failure");
 		expect(result.workflow_run.head_sha).toBe("abc123def");
@@ -158,20 +153,17 @@ describe("WorkflowRunCompletedPayloadSchema", () => {
 	});
 
 	test("workflow-run-failure has conclusion: failure", () => {
-		const result =
-			WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
+		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
 		expect(result.workflow_run.conclusion).toBe("failure");
 	});
 
 	test("parses workflow-run-success fixture", () => {
-		const result =
-			WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
+		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
 		expect(result.workflow_run.conclusion).toBe("success");
 	});
 
 	test("workflow-run-success has conclusion: success", () => {
-		const result =
-			WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
+		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
 		expect(result.workflow_run.conclusion).toBe("success");
 	});
 

@@ -2,7 +2,7 @@ import type { CoderClient } from "../coder-client";
 import type { GitHubClient } from "../github-client";
 import type { Logger } from "../logger";
 import { formatPRCommentMessage } from "../messages";
-import type { ActionOutputs, PRCommentInputs } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
 
 export interface PRCommentContext {
@@ -23,22 +23,22 @@ export class PRCommentHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: PRCommentInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: PRCommentContext,
 		private readonly logger: Logger,
 	) {}
 
 	async run(): Promise<ActionOutputs> {
 		// Guard: PR author must be the coder agent
-		if (this.context.prAuthor !== this.inputs.coderGithubUsername) {
+		if (this.context.prAuthor !== this.inputs.agentGithubUsername) {
 			this.logger.info(
-				`PR not authored by ${this.inputs.coderGithubUsername}, skipping`,
+				`PR not authored by ${this.inputs.agentGithubUsername}, skipping`,
 			);
 			return { skipped: true, skipReason: "pr-not-by-coder-agent" };
 		}
 
 		// Guard: self-comment
-		if (this.context.commenterLogin === this.inputs.coderGithubUsername) {
+		if (this.context.commenterLogin === this.inputs.agentGithubUsername) {
 			this.logger.info("Ignoring self-comment from coder agent");
 			return { skipped: true, skipReason: "self-comment" };
 		}

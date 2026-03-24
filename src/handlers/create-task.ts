@@ -2,7 +2,7 @@ import type { CoderClient } from "../coder-client";
 import { TaskNameSchema } from "../coder-client";
 import type { GitHubClient } from "../github-client";
 import type { Logger } from "../logger";
-import type { ActionOutputs, CreateTaskInputs } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName } from "../task-utils";
 
 export interface IssueContext {
@@ -17,7 +17,7 @@ export class CreateTaskHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: CreateTaskInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: IssueContext,
 		private readonly logger: Logger,
 	) {}

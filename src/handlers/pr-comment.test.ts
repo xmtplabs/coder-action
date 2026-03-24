@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../logger";
-import type { PRCommentInputs } from "../schemas";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -10,14 +10,14 @@ import {
 import { PRCommentHandler } from "./pr-comment";
 import type { PRCommentContext } from "./pr-comment";
 
-const baseInputs: PRCommentInputs = {
-	action: "pr_comment",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const validContext: PRCommentContext = {
@@ -136,6 +136,20 @@ describe("PRCommentHandler", () => {
 		);
 		const result = await handler.run();
 
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("self-comment");
+	});
+
+	test("skips self-comment using agentGithubUsername", async () => {
+		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
+		const handler = new PRCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		const result = await handler.run();
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("self-comment");
 	});

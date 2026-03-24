@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../logger";
-import type { FailedCheckInputs } from "../schemas";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -9,14 +9,14 @@ import {
 import { FailedCheckHandler } from "./failed-check";
 import type { FailedCheckContext } from "./failed-check";
 
-const baseInputs: FailedCheckInputs = {
-	action: "failed_check",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const validContext: FailedCheckContext = {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { CoderAPIError } from "../coder-client";
 import { TestLogger } from "../logger";
-import type { CloseTaskInputs } from "../schemas";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -10,14 +10,14 @@ import {
 import { CloseTaskHandler } from "./close-task";
 import type { CloseTaskContext } from "./close-task";
 
-const baseInputs: CloseTaskInputs = {
-	action: "close_task",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const closeContext: CloseTaskContext = {

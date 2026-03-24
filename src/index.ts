@@ -2,11 +2,7 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { RealCoderClient } from "./coder-client";
 import { GitHubClient } from "./github-client";
-import {
-	parseInputs,
-	type ActionOutputs,
-	type ResolvedInputs,
-} from "./schemas";
+import type { ActionOutputs, HandlerConfig } from "./schemas";
 import { CreateTaskHandler } from "./handlers/create-task";
 import { CloseTaskHandler } from "./handlers/close-task";
 import { PRCommentHandler } from "./handlers/pr-comment";
@@ -25,27 +21,18 @@ function requirePayload<T>(
 
 async function run(): Promise<void> {
 	try {
-		const rawInputs = {
-			action: core.getInput("action", { required: true }),
-			coderURL: core.getInput("coder-url", { required: true }),
-			coderToken: core.getInput("coder-token", { required: true }),
-			coderTaskNamePrefix: core.getInput("coder-task-name-prefix") || undefined,
-			coderTemplateName: core.getInput("coder-template-name") || undefined,
-			coderTemplatePreset: core.getInput("coder-template-preset") || undefined,
-			coderOrganization: core.getInput("coder-organization") || undefined,
-			prompt: core.getInput("prompt") || undefined,
-			githubToken:
-				core.getInput("github-token") || process.env.GITHUB_TOKEN || "",
-			coderGithubUsername: core.getInput("coder-github-username") || undefined,
-		};
+		const action = core.getInput("action", { required: true });
+		const coderURL = core.getInput("coder-url", { required: true });
+		const coderToken = core.getInput("coder-token", { required: true });
+		const githubToken =
+			core.getInput("github-token") || process.env.GITHUB_TOKEN || "";
 
-		core.setSecret(rawInputs.coderToken);
+		core.setSecret(coderToken);
 
-		const inputs = parseInputs(rawInputs);
 		const context = github.context;
 
-		const coder = new RealCoderClient(inputs.coderURL, inputs.coderToken);
-		const octokit = github.getOctokit(inputs.githubToken);
+		const coder = new RealCoderClient(coderURL, coderToken);
+		const octokit = github.getOctokit(githubToken);
 		const gh = new GitHubClient(octokit);
 
 		// Resolve the Coder username only for create_task, where the task must be
@@ -54,7 +41,7 @@ async function run(): Promise<void> {
 		// upfront user resolution is needed — and the GitHub sender may be a bot
 		// with no Coder account.
 		let coderUsername: string | undefined;
-		if (inputs.action === "create_task") {
+		if (action === "create_task") {
 			const sender = requirePayload(context.payload.sender, "sender");
 			const senderGithubId = sender.id as number;
 			core.info(
@@ -65,18 +52,27 @@ async function run(): Promise<void> {
 			coderUsername = coderUser.username;
 		}
 
-		const resolvedInputs: ResolvedInputs = {
-			...inputs,
+		const config: HandlerConfig = {
+			coderURL,
+			coderToken,
+			coderTaskNamePrefix: core.getInput("coder-task-name-prefix") || "gh",
+			coderTemplateName:
+				core.getInput("coder-template-name") || "task-template",
+			coderTemplatePreset: core.getInput("coder-template-preset") || undefined,
+			coderOrganization: core.getInput("coder-organization") || "default",
+			agentGithubUsername:
+				core.getInput("coder-github-username") || "xmtp-coder-agent",
 			coderUsername,
+			prompt: core.getInput("prompt") || undefined,
 		};
 
 		let result: ActionOutputs;
 
-		switch (resolvedInputs.action) {
+		switch (action) {
 			case "create_task": {
 				const issue = requirePayload(context.payload.issue, "issue");
 				const taskSender = requirePayload(context.payload.sender, "sender");
-				const handler = new CreateTaskHandler(coder, gh, resolvedInputs, {
+				const handler = new CreateTaskHandler(coder, gh, config, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					issueNumber: issue.number,
@@ -88,7 +84,7 @@ async function run(): Promise<void> {
 			}
 			case "close_task": {
 				const issue = requirePayload(context.payload.issue, "issue");
-				const handler = new CloseTaskHandler(coder, gh, resolvedInputs, {
+				const handler = new CloseTaskHandler(coder, gh, config, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					issueNumber: issue.number,
@@ -111,7 +107,7 @@ async function run(): Promise<void> {
 					? requirePayload(context.payload.review, "review")
 					: requirePayload(context.payload.comment, "comment");
 
-				const handler = new PRCommentHandler(coder, gh, resolvedInputs, {
+				const handler = new PRCommentHandler(coder, gh, config, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					prNumber: pr.number,
@@ -134,7 +130,7 @@ async function run(): Promise<void> {
 			case "issue_comment": {
 				const issue = requirePayload(context.payload.issue, "issue");
 				const comment = requirePayload(context.payload.comment, "comment");
-				const handler = new IssueCommentHandler(coder, gh, resolvedInputs, {
+				const handler = new IssueCommentHandler(coder, gh, config, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					issueNumber: issue.number,
@@ -152,7 +148,7 @@ async function run(): Promise<void> {
 					context.payload.workflow_run,
 					"workflow_run",
 				);
-				const handler = new FailedCheckHandler(coder, gh, resolvedInputs, {
+				const handler = new FailedCheckHandler(coder, gh, config, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					runId: workflowRun.id,
@@ -166,9 +162,7 @@ async function run(): Promise<void> {
 				break;
 			}
 			default:
-				throw new Error(
-					`Unknown action: ${(inputs as { action: string }).action}`,
-				);
+				throw new Error(`Unknown action: ${action}`);
 		}
 
 		if (result.taskName) core.setOutput("task-name", result.taskName);

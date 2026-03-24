@@ -2,7 +2,7 @@ import type { CoderClient } from "../coder-client";
 import type { GitHubClient, PRInfo } from "../github-client";
 import type { Logger } from "../logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../messages";
-import type { ActionOutputs, FailedCheckInputs } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
 
 const MAX_LOG_LINES = 100;
@@ -22,7 +22,7 @@ export class FailedCheckHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: FailedCheckInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: FailedCheckContext,
 		private readonly logger: Logger,
 	) {}
@@ -51,9 +51,9 @@ export class FailedCheckHandler {
 		}
 
 		// 2. Guard: PR author must be the coder agent
-		if (pr.user.login !== this.inputs.coderGithubUsername) {
+		if (pr.user.login !== this.inputs.agentGithubUsername) {
 			this.logger.info(
-				`PR #${pr.number} not authored by ${this.inputs.coderGithubUsername}`,
+				`PR #${pr.number} not authored by ${this.inputs.agentGithubUsername}`,
 			);
 			return { skipped: true, skipReason: "pr-not-by-coder-agent" };
 		}

@@ -5,20 +5,18 @@ import {
 	mockStoppedTask,
 	mockTask,
 } from "../test-helpers";
-import type { CreateTaskInputs } from "../schemas";
+import type { HandlerConfig } from "../schemas";
 import { TestLogger } from "../logger";
 import { CreateTaskHandler } from "./create-task";
 
-const baseInputs: CreateTaskInputs = {
-	action: "create_task",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
 	coderTemplateName: "task-template",
 	coderOrganization: "default",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const issueContext = {

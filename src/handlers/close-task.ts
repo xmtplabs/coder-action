@@ -2,7 +2,7 @@ import type { CoderClient } from "../coder-client";
 import { TaskNameSchema } from "../coder-client";
 import type { GitHubClient } from "../github-client";
 import type { Logger } from "../logger";
-import type { ActionOutputs, CloseTaskInputs } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName } from "../task-utils";
 
 export interface CloseTaskContext {
@@ -15,7 +15,7 @@ export class CloseTaskHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: CloseTaskInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: CloseTaskContext,
 		private readonly logger: Logger,
 	) {}
