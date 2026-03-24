@@ -37,7 +37,7 @@ on:
 permissions:
   actions: read
   issues: write
-  pull-requests: read
+  pull-requests: write
   contents: read
 
 jobs:
