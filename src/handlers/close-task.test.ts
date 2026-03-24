@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { CoderAPIError } from "../coder-client";
+import { TestLogger } from "../logger";
 import type { CloseTaskInputs } from "../schemas";
 import {
 	MockCoderClient,
@@ -28,10 +29,12 @@ const closeContext: CloseTaskContext = {
 describe("CloseTaskHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 	});
 
 	// AC #7: Stop and delete workspace, then delete task
@@ -46,6 +49,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -78,6 +82,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -100,6 +105,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -127,6 +133,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -151,6 +158,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -177,6 +185,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 

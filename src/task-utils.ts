@@ -1,6 +1,6 @@
-import * as core from "@actions/core";
 import type { CoderClient, ExperimentalCoderSDKTask } from "./coder-client";
 import { TaskNameSchema } from "./coder-client";
+import type { Logger } from "./logger";
 
 const MAX_TASK_NAME_LENGTH = 32;
 
@@ -46,6 +46,7 @@ export async function lookupAndEnsureActiveTask(
 	coder: CoderClient,
 	coderUsername: string | undefined,
 	taskName: string,
+	logger: Logger,
 ): Promise<ExperimentalCoderSDKTask | null> {
 	const parsedName = TaskNameSchema.parse(taskName);
 	const task = await coder.getTask(coderUsername, parsedName);
@@ -54,7 +55,7 @@ export async function lookupAndEnsureActiveTask(
 	}
 
 	if (task.status === "error") {
-		core.warning(`Task ${taskName} is in error state, skipping`);
+		logger.warning(`Task ${taskName} is in error state, skipping`);
 		return null;
 	}
 
@@ -64,11 +65,15 @@ export async function lookupAndEnsureActiveTask(
 
 	// Use task.owner_id (UUID) as the owner identifier — Coder accepts both
 	// usernames and UUIDs for user-scoped API paths.
-	core.info(`Task ${taskName} is ${task.status}, waiting for active state...`);
+	logger.info(
+		`Task ${taskName} is ${task.status}, waiting for active state...`,
+	);
 	if (task.status === "paused") {
-		core.info(`Resuming paused task ${taskName}...`);
+		logger.info(`Resuming paused task ${taskName}...`);
 		await coder.startWorkspace(task.workspace_id);
 	}
-	await coder.waitForTaskActive(task.owner_id, task.id, core.debug);
+	await coder.waitForTaskActive(task.owner_id, task.id, (msg) =>
+		logger.debug(msg),
+	);
 	return task;
 }

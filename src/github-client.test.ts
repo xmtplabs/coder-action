@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { GitHubClient } from "./github-client";
+import { TestLogger } from "./logger";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {
@@ -44,14 +45,14 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 		},
 		graphql: mock(() => Promise.resolve({})),
 		...overrides,
-	} as unknown as ReturnType<typeof import("@actions/github").getOctokit>;
+	} as unknown as import("./github-client").Octokit;
 }
 
 describe("GitHubClient", () => {
 	describe("checkActorPermission", () => {
 		test("returns true for users with write access", async () => {
 			const octokit = createMockOctokit();
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const result = await client.checkActorPermission("org", "repo", "writer");
 			expect(result).toBe(true);
 		});
@@ -64,7 +65,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const result = await client.checkActorPermission(
 				"org",
 				"repo",
@@ -81,7 +82,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const result = await client.checkActorPermission("org", "repo", "reader");
 			expect(result).toBe(false);
 		});
@@ -94,7 +95,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const result = await client.checkActorPermission(
 				"org",
 				"repo",
@@ -126,7 +127,7 @@ describe("GitHubClient", () => {
 					}),
 				),
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const issues = await client.findLinkedIssues("org", "repo", 1);
 			expect(issues).toHaveLength(1);
 			expect(issues[0].number).toBe(42);
@@ -144,7 +145,7 @@ describe("GitHubClient", () => {
 					}),
 				),
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const issues = await client.findLinkedIssues("org", "repo", 1);
 			expect(issues).toHaveLength(0);
 		});
@@ -153,7 +154,7 @@ describe("GitHubClient", () => {
 	describe("commentOnIssue", () => {
 		test("creates new comment when none exists", async () => {
 			const octokit = createMockOctokit();
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			await client.commentOnIssue(
 				"org",
 				"repo",
@@ -176,7 +177,7 @@ describe("GitHubClient", () => {
 					createComment: mock(() => Promise.resolve({ data: { id: 1 } })),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			await client.commentOnIssue(
 				"org",
 				"repo",
@@ -205,7 +206,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const pr = await client.findPRByHeadSHA("org", "repo", "abc");
 			expect(pr).not.toBeNull();
 			expect(pr?.number).toBe(5);
@@ -213,7 +214,7 @@ describe("GitHubClient", () => {
 
 		test("returns null when no PR found", async () => {
 			const octokit = createMockOctokit();
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const pr = await client.findPRByHeadSHA("org", "repo", "deadbeef");
 			expect(pr).toBeNull();
 		});
@@ -239,7 +240,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const jobs = await client.getFailedJobs("org", "repo", 100);
 			expect(jobs).toHaveLength(2);
 			expect(jobs[0].name).toBe("build");
@@ -250,7 +251,7 @@ describe("GitHubClient", () => {
 	describe("addReactionToComment", () => {
 		test("adds eyes reaction to comment", async () => {
 			const octokit = createMockOctokit();
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			await client.addReactionToComment("org", "repo", 42);
 			expect(octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith(
 				{
@@ -270,7 +271,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			await expect(
 				client.addReactionToComment("org", "repo", 42),
 			).resolves.toBeUndefined();
@@ -290,7 +291,7 @@ describe("GitHubClient", () => {
 					),
 				},
 			});
-			const client = new GitHubClient(octokit);
+			const client = new GitHubClient(octokit, new TestLogger());
 			const log = await client.getJobLogs("org", "repo", 1, 100);
 			const lines = log.split("\n");
 			expect(lines.length).toBe(100);

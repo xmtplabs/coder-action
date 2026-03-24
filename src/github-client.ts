@@ -1,7 +1,7 @@
-import * as core from "@actions/core";
-import type { getOctokit } from "@actions/github";
+import type { Logger } from "./logger";
+import type { Octokit as OctokitRest } from "@octokit/rest";
 
-export type Octokit = ReturnType<typeof getOctokit>;
+export type Octokit = OctokitRest;
 
 export interface LinkedIssue {
 	number: number;
@@ -23,7 +23,10 @@ export interface PRInfo {
 }
 
 export class GitHubClient {
-	constructor(private readonly octokit: Octokit) {}
+	constructor(
+		private readonly octokit: Octokit,
+		private readonly logger: Logger,
+	) {}
 
 	async checkActorPermission(
 		owner: string,
@@ -51,7 +54,14 @@ export class GitHubClient {
 		repo: string,
 		prNumber: number,
 	): Promise<LinkedIssue[]> {
-		const result = await this.octokit.graphql<{
+		const result = await (
+			this.octokit as unknown as {
+				graphql: <T>(
+					query: string,
+					variables: Record<string, unknown>,
+				) => Promise<T>;
+			}
+		).graphql<{
 			repository: {
 				pullRequest: {
 					closingIssuesReferences: { nodes: LinkedIssue[] };
@@ -199,7 +209,7 @@ export class GitHubClient {
 				content: "eyes",
 			});
 		} catch (error: unknown) {
-			core.warning(
+			this.logger.warning(
 				`Failed to add reaction to comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
@@ -218,7 +228,7 @@ export class GitHubClient {
 				content: "eyes",
 			});
 		} catch (error: unknown) {
-			core.warning(
+			this.logger.warning(
 				`Failed to add reaction to review comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}

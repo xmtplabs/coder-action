@@ -1,6 +1,6 @@
-import * as core from "@actions/core";
 import type { CoderClient } from "../coder-client";
 import type { GitHubClient } from "../github-client";
+import type { Logger } from "../logger";
 import { formatIssueCommentMessage } from "../messages";
 import type { ActionOutputs, IssueCommentInputs } from "../schemas";
 import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
@@ -22,12 +22,13 @@ export class IssueCommentHandler {
 		private readonly github: GitHubClient,
 		private readonly inputs: IssueCommentInputs,
 		private readonly context: IssueCommentContext,
+		private readonly logger: Logger,
 	) {}
 
 	async run(): Promise<ActionOutputs> {
 		// Guard: self-comment
 		if (this.context.commenterLogin === this.inputs.coderGithubUsername) {
-			core.info("Ignoring self-comment from coder agent");
+			this.logger.info("Ignoring self-comment from coder agent");
 			return { skipped: true, skipReason: "self-comment" };
 		}
 
@@ -41,9 +42,10 @@ export class IssueCommentHandler {
 			this.coder,
 			this.inputs.coderUsername,
 			taskName,
+			this.logger,
 		);
 		if (!task) {
-			core.info(`Task not found for issue #${this.context.issueNumber}`);
+			this.logger.info(`Task not found for issue #${this.context.issueNumber}`);
 			return { skipped: true, skipReason: "task-not-found" };
 		}
 
@@ -55,7 +57,7 @@ export class IssueCommentHandler {
 			body: this.context.commentBody,
 		});
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
-		core.info(`Comment forwarded to task ${taskName}`);
+		this.logger.info(`Comment forwarded to task ${taskName}`);
 
 		await this.github.addReactionToComment(
 			this.context.owner,
