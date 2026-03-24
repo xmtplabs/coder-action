@@ -151,7 +151,9 @@ export class HandlerDispatcher {
 						headSha: String(ctx.headSha),
 						workflowName: String(ctx.workflowName),
 						workflowFile:
-							ctx.workflowPath != null ? String(ctx.workflowPath) : "",
+							ctx.workflowPath != null
+								? (String(ctx.workflowPath).split("/").pop() ?? "unknown")
+								: "unknown",
 						pullRequests: pullRequestNumbers.map((n) => ({ number: n })),
 					},
 					this.options.logger,

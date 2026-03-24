@@ -51,6 +51,11 @@ function buildTestApp(logger: TestLogger): {
 				deliveryId,
 				payload,
 			);
+			if (capturedResult.dispatched) {
+				return { dispatched: true, handler: capturedResult.handler };
+			}
+			const status = capturedResult.validationError === true ? 400 : 200;
+			return { dispatched: false, status };
 		},
 		logger,
 	});

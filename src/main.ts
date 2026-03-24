@@ -63,16 +63,25 @@ async function main(): Promise<void> {
 		logger,
 	});
 
-	// Factory that creates an installation-scoped Octokit using the App credentials
-	const createInstallationOctokit = (installationId: number) =>
-		new Octokit({
-			authStrategy: createAppAuth,
-			auth: {
-				appId: config.appId,
-				privateKey: config.privateKey,
-				installationId,
-			},
-		});
+	// Factory that creates (and caches) an installation-scoped Octokit per installationId.
+	// Reusing the same Octokit instance allows @octokit/auth-app to cache the
+	// short-lived installation access token internally, avoiding redundant token requests.
+	const octokitCache = new Map<number, Octokit>();
+	const createInstallationOctokit = (installationId: number): Octokit => {
+		let octokit = octokitCache.get(installationId);
+		if (!octokit) {
+			octokit = new Octokit({
+				authStrategy: createAppAuth,
+				auth: {
+					appId: config.appId,
+					privateKey: config.privateKey,
+					installationId,
+				},
+			});
+			octokitCache.set(installationId, octokit);
+		}
+		return octokit;
+	};
 
 	const dispatcher = new HandlerDispatcher({
 		config,
@@ -88,7 +97,11 @@ async function main(): Promise<void> {
 			const result = await router.handleWebhook(eventName, deliveryId, payload);
 			if (result.dispatched) {
 				await dispatcher.dispatch(result);
+				return { dispatched: true, handler: result.handler };
 			}
+			// If the failure was due to a Zod schema validation error, signal 400.
+			const status = result.validationError === true ? 400 : 200;
+			return { dispatched: false, status };
 		},
 		logger,
 	});

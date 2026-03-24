@@ -1,6 +1,14 @@
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { verify } from "@octokit/webhooks-methods";
 import type { Logger } from "./logger";
+
+export interface WebhookHandleResult {
+	dispatched: boolean;
+	handler?: string;
+	/** Optional HTTP status override. Defaults to 200 when not provided. */
+	status?: number;
+}
 
 export interface CreateAppOptions {
 	webhookSecret: string;
@@ -8,7 +16,7 @@ export interface CreateAppOptions {
 		eventName: string,
 		deliveryId: string,
 		payload: unknown,
-	) => Promise<void>;
+	) => Promise<WebhookHandleResult>;
 	logger: Logger;
 }
 
@@ -34,6 +42,7 @@ export function createApp(options: CreateAppOptions): Hono {
 	});
 
 	app.post("/api/webhooks", async (c) => {
+		const startTime = Date.now();
 		const rawBody = await c.req.text();
 
 		const signature = c.req.header("X-Hub-Signature-256");
@@ -102,8 +111,9 @@ export function createApp(options: CreateAppOptions): Hono {
 		const payloadAction = safeStringField(payload, "action");
 		const payloadRepo = safeStringField(payload, "repository", "full_name");
 
+		let handleResult: WebhookHandleResult;
 		try {
-			await handleWebhook(eventName, deliveryId, payload);
+			handleResult = await handleWebhook(eventName, deliveryId, payload);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			logger.error(
@@ -114,21 +124,26 @@ export function createApp(options: CreateAppOptions): Hono {
 					repository: payloadRepo,
 					status: 500,
 					error: message,
+					duration_ms: Date.now() - startTime,
 				}),
 			);
 			return c.text("Internal Server Error", 500);
 		}
 
+		const responseStatus = (handleResult.status ?? 200) as ContentfulStatusCode;
 		logger.info(
 			JSON.stringify({
 				event: eventName,
 				delivery_id: deliveryId,
 				action: payloadAction,
 				repository: payloadRepo,
-				status: 200,
+				handler: handleResult.handler ?? null,
+				dispatched: handleResult.dispatched,
+				status: responseStatus,
+				duration_ms: Date.now() - startTime,
 			}),
 		);
-		return c.text("ok", 200);
+		return c.text("ok", responseStatus);
 	});
 
 	return app;

@@ -25,7 +25,7 @@ describe("GET /healthz", () => {
 		const logger = new TestLogger();
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {},
+			handleWebhook: async () => ({ dispatched: false }),
 			logger,
 		});
 
@@ -57,6 +57,7 @@ describe("POST /api/webhooks", () => {
 			webhookSecret: TEST_SECRET,
 			handleWebhook: async (eventName, deliveryId, payload) => {
 				receivedEvents.push({ eventName, deliveryId, payload });
+				return { dispatched: false };
 			},
 			logger,
 		});
@@ -83,7 +84,7 @@ describe("POST /api/webhooks", () => {
 
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {},
+			handleWebhook: async () => ({ dispatched: false }),
 			logger,
 		});
 
@@ -106,7 +107,7 @@ describe("POST /api/webhooks", () => {
 
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {},
+			handleWebhook: async () => ({ dispatched: false }),
 			logger,
 		});
 
@@ -129,7 +130,7 @@ describe("POST /api/webhooks", () => {
 
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {},
+			handleWebhook: async () => ({ dispatched: false }),
 			logger,
 		});
 
@@ -152,7 +153,7 @@ describe("POST /api/webhooks", () => {
 
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {},
+			handleWebhook: async () => ({ dispatched: false }),
 			logger,
 		});
 
@@ -176,7 +177,7 @@ describe("POST /api/webhooks", () => {
 
 		const app = createApp({
 			webhookSecret: TEST_SECRET,
-			handleWebhook: async () => {
+			handleWebhook: async (): Promise<never> => {
 				throw new Error("handler blew up");
 			},
 			logger,
@@ -196,5 +197,62 @@ describe("POST /api/webhooks", () => {
 		expect(res.status).toBe(500);
 		const errorLogs = logger.messages.filter((m) => m.level === "error");
 		expect(errorLogs.length).toBeGreaterThan(0);
+	});
+
+	test("handleWebhook returning status 400 results in 400 response", async () => {
+		const body = JSON.stringify({ action: "opened" });
+		const signature = await computeSignature(TEST_SECRET, body);
+
+		const app = createApp({
+			webhookSecret: TEST_SECRET,
+			handleWebhook: async () => ({ dispatched: false, status: 400 }),
+			logger,
+		});
+
+		const res = await app.request("/api/webhooks", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Hub-Signature-256": signature,
+				"X-GitHub-Event": "issue_comment",
+				"X-GitHub-Delivery": "abc-456",
+			},
+			body,
+		});
+
+		expect(res.status).toBe(400);
+	});
+
+	test("handleWebhook returning dispatched result logs handler and duration_ms", async () => {
+		const body = JSON.stringify({ action: "opened" });
+		const signature = await computeSignature(TEST_SECRET, body);
+
+		const app = createApp({
+			webhookSecret: TEST_SECRET,
+			handleWebhook: async () => ({
+				dispatched: true,
+				handler: "create_task",
+			}),
+			logger,
+		});
+
+		const res = await app.request("/api/webhooks", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Hub-Signature-256": signature,
+				"X-GitHub-Event": "issues",
+				"X-GitHub-Delivery": "abc-789",
+			},
+			body,
+		});
+
+		expect(res.status).toBe(200);
+		const infoLogs = logger.messages.filter((m) => m.level === "info");
+		const lastLog = infoLogs[infoLogs.length - 1];
+		const parsed = JSON.parse(lastLog.message);
+		expect(parsed.handler).toBe("create_task");
+		expect(parsed.dispatched).toBe(true);
+		expect(typeof parsed.duration_ms).toBe("number");
 	});
 });

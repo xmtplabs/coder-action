@@ -27,6 +27,8 @@ export type RouteResult =
 	| {
 			dispatched: false;
 			reason: string;
+			/** Set to true when the failure is due to a Zod schema validation error. */
+			validationError?: boolean;
 	  };
 
 export interface WebhookRouterOptions {
@@ -124,6 +126,7 @@ export class WebhookRouter {
 			return {
 				dispatched: false,
 				reason: "Failed to parse issue_comment payload",
+				validationError: true,
 			};
 		}
 
@@ -189,6 +192,7 @@ export class WebhookRouter {
 			return {
 				dispatched: false,
 				reason: "Failed to parse pull_request_review_comment payload",
+				validationError: true,
 			};
 		}
 
@@ -234,6 +238,7 @@ export class WebhookRouter {
 			return {
 				dispatched: false,
 				reason: "Failed to parse pull_request_review payload",
+				validationError: true,
 			};
 		}
 
@@ -286,6 +291,7 @@ export class WebhookRouter {
 			return {
 				dispatched: false,
 				reason: "Failed to parse workflow_run payload",
+				validationError: true,
 			};
 		}
 
