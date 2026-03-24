@@ -1,8 +1,7 @@
 {
 	"name": "xmtp-coder-action",
 	"version": "0.1.0",
-	"description": "GitHub Action to manage Coder AI task lifecycle from GitHub events",
-	"main": "dist/index.js",
+	"description": "GitHub App webhook server for managing Coder AI task lifecycle",
 	"scripts": {
 		"build": "bun build src/main.ts --outfile dist/server.js --target bun",
 		"start": "bun run dist/server.js",

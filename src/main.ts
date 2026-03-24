@@ -45,7 +45,12 @@ async function main(): Promise<void> {
 
 	// Discover bot identity from the GitHub App API
 	const { appSlug, appBotLogin } = await createStartupContext({
-		getAppInfo: () => appOctokit.rest.apps.getAuthenticated(),
+		getAppInfo: () =>
+			appOctokit.rest.apps.getAuthenticated().then((res) => {
+				const data = res.data;
+				if (!data) throw new Error("GitHub App returned no data");
+				return { data: { slug: data.slug ?? "", id: data.id } };
+			}),
 	});
 	logger.info(`Discovered app identity: ${appSlug} (bot: ${appBotLogin})`);
 
