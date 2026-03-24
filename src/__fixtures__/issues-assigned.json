@@ -1,0 +1,25 @@
+{
+  "action": "assigned",
+  "assignee": {
+    "login": "xmtp-coder-agent",
+    "id": 12345
+  },
+  "issue": {
+    "number": 42,
+    "html_url": "https://github.com/xmtp/test-repo/issues/42"
+  },
+  "sender": {
+    "id": 67890,
+    "login": "human-dev"
+  },
+  "repository": {
+    "name": "test-repo",
+    "owner": {
+      "login": "xmtp"
+    },
+    "full_name": "xmtp/test-repo"
+  },
+  "installation": {
+    "id": 99999
+  }
+}

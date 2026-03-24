@@ -1,0 +1,16 @@
+{
+  "action": "closed",
+  "issue": {
+    "number": 42
+  },
+  "repository": {
+    "name": "test-repo",
+    "owner": {
+      "login": "xmtp"
+    },
+    "full_name": "xmtp/test-repo"
+  },
+  "installation": {
+    "id": 99999
+  }
+}

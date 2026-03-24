@@ -1,0 +1,26 @@
+{
+  "action": "completed",
+  "workflow_run": {
+    "id": 4001,
+    "name": "CI",
+    "path": ".github/workflows/ci.yml",
+    "head_sha": "abc123def",
+    "html_url": "https://github.com/xmtp/test-repo/actions/runs/4001",
+    "conclusion": "failure",
+    "pull_requests": [
+      {
+        "number": 5
+      }
+    ]
+  },
+  "repository": {
+    "name": "test-repo",
+    "owner": {
+      "login": "xmtp"
+    },
+    "full_name": "xmtp/test-repo"
+  },
+  "installation": {
+    "id": 99999
+  }
+}
