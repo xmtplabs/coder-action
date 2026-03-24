@@ -30,6 +30,8 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  pull_request_review:
+    types: [submitted]
   workflow_run:
     workflows: ["CI"]  # Change this to match your CI workflow names
     types: [completed]
@@ -96,6 +98,22 @@ jobs:
       && github.event.comment.user.login != 'xmtp-coder-agent'
     steps:
       - name: Forward PR Review Comment to Coder Task
+        uses: xmtplabs/coder-action@main
+        with:
+          action: pr_comment
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+
+  pr-review:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request_review'
+      && github.event.action == 'submitted'
+      && github.event.pull_request.user.login == 'xmtp-coder-agent'
+      && github.event.review.user.login != 'xmtp-coder-agent'
+      && github.event.review.body != ''
+    steps:
+      - name: Forward PR Review to Coder Task
         uses: xmtplabs/coder-action@main
         with:
           action: pr_comment
