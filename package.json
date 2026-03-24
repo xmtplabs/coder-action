@@ -4,7 +4,9 @@
 	"description": "GitHub Action to manage Coder AI task lifecycle from GitHub events",
 	"main": "dist/index.js",
 	"scripts": {
-		"build": "bun build src/index.ts --outfile dist/index.js --target node --format cjs",
+		"build": "bun build src/main.ts --outfile dist/server.js --target bun",
+		"start": "bun run dist/server.js",
+		"dev": "bun run --watch src/main.ts",
 		"test": "bun test",
 		"format": "biome format --write .",
 		"format:check": "biome format .",
