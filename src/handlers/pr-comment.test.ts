@@ -203,6 +203,80 @@ describe("PRCommentHandler", () => {
 		expect(String(taskNameArg)).toBe("gh-libxmtp-42");
 	});
 
+	// Issue #58: PR review submissions (approve/request changes/comment body)
+	describe("review submissions (isReviewSubmission: true)", () => {
+		const reviewSubmissionContext: PRCommentContext = {
+			...validContext,
+			commentUrl:
+				"https://github.com/xmtp/libxmtp/pull/5#pullrequestreview-123",
+			commentBody: "Please address the naming conventions",
+			isReviewSubmission: true,
+		};
+
+		test("forwards review submission body to task", async () => {
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				reviewSubmissionContext,
+			);
+			const result = await handler.run();
+
+			expect(result.skipped).toBe(false);
+			expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+			const sentMessage = (
+				coder.sendTaskInput.mock.calls[0] as unknown as [
+					string,
+					unknown,
+					string,
+				]
+			)[2];
+			expect(sentMessage).toContain("Please address the naming conventions");
+		});
+
+		test("skips review submission with empty body", async () => {
+			const ctx = { ...reviewSubmissionContext, commentBody: "" };
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				ctx,
+			);
+			const result = await handler.run();
+
+			expect(result.skipped).toBe(true);
+			expect(result.skipReason).toBe("empty-review-body");
+			expect(coder.sendTaskInput).not.toHaveBeenCalled();
+		});
+
+		test("skips review submission with whitespace-only body", async () => {
+			const ctx = { ...reviewSubmissionContext, commentBody: "   \n  " };
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				ctx,
+			);
+			const result = await handler.run();
+
+			expect(result.skipped).toBe(true);
+			expect(result.skipReason).toBe("empty-review-body");
+		});
+
+		test("does not add reaction for review submissions", async () => {
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				reviewSubmissionContext,
+			);
+			await handler.run();
+
+			expect(github.addReactionToComment).not.toHaveBeenCalled();
+			expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
+		});
+	});
+
 	// Issue #46: PR review comments (inline code comments)
 	describe("review comments (isReviewComment: true)", () => {
 		const reviewContext: PRCommentContext = {

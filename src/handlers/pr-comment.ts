@@ -16,6 +16,7 @@ export interface PRCommentContext {
 	commentBody: string;
 	commentCreatedAt: string;
 	isReviewComment?: boolean;
+	isReviewSubmission?: boolean;
 }
 
 export class PRCommentHandler {
@@ -39,6 +40,12 @@ export class PRCommentHandler {
 		if (this.context.commenterLogin === this.inputs.coderGithubUsername) {
 			core.info("Ignoring self-comment from coder agent");
 			return { skipped: true, skipReason: "self-comment" };
+		}
+
+		// Guard: empty review body (e.g. approval with no text)
+		if (this.context.isReviewSubmission && !this.context.commentBody?.trim()) {
+			core.info("Ignoring review submission with empty body");
+			return { skipped: true, skipReason: "empty-review-body" };
 		}
 
 		// Find linked issue
@@ -84,7 +91,9 @@ export class PRCommentHandler {
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
 		core.info(`Comment forwarded to task ${taskName}`);
 
-		if (this.context.isReviewComment) {
+		if (this.context.isReviewSubmission) {
+			// No reaction API for review submissions — skip silently
+		} else if (this.context.isReviewComment) {
 			await this.github.addReactionToReviewComment(
 				this.context.owner,
 				this.context.repo,

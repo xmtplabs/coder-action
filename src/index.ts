@@ -99,21 +99,34 @@ async function run(): Promise<void> {
 			case "pr_comment": {
 				const isReviewComment =
 					context.eventName === "pull_request_review_comment";
-				const pr = isReviewComment
-					? requirePayload(context.payload.pull_request, "pull_request")
-					: requirePayload(context.payload.issue, "issue");
-				const comment = requirePayload(context.payload.comment, "comment");
+				const isReviewSubmission = context.eventName === "pull_request_review";
+
+				const pr =
+					isReviewComment || isReviewSubmission
+						? requirePayload(context.payload.pull_request, "pull_request")
+						: requirePayload(context.payload.issue, "issue");
+
+				// For review submissions, the comment data lives in payload.review
+				const commentSource = isReviewSubmission
+					? requirePayload(context.payload.review, "review")
+					: requirePayload(context.payload.comment, "comment");
+
 				const handler = new PRCommentHandler(coder, gh, resolvedInputs, {
 					owner: context.repo.owner,
 					repo: context.repo.repo,
 					prNumber: pr.number,
 					prAuthor: pr.user.login,
-					commenterLogin: comment.user.login,
-					commentId: comment.id,
-					commentUrl: comment.html_url,
-					commentBody: comment.body,
-					commentCreatedAt: comment.created_at,
+					commenterLogin: commentSource.user.login,
+					commentId: commentSource.id,
+					commentUrl: commentSource.html_url,
+					commentBody: isReviewSubmission
+						? (commentSource.body ?? "")
+						: commentSource.body,
+					commentCreatedAt: isReviewSubmission
+						? commentSource.submitted_at
+						: commentSource.created_at,
 					isReviewComment,
+					isReviewSubmission,
 				});
 				result = await handler.run();
 				break;

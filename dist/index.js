@@ -26692,6 +26692,10 @@ class PRCommentHandler {
       info("Ignoring self-comment from coder agent");
       return { skipped: true, skipReason: "self-comment" };
     }
+    if (this.context.isReviewSubmission && !this.context.commentBody?.trim()) {
+      info("Ignoring review submission with empty body");
+      return { skipped: true, skipReason: "empty-review-body" };
+    }
     const linkedIssues = await this.github.findLinkedIssues(this.context.owner, this.context.repo, this.context.prNumber);
     if (linkedIssues.length === 0) {
       info("No linked issue found");
@@ -26715,7 +26719,7 @@ class PRCommentHandler {
     });
     await this.coder.sendTaskInput(task.owner_id, task.id, message);
     info(`Comment forwarded to task ${taskName}`);
-    if (this.context.isReviewComment) {
+    if (this.context.isReviewSubmission) {} else if (this.context.isReviewComment) {
       await this.github.addReactionToReviewComment(this.context.owner, this.context.repo, this.context.commentId);
     } else {
       await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
@@ -26892,19 +26896,21 @@ async function run() {
       }
       case "pr_comment": {
         const isReviewComment = context3.eventName === "pull_request_review_comment";
-        const pr = isReviewComment ? requirePayload(context3.payload.pull_request, "pull_request") : requirePayload(context3.payload.issue, "issue");
-        const comment = requirePayload(context3.payload.comment, "comment");
+        const isReviewSubmission = context3.eventName === "pull_request_review";
+        const pr = isReviewComment || isReviewSubmission ? requirePayload(context3.payload.pull_request, "pull_request") : requirePayload(context3.payload.issue, "issue");
+        const commentSource = isReviewSubmission ? requirePayload(context3.payload.review, "review") : requirePayload(context3.payload.comment, "comment");
         const handler2 = new PRCommentHandler(coder, gh, resolvedInputs, {
           owner: context3.repo.owner,
           repo: context3.repo.repo,
           prNumber: pr.number,
           prAuthor: pr.user.login,
-          commenterLogin: comment.user.login,
-          commentId: comment.id,
-          commentUrl: comment.html_url,
-          commentBody: comment.body,
-          commentCreatedAt: comment.created_at,
-          isReviewComment
+          commenterLogin: commentSource.user.login,
+          commentId: commentSource.id,
+          commentUrl: commentSource.html_url,
+          commentBody: isReviewSubmission ? commentSource.body ?? "" : commentSource.body,
+          commentCreatedAt: isReviewSubmission ? commentSource.submitted_at : commentSource.created_at,
+          isReviewComment,
+          isReviewSubmission
         });
         result = await handler2.run();
         break;
