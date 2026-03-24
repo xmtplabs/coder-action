@@ -13,10 +13,11 @@
 		"check": "bun run typecheck && bun run lint && bun run format:check && bun test"
 	},
 	"dependencies": {
-		"@actions/core": "^3.0.0",
-		"@actions/github": "^9.0.0",
+		"@octokit/auth-app": "^8.2.0",
 		"@octokit/graphql": "^9.0.3",
 		"@octokit/rest": "^22.0.1",
+		"@octokit/webhooks": "^14.2.0",
+		"hono": "^4.12.9",
 		"zod": "^3.25.76"
 	},
 	"devDependencies": {
