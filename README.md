@@ -56,6 +56,7 @@ jobs:
           action: create_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
           prompt: |
             You are an autonomous AI agent. Resolve the GitHub issue below.
             Read the issue, develop a plan, post it as a comment, then implement and open a PR.
@@ -72,6 +73,7 @@ jobs:
           action: close_task
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 
   pr-comment:
     runs-on: ubuntu-latest
@@ -88,6 +90,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 
   pr-review-comment:
     runs-on: ubuntu-latest
@@ -103,6 +106,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 
   pr-review:
     runs-on: ubuntu-latest
@@ -119,6 +123,7 @@ jobs:
           action: pr_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 
   issue-comment:
     runs-on: ubuntu-latest
@@ -134,6 +139,7 @@ jobs:
           action: issue_comment
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 
   failed-check:
     runs-on: ubuntu-latest
@@ -147,6 +153,7 @@ jobs:
           action: failed_check
           coder-url: ${{ secrets.CODER_URL }}
           coder-token: ${{ secrets.CODER_TOKEN }}
+          github-token: ${{ github.token }}
 ```
 
 ## Inputs
@@ -157,7 +164,7 @@ jobs:
 | `coder-url` | Yes | — | Coder deployment URL |
 | `coder-token` | Yes | — | Coder API session token |
 | `coder-username` | No | `xmtp-coder-agent` | Coder username that owns tasks |
-| `github-token` | No | `GITHUB_TOKEN` | GitHub token for API operations (auto-detected from environment) |
+| `github-token` | No | `${{ github.token }}` | GitHub token for API operations — pass explicitly as `${{ github.token }}` |
 | `coder-task-name-prefix` | No | `gh` | Prefix for deterministic task names |
 | `coder-template-name` | No | `task-template` | Coder template for workspace creation (`create_task` only) |
 | `coder-template-preset` | No | — | Template preset to use (`create_task` only) |
@@ -182,7 +189,7 @@ jobs:
 | `CODER_URL` | Coder deployment URL (e.g., `https://sandbox.xmtp.team`) |
 | `CODER_TOKEN` | Coder API token with task creation and send permissions |
 
-The `github-token` input uses the default `${{ github.token }}` provided by GitHub Actions. The `coder-username` defaults to `xmtp-coder-agent`. A GitHub PAT for git operations is configured in the Coder task template, not needed at the workflow level.
+All three credentials (`coder-url`, `coder-token`, `github-token`) should be passed explicitly in every workflow step — do not rely on environment variable inheritance. The `coder-username` defaults to `xmtp-coder-agent`. A GitHub PAT for git operations is configured in the Coder task template, not needed at the workflow level.
 
 ## How It Works
 
