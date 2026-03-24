@@ -12,6 +12,19 @@ export interface CreateAppOptions {
 	logger: Logger;
 }
 
+/**
+ * Safely extracts a string field from an unknown payload object.
+ * Returns null if the field is missing or not a string.
+ */
+function safeStringField(payload: unknown, ...path: string[]): string | null {
+	let current: unknown = payload;
+	for (const key of path) {
+		if (typeof current !== "object" || current === null) return null;
+		current = (current as Record<string, unknown>)[key];
+	}
+	return typeof current === "string" ? current : null;
+}
+
 export function createApp(options: CreateAppOptions): Hono {
 	const { webhookSecret, handleWebhook, logger } = options;
 	const app = new Hono();
@@ -74,7 +87,7 @@ export function createApp(options: CreateAppOptions): Hono {
 		try {
 			payload = JSON.parse(rawBody);
 		} catch {
-			logger.info(
+			logger.error(
 				JSON.stringify({
 					event: eventName,
 					delivery_id: deliveryId,
@@ -85,6 +98,10 @@ export function createApp(options: CreateAppOptions): Hono {
 			return c.text("Bad Request: invalid JSON body", 400);
 		}
 
+		// Extract action and repository for structured logging
+		const payloadAction = safeStringField(payload, "action");
+		const payloadRepo = safeStringField(payload, "repository", "full_name");
+
 		try {
 			await handleWebhook(eventName, deliveryId, payload);
 		} catch (err) {
@@ -93,6 +110,8 @@ export function createApp(options: CreateAppOptions): Hono {
 				JSON.stringify({
 					event: eventName,
 					delivery_id: deliveryId,
+					action: payloadAction,
+					repository: payloadRepo,
 					status: 500,
 					error: message,
 				}),
@@ -104,6 +123,8 @@ export function createApp(options: CreateAppOptions): Hono {
 			JSON.stringify({
 				event: eventName,
 				delivery_id: deliveryId,
+				action: payloadAction,
+				repository: payloadRepo,
 				status: 200,
 			}),
 		);

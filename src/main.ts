@@ -4,6 +4,7 @@ import { loadConfig } from "./config";
 import { ConsoleLogger } from "./logger";
 import { RealCoderClient } from "./coder-client";
 import { WebhookRouter } from "./webhook-router";
+import { HandlerDispatcher } from "./handler-dispatcher";
 import { createApp } from "./server";
 
 // ── Startup context ───────────────────────────────────────────────────────────
@@ -55,18 +56,40 @@ async function main(): Promise<void> {
 	logger.info(`Discovered app identity: ${appSlug} (bot: ${appBotLogin})`);
 
 	// Wire up dependencies
-	const _coder = new RealCoderClient(config.coderURL, config.coderToken);
+	const coder = new RealCoderClient(config.coderURL, config.coderToken);
 	const router = new WebhookRouter({
 		agentGithubUsername: config.agentGithubUsername,
 		appBotLogin,
 		logger,
 	});
 
+	// Factory that creates an installation-scoped Octokit using the App credentials
+	const createInstallationOctokit = (installationId: number) =>
+		new Octokit({
+			authStrategy: createAppAuth,
+			auth: {
+				appId: config.appId,
+				privateKey: config.privateKey,
+				installationId,
+			},
+		});
+
+	const dispatcher = new HandlerDispatcher({
+		config,
+		createInstallationOctokit,
+		coderClient: coder,
+		logger,
+	});
+
 	// Create Hono app
 	const app = createApp({
 		webhookSecret: config.webhookSecret,
-		handleWebhook: (eventName, deliveryId, payload) =>
-			router.handleWebhook(eventName, deliveryId, payload).then(() => {}),
+		handleWebhook: async (eventName, deliveryId, payload) => {
+			const result = await router.handleWebhook(eventName, deliveryId, payload);
+			if (result.dispatched) {
+				await dispatcher.dispatch(result);
+			}
+		},
 		logger,
 	});
 

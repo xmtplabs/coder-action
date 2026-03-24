@@ -60,6 +60,10 @@ describe("WebhookRouter", () => {
 		);
 		expect(result.context.repoName).toBe("test-repo");
 		expect(result.context.repoOwner).toBe("xmtp");
+		// senderLogin and senderId must be present for permission checks and
+		// Coder username resolution
+		expect(result.context.senderLogin).toBe("human-dev");
+		expect(result.context.senderId).toBe(67890);
 	});
 
 	test("issues.assigned with non-matching assignee login → skipped", async () => {
@@ -158,6 +162,25 @@ describe("WebhookRouter", () => {
 		);
 		expect(result.context.repoName).toBe("test-repo");
 		expect(result.context.repoOwner).toBe("xmtp");
+	});
+
+	test("issue_comment.created on PR where PR author is not agent → skipped", async () => {
+		const payload = {
+			...issueCommentOnPr,
+			issue: {
+				...issueCommentOnPr.issue,
+				user: { login: "some-other-user" },
+			},
+		};
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-007a",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(false);
+		if (result.dispatched) throw new Error("expected skipped");
+		expect(result.reason).toMatch(/PR author/i);
 	});
 
 	test("issue_comment.created on PR from human → dispatched as pr_comment", async () => {

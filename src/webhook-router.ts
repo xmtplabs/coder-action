@@ -76,7 +76,8 @@ export class WebhookRouter {
 		// Try "assigned" first
 		const assigned = IssuesAssignedPayloadSchema.safeParse(payload);
 		if (assigned.success) {
-			const { assignee, issue, repository, installation } = assigned.data;
+			const { assignee, issue, repository, installation, sender } =
+				assigned.data;
 			if (assignee.login !== this.options.agentGithubUsername) {
 				return {
 					dispatched: false,
@@ -92,6 +93,8 @@ export class WebhookRouter {
 					issueUrl: issue.html_url,
 					repoName: repository.name,
 					repoOwner: repository.owner.login,
+					senderLogin: sender.login,
+					senderId: sender.id,
 				},
 			};
 		}
@@ -134,7 +137,14 @@ export class WebhookRouter {
 		}
 
 		// Issue comment on a PR (issue.pull_request is present and non-null)
+		// Guard: only forward comments on PRs opened by the agent
 		if (issue.pull_request != null) {
+			if (issue.user.login !== this.options.agentGithubUsername) {
+				return {
+					dispatched: false,
+					reason: `Skipping: PR author "${issue.user.login}" does not match agent login`,
+				};
+			}
 			return {
 				dispatched: true,
 				handler: "pr_comment",
@@ -147,6 +157,8 @@ export class WebhookRouter {
 					commentCreatedAt: comment.created_at,
 					repoName: repository.name,
 					repoOwner: repository.owner.login,
+					prAuthor: issue.user.login,
+					commenterLogin: comment.user.login,
 					isReviewComment: false,
 					isReviewSubmission: false,
 				},
@@ -166,6 +178,7 @@ export class WebhookRouter {
 				commentCreatedAt: comment.created_at,
 				repoName: repository.name,
 				repoOwner: repository.owner.login,
+				commenterLogin: comment.user.login,
 			},
 		};
 	}
@@ -207,6 +220,8 @@ export class WebhookRouter {
 				commentCreatedAt: comment.created_at,
 				repoName: repository.name,
 				repoOwner: repository.owner.login,
+				prAuthor: pull_request.user.login,
+				commenterLogin: comment.user.login,
 				isReviewComment: true,
 				isReviewSubmission: false,
 			},
@@ -257,6 +272,8 @@ export class WebhookRouter {
 				commentCreatedAt: review.submitted_at,
 				repoName: repository.name,
 				repoOwner: repository.owner.login,
+				prAuthor: pull_request.user.login,
+				commenterLogin: review.user.login,
 				isReviewComment: false,
 				isReviewSubmission: true,
 			},
