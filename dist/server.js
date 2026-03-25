@@ -9164,7 +9164,7 @@ class WebhookRouter {
   routeIssues(payload) {
     const assigned = IssuesAssignedPayloadSchema.safeParse(payload);
     if (assigned.success) {
-      const { assignee, issue, repository, installation } = assigned.data;
+      const { assignee, issue, repository, installation, sender } = assigned.data;
       if (assignee.login !== this.options.agentGithubUsername) {
         return {
           dispatched: false,
@@ -9179,7 +9179,9 @@ class WebhookRouter {
           issueNumber: issue.number,
           issueUrl: issue.html_url,
           repoName: repository.name,
-          repoOwner: repository.owner.login
+          repoOwner: repository.owner.login,
+          senderLogin: sender.login,
+          senderId: sender.id
         }
       };
     }
@@ -9204,7 +9206,8 @@ class WebhookRouter {
     if (!parsed.success) {
       return {
         dispatched: false,
-        reason: "Failed to parse issue_comment payload"
+        reason: "Failed to parse issue_comment payload",
+        validationError: true
       };
     }
     const { issue, comment, repository, installation } = parsed.data;
@@ -9215,6 +9218,12 @@ class WebhookRouter {
       };
     }
     if (issue.pull_request != null) {
+      if (issue.user.login !== this.options.agentGithubUsername) {
+        return {
+          dispatched: false,
+          reason: `Skipping: PR author "${issue.user.login}" does not match agent login`
+        };
+      }
       return {
         dispatched: true,
         handler: "pr_comment",
@@ -9227,6 +9236,8 @@ class WebhookRouter {
           commentCreatedAt: comment.created_at,
           repoName: repository.name,
           repoOwner: repository.owner.login,
+          prAuthor: issue.user.login,
+          commenterLogin: comment.user.login,
           isReviewComment: false,
           isReviewSubmission: false
         }
@@ -9243,7 +9254,8 @@ class WebhookRouter {
         commentId: comment.id,
         commentCreatedAt: comment.created_at,
         repoName: repository.name,
-        repoOwner: repository.owner.login
+        repoOwner: repository.owner.login,
+        commenterLogin: comment.user.login
       }
     };
   }
@@ -9252,7 +9264,8 @@ class WebhookRouter {
     if (!parsed.success) {
       return {
         dispatched: false,
-        reason: "Failed to parse pull_request_review_comment payload"
+        reason: "Failed to parse pull_request_review_comment payload",
+        validationError: true
       };
     }
     const { pull_request, comment, repository, installation } = parsed.data;
@@ -9280,6 +9293,8 @@ class WebhookRouter {
         commentCreatedAt: comment.created_at,
         repoName: repository.name,
         repoOwner: repository.owner.login,
+        prAuthor: pull_request.user.login,
+        commenterLogin: comment.user.login,
         isReviewComment: true,
         isReviewSubmission: false
       }
@@ -9290,7 +9305,8 @@ class WebhookRouter {
     if (!parsed.success) {
       return {
         dispatched: false,
-        reason: "Failed to parse pull_request_review payload"
+        reason: "Failed to parse pull_request_review payload",
+        validationError: true
       };
     }
     const { pull_request, review, repository, installation } = parsed.data;
@@ -9324,6 +9340,8 @@ class WebhookRouter {
         commentCreatedAt: review.submitted_at,
         repoName: repository.name,
         repoOwner: repository.owner.login,
+        prAuthor: pull_request.user.login,
+        commenterLogin: review.user.login,
         isReviewComment: false,
         isReviewSubmission: true
       }
@@ -9334,7 +9352,8 @@ class WebhookRouter {
     if (!parsed.success) {
       return {
         dispatched: false,
-        reason: "Failed to parse workflow_run payload"
+        reason: "Failed to parse workflow_run payload",
+        validationError: true
       };
     }
     const { workflow_run, repository, installation } = parsed.data;
@@ -9360,6 +9379,628 @@ class WebhookRouter {
         repoOwner: repository.owner.login
       }
     };
+  }
+}
+
+// src/github-client.ts
+class GitHubClient {
+  octokit;
+  logger;
+  constructor(octokit, logger) {
+    this.octokit = octokit;
+    this.logger = logger;
+  }
+  async checkActorPermission(owner, repo, username) {
+    try {
+      const { data } = await this.octokit.rest.repos.getCollaboratorPermissionLevel({
+        owner,
+        repo,
+        username
+      });
+      const allowed = new Set(["admin", "write"]);
+      return allowed.has(data.permission);
+    } catch (error) {
+      const err = error;
+      if (err?.status === 404)
+        return false;
+      throw error;
+    }
+  }
+  async findLinkedIssues(owner, repo, prNumber) {
+    const result = await this.octokit.graphql(`query($owner: String!, $repo: String!, $pr: Int!) {
+				repository(owner: $owner, name: $repo) {
+					pullRequest(number: $pr) {
+						closingIssuesReferences(first: 10) {
+							nodes { number title state url }
+						}
+					}
+				}
+			}`, { owner, repo, pr: prNumber });
+    return result.repository.pullRequest.closingIssuesReferences.nodes;
+  }
+  async commentOnIssue(owner, repo, issueNumber, body, matchPrefix) {
+    const { data: comments } = await this.octokit.rest.issues.listComments({
+      owner,
+      repo,
+      issue_number: issueNumber
+    });
+    const existing = [...comments].reverse().find((c) => c.body?.startsWith(matchPrefix));
+    if (existing) {
+      await this.octokit.rest.issues.updateComment({
+        owner,
+        repo,
+        comment_id: existing.id,
+        body
+      });
+    } else {
+      await this.octokit.rest.issues.createComment({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        body
+      });
+    }
+  }
+  async findPRByHeadSHA(owner, repo, sha) {
+    const { data: prs } = await this.octokit.rest.pulls.list({
+      owner,
+      repo,
+      state: "open",
+      sort: "updated",
+      direction: "desc",
+      per_page: 10
+    });
+    const match = prs.find((pr) => pr.head.sha === sha);
+    if (!match)
+      return null;
+    return {
+      number: match.number,
+      user: match.user,
+      head: match.head
+    };
+  }
+  async getPR(owner, repo, prNumber) {
+    const { data } = await this.octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber
+    });
+    return {
+      number: data.number,
+      user: data.user,
+      head: data.head
+    };
+  }
+  async getFailedJobs(owner, repo, runId) {
+    const { data } = await this.octokit.rest.actions.listJobsForWorkflowRun({
+      owner,
+      repo,
+      run_id: runId
+    });
+    return data.jobs.filter((j) => j.conclusion === "failure").map((j) => ({
+      id: j.id,
+      name: j.name,
+      conclusion: j.conclusion
+    }));
+  }
+  async getJobLogs(owner, repo, jobId, maxLines = 100) {
+    const { data } = await this.octokit.rest.actions.downloadJobLogsForWorkflowRun({
+      owner,
+      repo,
+      job_id: jobId
+    });
+    const log = data;
+    const lines = log.split(`
+`);
+    if (lines.length <= maxLines)
+      return log;
+    return lines.slice(-maxLines).join(`
+`);
+  }
+  async addReactionToComment(owner, repo, commentId) {
+    try {
+      await this.octokit.rest.reactions.createForIssueComment({
+        owner,
+        repo,
+        comment_id: commentId,
+        content: "eyes"
+      });
+    } catch (error) {
+      this.logger.warning(`Failed to add reaction to comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  async addReactionToReviewComment(owner, repo, commentId) {
+    try {
+      await this.octokit.rest.reactions.createForPullRequestReviewComment({
+        owner,
+        repo,
+        comment_id: commentId,
+        content: "eyes"
+      });
+    } catch (error) {
+      this.logger.warning(`Failed to add reaction to review comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+// src/task-utils.ts
+var MAX_TASK_NAME_LENGTH = 32;
+function generateTaskName(prefix, repo, issueNumber) {
+  const issueStr = String(issueNumber);
+  const overhead = prefix.length + 1 + 1 + issueStr.length;
+  const maxRepoLength = MAX_TASK_NAME_LENGTH - overhead;
+  if (maxRepoLength <= 0) {
+    throw new Error(`Task name prefix "${prefix}" and issue number ${issueNumber} leave no room for the repo name (max ${MAX_TASK_NAME_LENGTH} chars)`);
+  }
+  const truncatedRepo = repo.length > maxRepoLength ? repo.slice(0, maxRepoLength).replace(/-+$/, "") : repo;
+  return `${prefix}-${truncatedRepo}-${issueStr}`;
+}
+async function lookupAndEnsureActiveTask(coder, coderUsername, taskName, logger) {
+  const parsedName = TaskNameSchema.parse(taskName);
+  const task = await coder.getTask(coderUsername, parsedName);
+  if (!task) {
+    return null;
+  }
+  if (task.status === "error") {
+    logger.warning(`Task ${taskName} is in error state, skipping`);
+    return null;
+  }
+  if (task.status === "active" && task.current_state?.state === "idle") {
+    return task;
+  }
+  logger.info(`Task ${taskName} is ${task.status}, waiting for active state...`);
+  if (task.status === "paused") {
+    logger.info(`Resuming paused task ${taskName}...`);
+    await coder.startWorkspace(task.workspace_id);
+  }
+  await coder.waitForTaskActive(task.owner_id, task.id, (msg) => logger.debug(msg));
+  return task;
+}
+
+// src/handlers/close-task.ts
+class CloseTaskHandler {
+  coder;
+  github;
+  inputs;
+  context;
+  logger;
+  constructor(coder, github, inputs, context, logger) {
+    this.coder = coder;
+    this.github = github;
+    this.inputs = inputs;
+    this.context = context;
+    this.logger = logger;
+  }
+  async run() {
+    const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);
+    this.logger.info(`Looking up task: ${taskName}`);
+    const parsedName = TaskNameSchema.parse(taskName);
+    const task = await this.coder.getTask(this.inputs.coderUsername, parsedName);
+    if (!task) {
+      this.logger.info(`No task found for issue #${this.context.issueNumber}, nothing to clean up`);
+      return { skipped: true, skipReason: "task-not-found" };
+    }
+    const workspaceId = task.workspace_id;
+    this.logger.info(`Stopping workspace ${workspaceId} for task ${taskName}`);
+    let stopSucceeded = false;
+    try {
+      await this.coder.stopWorkspace(workspaceId);
+      stopSucceeded = true;
+    } catch (error) {
+      this.logger.warning(`Failed to stop workspace: ${error}`);
+    }
+    if (stopSucceeded) {
+      try {
+        await this.coder.waitForWorkspaceStopped(workspaceId, (msg) => this.logger.info(msg));
+      } catch (error) {
+        this.logger.warning(`Timed out waiting for workspace to stop: ${error}`);
+      }
+    }
+    try {
+      await this.coder.deleteWorkspace(workspaceId);
+    } catch (error) {
+      this.logger.warning(`Failed to delete workspace: ${error}`);
+    }
+    try {
+      await this.coder.deleteTask(this.inputs.coderUsername, task.id);
+    } catch (error) {
+      this.logger.warning(`Failed to delete task: ${error}`);
+    }
+    await this.github.commentOnIssue(this.context.owner, this.context.repo, this.context.issueNumber, "Task completed.", "Task created:");
+    return { taskName, taskStatus: "deleted", skipped: false };
+  }
+}
+
+// src/handlers/create-task.ts
+class CreateTaskHandler {
+  coder;
+  github;
+  inputs;
+  context;
+  logger;
+  constructor(coder, github, inputs, context, logger) {
+    this.coder = coder;
+    this.github = github;
+    this.inputs = inputs;
+    this.context = context;
+    this.logger = logger;
+  }
+  async run() {
+    const coderUsername = this.inputs.coderUsername;
+    if (!coderUsername) {
+      throw new Error("coderUsername is required for create_task");
+    }
+    const hasAccess = await this.github.checkActorPermission(this.context.owner, this.context.repo, this.context.senderLogin);
+    if (!hasAccess) {
+      this.logger.info(`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`);
+      return { skipped: true, skipReason: "insufficient-permissions" };
+    }
+    const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);
+    this.logger.info(`Task name: ${taskName}`);
+    const parsedName = TaskNameSchema.parse(taskName);
+    const existingTask = await this.coder.getTask(coderUsername, parsedName);
+    if (existingTask) {
+      this.logger.info(`Task ${taskName} already exists (status: ${existingTask.status})`);
+      if (existingTask.status !== "active" || existingTask.current_state?.state !== "idle") {
+        await this.coder.waitForTaskActive(coderUsername, existingTask.id, (msg) => this.logger.debug(msg));
+      }
+      const taskUrl2 = this.generateTaskUrl(coderUsername, String(existingTask.id));
+      return {
+        taskName,
+        taskUrl: taskUrl2,
+        taskStatus: existingTask.status,
+        skipped: false
+      };
+    }
+    const fullPrompt = this.inputs.prompt ? `${this.inputs.prompt}
+
+${this.context.issueUrl}` : this.context.issueUrl;
+    const template = await this.coder.getTemplateByOrganizationAndName(this.inputs.coderOrganization, this.inputs.coderTemplateName);
+    const presets = await this.coder.getTemplateVersionPresets(template.active_version_id);
+    let presetId;
+    if (this.inputs.coderTemplatePreset) {
+      const found = presets.find((p) => p.Name === this.inputs.coderTemplatePreset);
+      if (!found)
+        throw new Error(`Preset ${this.inputs.coderTemplatePreset} not found`);
+      presetId = found.ID;
+    } else {
+      const defaultPreset = presets.find((p) => p.Default);
+      presetId = defaultPreset?.ID;
+    }
+    const createdTask = await this.coder.createTask(coderUsername, {
+      name: taskName,
+      template_version_id: template.active_version_id,
+      template_version_preset_id: presetId,
+      input: fullPrompt
+    });
+    const taskUrl = this.generateTaskUrl(coderUsername, String(createdTask.id));
+    this.logger.info(`Task created: ${taskUrl}`);
+    await this.github.commentOnIssue(this.context.owner, this.context.repo, this.context.issueNumber, `Task created: ${taskUrl}`, "Task created:");
+    return {
+      taskName,
+      taskUrl,
+      taskStatus: createdTask.status,
+      skipped: false
+    };
+  }
+  generateTaskUrl(coderUsername, taskId) {
+    const baseURL = this.inputs.coderURL.replace(/\/$/, "");
+    return `${baseURL}/tasks/${coderUsername}/${taskId}`;
+  }
+}
+
+// src/messages.ts
+var MAX_FAILED_JOBS = 5;
+function formatPRCommentMessage(params) {
+  return `New Comment on PR: ${params.commentUrl}
+Commenter: ${params.commenter}
+Timestamp: ${params.timestamp}
+
+[INSTRUCTIONS]
+First, determine whether this comment requires action.
+
+If the comment is automated and does not require code changes or a reply \u2014 for example: bot status updates, approvability checks, CI notifications, merge conflict warnings, or other non-human automated comments \u2014 react to the comment with a \uD83D\uDC4D emoji and take no further action.
+
+If the comment contains valid suggestions or feedback from a human reviewer, implement them, ensure the branch is still in a healthy state (all lint and tests continue to pass), then commit and push. Reply to the comment with a succinct and clear explanation of the changes you made.
+
+If you have questions or need clarification, ask them directly in the comment thread and wait for further feedback.
+
+If no changes are needed or the comment is invalid feedback, reply to the comment with a succinct and clear explanation why no action was taken.
+[END INSTRUCTIONS]
+
+[COMMENT]
+${params.body}
+[END COMMENT]`;
+}
+function formatIssueCommentMessage(params) {
+  return `New Comment on Issue: ${params.commentUrl}
+Commenter: ${params.commenter}
+Timestamp: ${params.timestamp}
+
+[INSTRUCTIONS]
+First, determine whether this comment requires action.
+
+If the comment is automated and does not contain actionable information \u2014 for example: bot status updates, CI notifications, task tracking comments, or other non-human automated comments \u2014 react to the comment with a \uD83D\uDC4D emoji and take no further action.
+
+If the comment contains new requirements, clarifications, or feedback that affects your current work, adjust your approach accordingly.
+
+If the comment asks a question, reply directly on the issue.
+[END INSTRUCTIONS]
+
+[COMMENT]
+${params.body}
+[END COMMENT]`;
+}
+function formatFailedCheckMessage(params) {
+  const capped = params.failedJobs.slice(0, MAX_FAILED_JOBS);
+  const jobNames = capped.map((j) => j.name).join(", ");
+  const jobSections = capped.map((j) => `## ${j.name}
+${j.logs}`).join(`
+
+`);
+  return `CI Check Failed on PR: ${params.prUrl}
+Workflow: ${params.workflowName}
+Run: ${params.runUrl}
+Failed Jobs: ${jobNames}
+
+Review the failing checks below. Fix the issues, ensure all checks pass locally, then commit and push.
+
+If you cannot determine the root cause from the logs, check out the workflow definition at .github/workflows/${params.workflowFile} for context.
+---
+
+${jobSections}`;
+}
+
+// src/handlers/failed-check.ts
+var MAX_LOG_LINES = 100;
+
+class FailedCheckHandler {
+  coder;
+  github;
+  inputs;
+  context;
+  logger;
+  constructor(coder, github, inputs, context, logger) {
+    this.coder = coder;
+    this.github = github;
+    this.inputs = inputs;
+    this.context = context;
+    this.logger = logger;
+  }
+  async run() {
+    let pr = null;
+    if (this.context.pullRequests.length > 0) {
+      pr = await this.github.getPR(this.context.owner, this.context.repo, this.context.pullRequests[0].number);
+    } else {
+      this.logger.info("No pull_requests in event, looking up by head SHA");
+      pr = await this.github.findPRByHeadSHA(this.context.owner, this.context.repo, this.context.headSha);
+    }
+    if (!pr) {
+      this.logger.info("No PR found for workflow run");
+      return { skipped: true, skipReason: "no-pr-found" };
+    }
+    if (pr.user.login !== this.inputs.agentGithubUsername) {
+      this.logger.info(`PR #${pr.number} not authored by ${this.inputs.agentGithubUsername}`);
+      return { skipped: true, skipReason: "pr-not-by-coder-agent" };
+    }
+    if (pr.head.sha !== this.context.headSha) {
+      this.logger.info(`Workflow run is for stale commit ${this.context.headSha}, PR is at ${pr.head.sha}`);
+      return { skipped: true, skipReason: "stale-commit" };
+    }
+    const linkedIssues = await this.github.findLinkedIssues(this.context.owner, this.context.repo, pr.number);
+    if (linkedIssues.length === 0) {
+      this.logger.info("No linked issue found");
+      return { skipped: true, skipReason: "no-linked-issue" };
+    }
+    const issue = linkedIssues[0];
+    const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, issue.number);
+    const task = await lookupAndEnsureActiveTask(this.coder, this.inputs.coderUsername, taskName, this.logger);
+    if (!task) {
+      this.logger.info(`Task not found: ${taskName}`);
+      return { skipped: true, skipReason: "task-not-found" };
+    }
+    const allFailedJobs = await this.github.getFailedJobs(this.context.owner, this.context.repo, this.context.runId);
+    const cappedJobs = allFailedJobs.slice(0, MAX_FAILED_JOBS);
+    const jobsWithLogs = await Promise.all(cappedJobs.map(async (job) => ({
+      name: job.name,
+      logs: await this.github.getJobLogs(this.context.owner, this.context.repo, job.id, MAX_LOG_LINES)
+    })));
+    const message = formatFailedCheckMessage({
+      prUrl: `https://github.com/${this.context.owner}/${this.context.repo}/pull/${pr.number}`,
+      workflowName: this.context.workflowName,
+      runUrl: this.context.runUrl,
+      workflowFile: this.context.workflowFile,
+      failedJobs: jobsWithLogs
+    });
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
+    this.logger.info(`Failed check details forwarded to task ${taskName}`);
+    return { taskName, taskStatus: task.status, skipped: false };
+  }
+}
+
+// src/handlers/issue-comment.ts
+class IssueCommentHandler {
+  coder;
+  github;
+  inputs;
+  context;
+  logger;
+  constructor(coder, github, inputs, context, logger) {
+    this.coder = coder;
+    this.github = github;
+    this.inputs = inputs;
+    this.context = context;
+    this.logger = logger;
+  }
+  async run() {
+    if (this.context.commenterLogin === this.inputs.agentGithubUsername) {
+      this.logger.info("Ignoring self-comment from coder agent");
+      return { skipped: true, skipReason: "self-comment" };
+    }
+    const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, this.context.issueNumber);
+    const task = await lookupAndEnsureActiveTask(this.coder, this.inputs.coderUsername, taskName, this.logger);
+    if (!task) {
+      this.logger.info(`Task not found for issue #${this.context.issueNumber}`);
+      return { skipped: true, skipReason: "task-not-found" };
+    }
+    const message = formatIssueCommentMessage({
+      commentUrl: this.context.commentUrl,
+      commenter: this.context.commenterLogin,
+      timestamp: this.context.commentCreatedAt,
+      body: this.context.commentBody
+    });
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
+    this.logger.info(`Comment forwarded to task ${taskName}`);
+    await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
+    return { taskName, taskStatus: task.status, skipped: false };
+  }
+}
+
+// src/handlers/pr-comment.ts
+class PRCommentHandler {
+  coder;
+  github;
+  inputs;
+  context;
+  logger;
+  constructor(coder, github, inputs, context, logger) {
+    this.coder = coder;
+    this.github = github;
+    this.inputs = inputs;
+    this.context = context;
+    this.logger = logger;
+  }
+  async run() {
+    if (this.context.prAuthor !== this.inputs.agentGithubUsername) {
+      this.logger.info(`PR not authored by ${this.inputs.agentGithubUsername}, skipping`);
+      return { skipped: true, skipReason: "pr-not-by-coder-agent" };
+    }
+    if (this.context.commenterLogin === this.inputs.agentGithubUsername) {
+      this.logger.info("Ignoring self-comment from coder agent");
+      return { skipped: true, skipReason: "self-comment" };
+    }
+    if (this.context.isReviewSubmission && !this.context.commentBody?.trim()) {
+      this.logger.info("Ignoring review submission with empty body");
+      return { skipped: true, skipReason: "empty-review-body" };
+    }
+    const linkedIssues = await this.github.findLinkedIssues(this.context.owner, this.context.repo, this.context.prNumber);
+    if (linkedIssues.length === 0) {
+      this.logger.info("No linked issue found");
+      return { skipped: true, skipReason: "no-linked-issue" };
+    }
+    if (linkedIssues.length > 1) {
+      this.logger.warning(`Multiple linked issues found, using first: #${linkedIssues[0].number}`);
+    }
+    const issue = linkedIssues[0];
+    const taskName = generateTaskName(this.inputs.coderTaskNamePrefix, this.context.repo, issue.number);
+    const task = await lookupAndEnsureActiveTask(this.coder, this.inputs.coderUsername, taskName, this.logger);
+    if (!task) {
+      this.logger.info(`Task not found: ${taskName}`);
+      return { skipped: true, skipReason: "task-not-found" };
+    }
+    const message = formatPRCommentMessage({
+      commentUrl: this.context.commentUrl,
+      commenter: this.context.commenterLogin,
+      timestamp: this.context.commentCreatedAt,
+      body: this.context.commentBody
+    });
+    await this.coder.sendTaskInput(task.owner_id, task.id, message);
+    this.logger.info(`Comment forwarded to task ${taskName}`);
+    if (this.context.isReviewSubmission) {} else if (this.context.isReviewComment) {
+      await this.github.addReactionToReviewComment(this.context.owner, this.context.repo, this.context.commentId);
+    } else {
+      await this.github.addReactionToComment(this.context.owner, this.context.repo, this.context.commentId);
+    }
+    return { taskName, taskStatus: task.status, skipped: false };
+  }
+}
+
+// src/handler-dispatcher.ts
+class HandlerDispatcher {
+  options;
+  constructor(options) {
+    this.options = options;
+  }
+  async dispatch(result) {
+    const octokit = this.options.createInstallationOctokit(result.installationId);
+    const createGitHubClient = this.options.createGitHubClient ?? ((oct) => new GitHubClient(oct, this.options.logger));
+    const github = createGitHubClient(octokit);
+    const handlerConfig = {
+      coderURL: this.options.config.coderURL,
+      coderToken: this.options.config.coderToken,
+      coderTaskNamePrefix: this.options.config.coderTaskNamePrefix,
+      coderTemplateName: this.options.config.coderTemplateName,
+      coderTemplatePreset: this.options.config.coderTemplatePreset,
+      coderOrganization: this.options.config.coderOrganization,
+      agentGithubUsername: this.options.config.agentGithubUsername
+    };
+    const ctx = result.context;
+    switch (result.handler) {
+      case "create_task": {
+        const senderId = typeof ctx.senderId === "number" ? ctx.senderId : undefined;
+        const coderUser = await this.options.coderClient.getCoderUserByGitHubId(senderId);
+        const config = { ...handlerConfig, coderUsername: coderUser.username };
+        const handler2 = new CreateTaskHandler(this.options.coderClient, github, config, {
+          owner: String(ctx.repoOwner),
+          repo: String(ctx.repoName),
+          issueNumber: Number(ctx.issueNumber),
+          issueUrl: String(ctx.issueUrl),
+          senderLogin: String(ctx.senderLogin)
+        }, this.options.logger);
+        return handler2.run();
+      }
+      case "close_task": {
+        const handler2 = new CloseTaskHandler(this.options.coderClient, github, handlerConfig, {
+          owner: String(ctx.repoOwner),
+          repo: String(ctx.repoName),
+          issueNumber: Number(ctx.issueNumber)
+        }, this.options.logger);
+        return handler2.run();
+      }
+      case "pr_comment": {
+        const handler2 = new PRCommentHandler(this.options.coderClient, github, handlerConfig, {
+          owner: String(ctx.repoOwner),
+          repo: String(ctx.repoName),
+          prNumber: Number(ctx.issueNumber),
+          prAuthor: String(ctx.prAuthor),
+          commenterLogin: String(ctx.commenterLogin),
+          commentId: Number(ctx.commentId),
+          commentUrl: String(ctx.commentUrl),
+          commentBody: String(ctx.commentBody),
+          commentCreatedAt: String(ctx.commentCreatedAt),
+          isReviewComment: Boolean(ctx.isReviewComment),
+          isReviewSubmission: Boolean(ctx.isReviewSubmission)
+        }, this.options.logger);
+        return handler2.run();
+      }
+      case "issue_comment": {
+        const handler2 = new IssueCommentHandler(this.options.coderClient, github, handlerConfig, {
+          owner: String(ctx.repoOwner),
+          repo: String(ctx.repoName),
+          issueNumber: Number(ctx.issueNumber),
+          commentId: Number(ctx.commentId),
+          commenterLogin: String(ctx.commenterLogin),
+          commentUrl: String(ctx.commentUrl),
+          commentBody: String(ctx.commentBody),
+          commentCreatedAt: String(ctx.commentCreatedAt)
+        }, this.options.logger);
+        return handler2.run();
+      }
+      case "failed_check": {
+        const pullRequestNumbers = Array.isArray(ctx.pullRequestNumbers) ? ctx.pullRequestNumbers : [];
+        const handler2 = new FailedCheckHandler(this.options.coderClient, github, handlerConfig, {
+          owner: String(ctx.repoOwner),
+          repo: String(ctx.repoName),
+          runId: Number(ctx.workflowRunId),
+          runUrl: String(ctx.workflowRunUrl),
+          headSha: String(ctx.headSha),
+          workflowName: String(ctx.workflowName),
+          workflowFile: ctx.workflowPath != null ? String(ctx.workflowPath).split("/").pop() ?? "unknown" : "unknown",
+          pullRequests: pullRequestNumbers.map((n) => ({ number: n }))
+        }, this.options.logger);
+        return handler2.run();
+      }
+    }
   }
 }
 
@@ -10934,6 +11575,15 @@ async function verify(secret, eventPayload, signature) {
 verify.VERSION = VERSION13;
 
 // src/server.ts
+function safeStringField(payload, ...path) {
+  let current = payload;
+  for (const key of path) {
+    if (typeof current !== "object" || current === null)
+      return null;
+    current = current[key];
+  }
+  return typeof current === "string" ? current : null;
+}
 function createApp(options) {
   const { webhookSecret, handleWebhook, logger } = options;
   const app = new Hono2;
@@ -10941,15 +11591,15 @@ function createApp(options) {
     return c.text("ok", 200);
   });
   app.post("/api/webhooks", async (c) => {
+    const startTime = Date.now();
     const rawBody = await c.req.text();
     const signature = c.req.header("X-Hub-Signature-256");
     if (!signature) {
-      logger.info(JSON.stringify({
+      logger.info("Webhook rejected: missing signature", {
         event: null,
         delivery_id: null,
-        status: 401,
-        reason: "missing signature"
-      }));
+        status: 401
+      });
       return c.text("Unauthorized: missing signature", 401);
     }
     let signatureValid;
@@ -10959,22 +11609,20 @@ function createApp(options) {
       signatureValid = false;
     }
     if (!signatureValid) {
-      logger.info(JSON.stringify({
+      logger.info("Webhook rejected: invalid signature", {
         event: null,
         delivery_id: null,
-        status: 401,
-        reason: "invalid signature"
-      }));
+        status: 401
+      });
       return c.text("Unauthorized: invalid signature", 401);
     }
     const eventName = c.req.header("X-GitHub-Event");
     if (!eventName) {
-      logger.info(JSON.stringify({
+      logger.info("Webhook rejected: missing X-GitHub-Event", {
         event: null,
         delivery_id: null,
-        status: 400,
-        reason: "missing X-GitHub-Event"
-      }));
+        status: 400
+      });
       return c.text("Bad Request: missing X-GitHub-Event header", 400);
     }
     const deliveryId = c.req.header("X-GitHub-Delivery") ?? "unknown";
@@ -10982,32 +11630,43 @@ function createApp(options) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
-      logger.info(JSON.stringify({
+      logger.error("Webhook rejected: invalid JSON body", {
         event: eventName,
         delivery_id: deliveryId,
-        status: 400,
-        reason: "invalid JSON"
-      }));
+        status: 400
+      });
       return c.text("Bad Request: invalid JSON body", 400);
     }
+    const payloadAction = safeStringField(payload, "action");
+    const payloadRepo = safeStringField(payload, "repository", "full_name");
+    let handleResult2;
     try {
-      await handleWebhook(eventName, deliveryId, payload);
+      handleResult2 = await handleWebhook(eventName, deliveryId, payload);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logger.error(JSON.stringify({
+      logger.error(`Webhook handler error: ${message}`, {
         event: eventName,
         delivery_id: deliveryId,
+        action: payloadAction,
+        repository: payloadRepo,
         status: 500,
-        error: message
-      }));
+        error: message,
+        duration_ms: Date.now() - startTime
+      });
       return c.text("Internal Server Error", 500);
     }
-    logger.info(JSON.stringify({
+    const responseStatus = handleResult2.status ?? 200;
+    logger.info("Webhook processed", {
       event: eventName,
       delivery_id: deliveryId,
-      status: 200
-    }));
-    return c.text("ok", 200);
+      action: payloadAction,
+      repository: payloadRepo,
+      handler: handleResult2.handler ?? null,
+      dispatched: handleResult2.dispatched,
+      status: responseStatus,
+      duration_ms: Date.now() - startTime
+    });
+    return c.text("ok", responseStatus);
   });
   return app;
 }
@@ -11028,7 +11687,12 @@ async function main() {
     auth: { appId: config.appId, privateKey: config.privateKey }
   });
   const { appSlug, appBotLogin } = await createStartupContext({
-    getAppInfo: () => appOctokit.rest.apps.getAuthenticated()
+    getAppInfo: () => appOctokit.rest.apps.getAuthenticated().then((res) => {
+      const data = res.data;
+      if (!data)
+        throw new Error("GitHub App returned no data");
+      return { data: { slug: data.slug ?? "", id: data.id } };
+    })
   });
   logger.info(`Discovered app identity: ${appSlug} (bot: ${appBotLogin})`);
   const coder = new RealCoderClient(config.coderURL, config.coderToken);
@@ -11037,9 +11701,39 @@ async function main() {
     appBotLogin,
     logger
   });
+  const octokitCache = new Map;
+  const createInstallationOctokit = (installationId) => {
+    let octokit = octokitCache.get(installationId);
+    if (!octokit) {
+      octokit = new Octokit2({
+        authStrategy: createAppAuth,
+        auth: {
+          appId: config.appId,
+          privateKey: config.privateKey,
+          installationId
+        }
+      });
+      octokitCache.set(installationId, octokit);
+    }
+    return octokit;
+  };
+  const dispatcher = new HandlerDispatcher({
+    config,
+    createInstallationOctokit,
+    coderClient: coder,
+    logger
+  });
   const app = createApp({
     webhookSecret: config.webhookSecret,
-    handleWebhook: (eventName, deliveryId, payload) => router.handleWebhook(eventName, deliveryId, payload).then(() => {}),
+    handleWebhook: async (eventName, deliveryId, payload) => {
+      const result = await router.handleWebhook(eventName, deliveryId, payload);
+      if (result.dispatched) {
+        await dispatcher.dispatch(result);
+        return { dispatched: true, handler: result.handler };
+      }
+      const status = result.validationError === true ? 400 : 200;
+      return { dispatched: false, status };
+    },
     logger
   });
   const server = Bun.serve({
