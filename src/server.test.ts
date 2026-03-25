@@ -255,6 +255,40 @@ describe("POST /api/webhooks", () => {
 		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
 
+	test("logs raw webhook payload at info level", async () => {
+		const payloadObj = {
+			action: "opened",
+			repository: { full_name: "org/repo" },
+		};
+		const body = JSON.stringify(payloadObj);
+		const signature = await computeSignature(TEST_SECRET, body);
+
+		const app = createApp({
+			webhookSecret: TEST_SECRET,
+			handleWebhook: async () => ({ dispatched: false }),
+			logger,
+		});
+
+		await app.request("/api/webhooks", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Hub-Signature-256": signature,
+				"X-GitHub-Event": "issues",
+				"X-GitHub-Delivery": "raw-log-test",
+			},
+			body,
+		});
+
+		const rawLog = logger.messages.find(
+			(m) => m.level === "info" && m.message === "Raw webhook received",
+		);
+		expect(rawLog).toBeDefined();
+		expect(rawLog?.fields?.payload).toEqual(payloadObj);
+		expect(rawLog?.fields?.deliveryId).toBe("raw-log-test");
+		expect(rawLog?.fields?.eventName).toBe("issues");
+	});
+
 	test("per-request child logger includes deliveryId and eventName", async () => {
 		const body = JSON.stringify({ action: "opened" });
 		const signature = await computeSignature(TEST_SECRET, body);
