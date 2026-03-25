@@ -3,7 +3,11 @@ import type { GitHubClient } from "../github-client";
 import type { Logger } from "../logger";
 import { formatIssueCommentMessage } from "../messages";
 import type { ActionOutputs, HandlerConfig } from "../schemas";
-import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
+import {
+	generateTaskName,
+	lookupAndEnsureActiveTask,
+	sendInputWithRetry,
+} from "../task-utils";
 
 export interface IssueCommentContext {
 	owner: string;
@@ -56,7 +60,7 @@ export class IssueCommentHandler {
 			timestamp: this.context.commentCreatedAt,
 			body: this.context.commentBody,
 		});
-		await this.coder.sendTaskInput(task.owner_id, task.id, message);
+		await sendInputWithRetry(this.coder, task, message, this.logger);
 		this.logger.info(`Comment forwarded to task ${taskName}`);
 
 		await this.github.addReactionToComment(
