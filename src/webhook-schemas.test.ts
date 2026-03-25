@@ -23,10 +23,10 @@ describe("IssuesAssignedPayloadSchema", () => {
 		const result = IssuesAssignedPayloadSchema.parse(issuesAssigned);
 		expect(result.action).toBe("assigned");
 		expect(result.assignee.login).toBe("xmtp-coder-agent");
-		expect(result.issue.number).toBe(42);
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
-		expect(result.sender.login).toBe("human-dev");
+		expect(result.issue.number).toBe(65);
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
+		expect(result.sender.login).toBe("neekolas");
 	});
 
 	test("rejects fixture with missing required field", () => {
@@ -47,9 +47,9 @@ describe("IssuesClosedPayloadSchema", () => {
 	test("parses issues-closed fixture", () => {
 		const result = IssuesClosedPayloadSchema.parse(issuesClosed);
 		expect(result.action).toBe("closed");
-		expect(result.issue.number).toBe(42);
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
+		expect(result.issue.number).toBe(63);
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
 	});
 
 	test("rejects fixture with missing required field", () => {
@@ -62,10 +62,10 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 	test("parses issue-comment-on-pr fixture", () => {
 		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnPr);
 		expect(result.action).toBe("created");
-		expect(result.issue.number).toBe(5);
+		expect(result.issue.number).toBe(64);
 		expect(result.comment.body).toBeTruthy();
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
 	});
 
 	test("issue-comment-on-pr has issue.pull_request truthy", () => {
@@ -76,7 +76,7 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 	test("parses issue-comment-on-issue fixture", () => {
 		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnIssue);
 		expect(result.action).toBe("created");
-		expect(result.issue.number).toBe(42);
+		expect(result.issue.number).toBe(65);
 	});
 
 	test("issue-comment-on-issue has issue.pull_request falsy", () => {
@@ -102,11 +102,11 @@ describe("PRReviewCommentCreatedPayloadSchema", () => {
 	test("parses pr-review-comment fixture", () => {
 		const result = PRReviewCommentCreatedPayloadSchema.parse(prReviewComment);
 		expect(result.action).toBe("created");
-		expect(result.pull_request.number).toBe(5);
+		expect(result.pull_request.number).toBe(64);
 		expect(result.pull_request.user.login).toBe("xmtp-coder-agent");
-		expect(result.comment.user.login).toBe("human-reviewer");
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
+		expect(result.comment.user.login).toBe("neekolas");
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
 	});
 
 	test("rejects fixture with missing required field", () => {
@@ -121,12 +121,12 @@ describe("PRReviewSubmittedPayloadSchema", () => {
 	test("parses pr-review-submitted fixture", () => {
 		const result = PRReviewSubmittedPayloadSchema.parse(prReviewSubmitted);
 		expect(result.action).toBe("submitted");
-		expect(result.pull_request.number).toBe(5);
+		expect(result.pull_request.number).toBe(64);
 		expect(result.pull_request.user.login).toBe("xmtp-coder-agent");
 		expect(result.review.body).toBe("Please fix the naming");
-		expect(result.review.user.login).toBe("human-reviewer");
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
+		expect(result.review.user.login).toBe("neekolas");
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
 	});
 
 	test("parses pr-review-submitted-empty fixture (null body)", () => {
@@ -146,10 +146,12 @@ describe("WorkflowRunCompletedPayloadSchema", () => {
 		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
 		expect(result.action).toBe("completed");
 		expect(result.workflow_run.conclusion).toBe("failure");
-		expect(result.workflow_run.head_sha).toBe("abc123def");
-		expect(result.workflow_run.pull_requests[0]?.number).toBe(5);
-		expect(result.repository.full_name).toBe("xmtp/test-repo");
-		expect(result.installation.id).toBe(99999);
+		expect(result.workflow_run.head_sha).toBe(
+			"dbbd661d51e80fbbcfb1fcc2cd7446f661d08016",
+		);
+		expect(result.workflow_run.pull_requests[0]?.number).toBe(64);
+		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
+		expect(result.installation.id).toBe(118770088);
 	});
 
 	test("workflow-run-failure has conclusion: failure", () => {

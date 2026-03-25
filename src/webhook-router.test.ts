@@ -15,8 +15,8 @@ import workflowRunSuccess from "./__fixtures__/workflow-run-success.json";
 
 // These constants must match the fixture data
 const AGENT_USER_LOGIN = "xmtp-coder-agent";
-const APP_BOT_LOGIN = "xmtp-coder-app[bot]";
-const INSTALLATION_ID = 99999;
+const APP_BOT_LOGIN = "xmtp-coder-tasks[bot]";
+const INSTALLATION_ID = 118770088;
 
 const noopLogger: Logger = {
 	info: () => {},
@@ -55,16 +55,16 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("create_task");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(42);
+		expect(result.context.issueNumber).toBe(65);
 		expect(result.context.issueUrl).toBe(
-			"https://github.com/xmtp/test-repo/issues/42",
+			"https://github.com/xmtplabs/coder-action/issues/65",
 		);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 		// senderLogin and senderId must be present for permission checks and
 		// Coder username resolution
-		expect(result.context.senderLogin).toBe("human-dev");
-		expect(result.context.senderId).toBe(67890);
+		expect(result.context.senderLogin).toBe("neekolas");
+		expect(result.context.senderId).toBe(65710);
 	});
 
 	test("issues.assigned with non-matching assignee login → skipped", async () => {
@@ -96,9 +96,9 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("close_task");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(42);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.issueNumber).toBe(63);
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 	});
 
 	// ── issue_comment.created — self-comment suppression ──────────────────────
@@ -154,15 +154,15 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("issue_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(42);
+		expect(result.context.issueNumber).toBe(65);
 		expect(result.context.commentBody).toBe(
 			"Can you also handle the edge case for empty inputs?",
 		);
 		expect(result.context.commentUrl).toBe(
-			"https://github.com/xmtp/test-repo/issues/42#issuecomment-1002",
+			"https://github.com/xmtplabs/coder-action/issues/65#issuecomment-4123912472",
 		);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 	});
 
 	test("issue_comment.created on PR where PR author is not agent → skipped", async () => {
@@ -195,14 +195,14 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.issueNumber).toBe(64);
 		expect(result.context.commentBody).toBe(
 			"Looks good, but please fix the naming.",
 		);
 		expect(result.context.isReviewComment).toBe(false);
 		expect(result.context.isReviewSubmission).toBe(false);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 	});
 
 	// ── pull_request_review_comment.created ───────────────────────────────────
@@ -218,14 +218,12 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(5);
-		expect(result.context.commentBody).toBe(
-			"This variable name is misleading, consider renaming it.",
-		);
+		expect(result.context.issueNumber).toBe(64);
+		expect(result.context.commentBody).toBe("Why didn't you respond to this?");
 		expect(result.context.isReviewComment).toBe(true);
 		expect(result.context.isReviewSubmission).toBe(false);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 	});
 
 	test("pull_request_review_comment.created, comment from app bot → skipped", async () => {
@@ -276,12 +274,12 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.issueNumber).toBe(64);
 		expect(result.context.commentBody).toBe("Please fix the naming");
 		expect(result.context.isReviewComment).toBe(false);
 		expect(result.context.isReviewSubmission).toBe(true);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
 	});
 
 	test("pull_request_review.submitted, reviewer is agent → skipped", async () => {
@@ -328,9 +326,9 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("failed_check");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.repoName).toBe("test-repo");
-		expect(result.context.repoOwner).toBe("xmtp");
-		expect(result.context.workflowRunId).toBe(4001);
+		expect(result.context.repoName).toBe("coder-action");
+		expect(result.context.repoOwner).toBe("xmtplabs");
+		expect(result.context.workflowRunId).toBe(23526809052);
 		expect(result.context.workflowName).toBe("CI");
 		expect(result.context.conclusion).toBe("failure");
 	});

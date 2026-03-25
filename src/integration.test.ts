@@ -27,7 +27,7 @@ async function computeSignature(secret: string, body: string): Promise<string> {
 
 const TEST_SECRET = "test-webhook-secret";
 const AGENT_LOGIN = "xmtp-coder-agent";
-const BOT_LOGIN = "xmtp-coder-agent[bot]";
+const BOT_LOGIN = "xmtp-coder-tasks[bot]";
 
 // ── Test setup helpers ────────────────────────────────────────────────────────
 
@@ -110,10 +110,10 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		expect(result?.dispatched).toBe(true);
 		if (result?.dispatched) {
 			expect(result.handler).toBe("create_task");
-			expect(result.installationId).toBe(99999);
-			expect(result.context.issueNumber).toBe(42);
-			expect(result.context.repoName).toBe("test-repo");
-			expect(result.context.repoOwner).toBe("xmtp");
+			expect(result.installationId).toBe(118770088);
+			expect(result.context.issueNumber).toBe(65);
+			expect(result.context.repoName).toBe("coder-action");
+			expect(result.context.repoOwner).toBe("xmtplabs");
 		}
 	});
 
@@ -130,13 +130,13 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		expect(result?.dispatched).toBe(true);
 		if (result?.dispatched) {
 			expect(result.handler).toBe("issue_comment");
-			expect(result.installationId).toBe(99999);
-			expect(result.context.issueNumber).toBe(42);
+			expect(result.installationId).toBe(118770088);
+			expect(result.context.issueNumber).toBe(65);
 			expect(result.context.commentBody).toBe(
 				"Can you also handle the edge case for empty inputs?",
 			);
-			expect(result.context.repoName).toBe("test-repo");
-			expect(result.context.repoOwner).toBe("xmtp");
+			expect(result.context.repoName).toBe("coder-action");
+			expect(result.context.repoOwner).toBe("xmtplabs");
 		}
 	});
 
