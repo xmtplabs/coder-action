@@ -255,7 +255,7 @@ describe("POST /api/webhooks", () => {
 		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
 
-	test("logs raw webhook payload at debug level", async () => {
+	test("logs raw webhook payload at info level", async () => {
 		const payloadObj = {
 			action: "opened",
 			repository: { full_name: "org/repo" },
@@ -280,13 +280,13 @@ describe("POST /api/webhooks", () => {
 			body,
 		});
 
-		const debugLog = logger.messages.find(
-			(m) => m.level === "debug" && m.message === "Raw webhook received",
+		const rawLog = logger.messages.find(
+			(m) => m.level === "info" && m.message === "Raw webhook received",
 		);
-		expect(debugLog).toBeDefined();
-		expect(debugLog?.fields?.payload).toEqual(payloadObj);
-		expect(debugLog?.fields?.deliveryId).toBe("raw-log-test");
-		expect(debugLog?.fields?.eventName).toBe("issues");
+		expect(rawLog).toBeDefined();
+		expect(rawLog?.fields?.payload).toEqual(payloadObj);
+		expect(rawLog?.fields?.deliveryId).toBe("raw-log-test");
+		expect(rawLog?.fields?.eventName).toBe("issues");
 	});
 
 	test("per-request child logger includes deliveryId and eventName", async () => {
