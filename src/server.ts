@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { verify } from "@octokit/webhooks-methods";
 import type { Logger } from "./logger";
+import { type WebhookEnv, webhookSignatureMiddleware } from "./middleware";
 
 export interface WebhookHandleResult {
 	dispatched: boolean;
@@ -34,111 +34,90 @@ function safeStringField(payload: unknown, ...path: string[]): string | null {
 	return typeof current === "string" ? current : null;
 }
 
-export function createApp(options: CreateAppOptions): Hono {
+export function createApp(options: CreateAppOptions): Hono<WebhookEnv> {
 	const { webhookSecret, handleWebhook, logger } = options;
-	const app = new Hono();
+	const app = new Hono<WebhookEnv>();
 
 	app.get("/healthz", (c) => {
 		return c.text("ok", 200);
 	});
 
-	app.post("/api/webhooks", async (c) => {
-		const startTime = Date.now();
-		const rawBody = await c.req.text();
+	app.post(
+		"/api/webhooks",
+		webhookSignatureMiddleware(webhookSecret, logger),
+		async (c) => {
+			const startTime = Date.now();
+			const rawBody = c.get("rawBody");
 
-		const signature = c.req.header("X-Hub-Signature-256");
-		if (!signature) {
-			logger.info("Webhook rejected: missing signature", {
-				event: null,
-				delivery_id: null,
-				status: 401,
-			});
-			return c.text("Unauthorized: missing signature", 401);
-		}
+			const eventName = c.req.header("X-GitHub-Event");
+			if (!eventName) {
+				logger.info("Webhook rejected: missing X-GitHub-Event", {
+					event: null,
+					delivery_id: null,
+					status: 400,
+				});
+				return c.text("Bad Request: missing X-GitHub-Event header", 400);
+			}
 
-		let signatureValid: boolean;
-		try {
-			signatureValid = await verify(webhookSecret, rawBody, signature);
-		} catch {
-			signatureValid = false;
-		}
+			const deliveryId = c.req.header("X-GitHub-Delivery") ?? "unknown";
 
-		if (!signatureValid) {
-			logger.info("Webhook rejected: invalid signature", {
-				event: null,
-				delivery_id: null,
-				status: 401,
-			});
-			return c.text("Unauthorized: invalid signature", 401);
-		}
+			let payload: unknown;
+			try {
+				payload = JSON.parse(rawBody);
+			} catch {
+				logger.error("Webhook rejected: invalid JSON body", {
+					event: eventName,
+					delivery_id: deliveryId,
+					status: 400,
+				});
+				return c.text("Bad Request: invalid JSON body", 400);
+			}
 
-		const eventName = c.req.header("X-GitHub-Event");
-		if (!eventName) {
-			logger.info("Webhook rejected: missing X-GitHub-Event", {
-				event: null,
-				delivery_id: null,
-				status: 400,
-			});
-			return c.text("Bad Request: missing X-GitHub-Event header", 400);
-		}
-
-		const deliveryId = c.req.header("X-GitHub-Delivery") ?? "unknown";
-
-		let payload: unknown;
-		try {
-			payload = JSON.parse(rawBody);
-		} catch {
-			logger.error("Webhook rejected: invalid JSON body", {
-				event: eventName,
-				delivery_id: deliveryId,
-				status: 400,
-			});
-			return c.text("Bad Request: invalid JSON body", 400);
-		}
-
-		// Create per-request child logger with request context
-		const reqLogger = logger.child({
-			deliveryId,
-			eventName,
-		});
-
-		reqLogger.info("Raw webhook received", { payload });
-
-		// Extract action and repository for structured logging
-		const payloadAction = safeStringField(payload, "action");
-		const payloadRepo = safeStringField(payload, "repository", "full_name");
-
-		let handleResult: WebhookHandleResult;
-		try {
-			handleResult = await handleWebhook(
-				eventName,
+			// Create per-request child logger with request context
+			const reqLogger = logger.child({
 				deliveryId,
-				payload,
-				reqLogger,
-			);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			reqLogger.error(`Webhook handler error: ${message}`, {
+				eventName,
+			});
+
+			reqLogger.info("Raw webhook received", { payload });
+
+			// Extract action and repository for structured logging
+			const payloadAction = safeStringField(payload, "action");
+			const payloadRepo = safeStringField(payload, "repository", "full_name");
+
+			let handleResult: WebhookHandleResult;
+			try {
+				handleResult = await handleWebhook(
+					eventName,
+					deliveryId,
+					payload,
+					reqLogger,
+				);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				reqLogger.error(`Webhook handler error: ${message}`, {
+					action: payloadAction,
+					repository: payloadRepo,
+					status: 500,
+					error: message,
+					duration_ms: Date.now() - startTime,
+				});
+				return c.text("Internal Server Error", 500);
+			}
+
+			const responseStatus = (handleResult.status ??
+				200) as ContentfulStatusCode;
+			reqLogger.info("Webhook processed", {
 				action: payloadAction,
 				repository: payloadRepo,
-				status: 500,
-				error: message,
+				handler: handleResult.handler ?? null,
+				dispatched: handleResult.dispatched,
+				status: responseStatus,
 				duration_ms: Date.now() - startTime,
 			});
-			return c.text("Internal Server Error", 500);
-		}
-
-		const responseStatus = (handleResult.status ?? 200) as ContentfulStatusCode;
-		reqLogger.info("Webhook processed", {
-			action: payloadAction,
-			repository: payloadRepo,
-			handler: handleResult.handler ?? null,
-			dispatched: handleResult.dispatched,
-			status: responseStatus,
-			duration_ms: Date.now() - startTime,
-		});
-		return c.text("ok", responseStatus);
-	});
+			return c.text("ok", responseStatus);
+		},
+	);
 
 	return app;
 }
