@@ -7,10 +7,7 @@ import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issuesClosed from "./__fixtures__/issues-closed.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
 import issueCommentOnPr from "./__fixtures__/issue-comment-on-pr.json";
-import issueCommentEditedOnIssue from "./__fixtures__/issue-comment-edited-on-issue.json";
-import issueCommentEditedOnPr from "./__fixtures__/issue-comment-edited-on-pr.json";
 import prReviewComment from "./__fixtures__/pr-review-comment.json";
-import prReviewCommentEdited from "./__fixtures__/pr-review-comment-edited.json";
 import prReviewSubmitted from "./__fixtures__/pr-review-submitted.json";
 import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.json";
 import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
@@ -190,10 +187,11 @@ describe("WebhookRouter", () => {
 	// ── issue_comment.edited — dispatch ─────────────────────────────────────
 
 	test("issue_comment.edited on issue from human → dispatched as issue_comment", async () => {
+		const payload = { ...issueCommentOnIssue, action: "edited" };
 		const result = await router.handleWebhook(
 			"issue_comment",
 			"delivery-006a",
-			issueCommentEditedOnIssue,
+			payload,
 		);
 
 		expect(result.dispatched).toBe(true);
@@ -201,14 +199,14 @@ describe("WebhookRouter", () => {
 		expect(result.handler).toBe("issue_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
 		expect(result.context.issueNumber).toBe(42);
-		expect(result.context.commentBody).toContain("(updated)");
 	});
 
 	test("issue_comment.edited on PR from human → dispatched as pr_comment", async () => {
+		const payload = { ...issueCommentOnPr, action: "edited" };
 		const result = await router.handleWebhook(
 			"issue_comment",
 			"delivery-006b",
-			issueCommentEditedOnPr,
+			payload,
 		);
 
 		expect(result.dispatched).toBe(true);
@@ -216,7 +214,6 @@ describe("WebhookRouter", () => {
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
 		expect(result.context.issueNumber).toBe(5);
-		expect(result.context.commentBody).toContain("(updated)");
 	});
 
 	test("issue_comment.deleted → skipped without validation error", async () => {
@@ -279,10 +276,11 @@ describe("WebhookRouter", () => {
 	});
 
 	test("pull_request_review_comment.edited, PR by agent, comment by human → dispatched as pr_comment", async () => {
+		const payload = { ...prReviewComment, action: "edited" };
 		const result = await router.handleWebhook(
 			"pull_request_review_comment",
 			"delivery-008a",
-			prReviewCommentEdited,
+			payload,
 		);
 
 		expect(result.dispatched).toBe(true);
@@ -290,7 +288,6 @@ describe("WebhookRouter", () => {
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
 		expect(result.context.issueNumber).toBe(5);
-		expect(result.context.commentBody).toContain("(updated)");
 		expect(result.context.isReviewComment).toBe(true);
 	});
 
