@@ -2,6 +2,9 @@ import { createMiddleware } from "hono/factory";
 import { verify } from "@octokit/webhooks-methods";
 import type { Logger } from "./logger";
 
+const ERR_MISSING_SIGNATURE = "Unauthorized: missing signature";
+const ERR_INVALID_SIGNATURE = "Unauthorized: invalid signature";
+
 export type WebhookEnv = {
 	Variables: {
 		rawBody: string;
@@ -26,7 +29,7 @@ export function webhookSignatureMiddleware(
 				delivery_id: null,
 				status: 401,
 			});
-			return c.text("Unauthorized: missing signature", 401);
+			return c.text(ERR_MISSING_SIGNATURE, 401);
 		}
 
 		let signatureValid: boolean;
@@ -42,7 +45,7 @@ export function webhookSignatureMiddleware(
 				delivery_id: null,
 				status: 401,
 			});
-			return c.text("Unauthorized: invalid signature", 401);
+			return c.text(ERR_INVALID_SIGNATURE, 401);
 		}
 
 		c.set("rawBody", rawBody);
