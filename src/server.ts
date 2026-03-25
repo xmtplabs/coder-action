@@ -79,7 +79,9 @@ export function createApp(options: CreateAppOptions): Hono<WebhookEnv> {
 				eventName,
 			});
 
-			reqLogger.info("Raw webhook received", { payload });
+			reqLogger.info("Webhook received", {
+				action: safeStringField(payload, "action"),
+			});
 
 			// Extract action and repository for structured logging
 			const payloadAction = safeStringField(payload, "action");
