@@ -2,7 +2,7 @@ import type { CoderClient, ExperimentalCoderSDKTask } from "./coder-client";
 import { CoderAPIError, TaskNameSchema } from "./coder-client";
 import type { Logger } from "./logger";
 
-const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_MAX_RETRIES = 5;
 
 const MAX_TASK_NAME_LENGTH = 32;
 
