@@ -255,7 +255,7 @@ describe("POST /api/webhooks", () => {
 		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
 
-	test("logs webhook event name, action, and deliveryId without full payload", async () => {
+	test("logs qualified eventName (event.action) and deliveryId without full payload", async () => {
 		const payloadObj = {
 			action: "opened",
 			repository: { full_name: "org/repo" },
@@ -284,9 +284,8 @@ describe("POST /api/webhooks", () => {
 			(m) => m.level === "info" && m.message === "Webhook received",
 		);
 		expect(receivedLog).toBeDefined();
-		expect(receivedLog?.fields?.action).toBe("opened");
+		expect(receivedLog?.fields?.eventName).toBe("issues.opened");
 		expect(receivedLog?.fields?.deliveryId).toBe("raw-log-test");
-		expect(receivedLog?.fields?.eventName).toBe("issues");
 		expect(receivedLog?.fields?.payload).toBeUndefined();
 	});
 
@@ -319,6 +318,6 @@ describe("POST /api/webhooks", () => {
 		);
 		expect(handlerLog).toBeDefined();
 		expect(handlerLog?.fields?.deliveryId).toBe("delivery-xyz");
-		expect(handlerLog?.fields?.eventName).toBe("issues");
+		expect(handlerLog?.fields?.eventName).toBe("issues.opened");
 	});
 });

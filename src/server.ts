@@ -74,17 +74,18 @@ export function createApp(options: CreateAppOptions): Hono<WebhookEnv> {
 			}
 
 			// Create per-request child logger with request context
+			const payloadAction = safeStringField(payload, "action");
+			const qualifiedEvent = payloadAction
+				? `${eventName}.${payloadAction}`
+				: eventName;
 			const reqLogger = logger.child({
 				deliveryId,
-				eventName,
+				eventName: qualifiedEvent,
 			});
 
-			reqLogger.info("Webhook received", {
-				action: safeStringField(payload, "action"),
-			});
+			reqLogger.info("Webhook received");
 
-			// Extract action and repository for structured logging
-			const payloadAction = safeStringField(payload, "action");
+			// Extract repository for structured logging
 			const payloadRepo = safeStringField(payload, "repository", "full_name");
 
 			let handleResult: WebhookHandleResult;
