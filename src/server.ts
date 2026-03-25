@@ -47,14 +47,11 @@ export function createApp(options: CreateAppOptions): Hono {
 
 		const signature = c.req.header("X-Hub-Signature-256");
 		if (!signature) {
-			logger.info(
-				JSON.stringify({
-					event: null,
-					delivery_id: null,
-					status: 401,
-					reason: "missing signature",
-				}),
-			);
+			logger.info("Webhook rejected: missing signature", {
+				event: null,
+				delivery_id: null,
+				status: 401,
+			});
 			return c.text("Unauthorized: missing signature", 401);
 		}
 
@@ -66,27 +63,21 @@ export function createApp(options: CreateAppOptions): Hono {
 		}
 
 		if (!signatureValid) {
-			logger.info(
-				JSON.stringify({
-					event: null,
-					delivery_id: null,
-					status: 401,
-					reason: "invalid signature",
-				}),
-			);
+			logger.info("Webhook rejected: invalid signature", {
+				event: null,
+				delivery_id: null,
+				status: 401,
+			});
 			return c.text("Unauthorized: invalid signature", 401);
 		}
 
 		const eventName = c.req.header("X-GitHub-Event");
 		if (!eventName) {
-			logger.info(
-				JSON.stringify({
-					event: null,
-					delivery_id: null,
-					status: 400,
-					reason: "missing X-GitHub-Event",
-				}),
-			);
+			logger.info("Webhook rejected: missing X-GitHub-Event", {
+				event: null,
+				delivery_id: null,
+				status: 400,
+			});
 			return c.text("Bad Request: missing X-GitHub-Event header", 400);
 		}
 
@@ -96,14 +87,11 @@ export function createApp(options: CreateAppOptions): Hono {
 		try {
 			payload = JSON.parse(rawBody);
 		} catch {
-			logger.error(
-				JSON.stringify({
-					event: eventName,
-					delivery_id: deliveryId,
-					status: 400,
-					reason: "invalid JSON",
-				}),
-			);
+			logger.error("Webhook rejected: invalid JSON body", {
+				event: eventName,
+				delivery_id: deliveryId,
+				status: 400,
+			});
 			return c.text("Bad Request: invalid JSON body", 400);
 		}
 
@@ -116,33 +104,29 @@ export function createApp(options: CreateAppOptions): Hono {
 			handleResult = await handleWebhook(eventName, deliveryId, payload);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
-			logger.error(
-				JSON.stringify({
-					event: eventName,
-					delivery_id: deliveryId,
-					action: payloadAction,
-					repository: payloadRepo,
-					status: 500,
-					error: message,
-					duration_ms: Date.now() - startTime,
-				}),
-			);
-			return c.text("Internal Server Error", 500);
-		}
-
-		const responseStatus = (handleResult.status ?? 200) as ContentfulStatusCode;
-		logger.info(
-			JSON.stringify({
+			logger.error(`Webhook handler error: ${message}`, {
 				event: eventName,
 				delivery_id: deliveryId,
 				action: payloadAction,
 				repository: payloadRepo,
-				handler: handleResult.handler ?? null,
-				dispatched: handleResult.dispatched,
-				status: responseStatus,
+				status: 500,
+				error: message,
 				duration_ms: Date.now() - startTime,
-			}),
-		);
+			});
+			return c.text("Internal Server Error", 500);
+		}
+
+		const responseStatus = (handleResult.status ?? 200) as ContentfulStatusCode;
+		logger.info("Webhook processed", {
+			event: eventName,
+			delivery_id: deliveryId,
+			action: payloadAction,
+			repository: payloadRepo,
+			handler: handleResult.handler ?? null,
+			dispatched: handleResult.dispatched,
+			status: responseStatus,
+			duration_ms: Date.now() - startTime,
+		});
 		return c.text("ok", responseStatus);
 	});
 

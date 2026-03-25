@@ -250,9 +250,8 @@ describe("POST /api/webhooks", () => {
 		expect(res.status).toBe(200);
 		const infoLogs = logger.messages.filter((m) => m.level === "info");
 		const lastLog = infoLogs[infoLogs.length - 1];
-		const parsed = JSON.parse(lastLog.message);
-		expect(parsed.handler).toBe("create_task");
-		expect(parsed.dispatched).toBe(true);
-		expect(typeof parsed.duration_ms).toBe("number");
+		expect(lastLog.fields?.handler).toBe("create_task");
+		expect(lastLog.fields?.dispatched).toBe(true);
+		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
 });
