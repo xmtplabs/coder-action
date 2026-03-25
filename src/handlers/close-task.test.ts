@@ -61,7 +61,7 @@ describe("CloseTaskHandler", () => {
 		);
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
 		expect(coder.deleteTask).toHaveBeenCalledWith(
-			baseInputs.coderUsername,
+			mockTask.owner_id,
 			mockTask.id,
 		);
 		expect(github.commentOnIssue).toHaveBeenCalledWith(
@@ -113,7 +113,7 @@ describe("CloseTaskHandler", () => {
 		expect(coder.waitForWorkspaceStopped).not.toHaveBeenCalled();
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
 		expect(coder.deleteTask).toHaveBeenCalledWith(
-			baseInputs.coderUsername,
+			mockTask.owner_id,
 			mockTask.id,
 		);
 	});
@@ -140,7 +140,7 @@ describe("CloseTaskHandler", () => {
 		expect(result.skipped).toBe(false);
 		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
 		expect(coder.deleteTask).toHaveBeenCalledWith(
-			baseInputs.coderUsername,
+			mockTask.owner_id,
 			mockTask.id,
 		);
 	});
@@ -164,7 +164,34 @@ describe("CloseTaskHandler", () => {
 
 		expect(result.skipped).toBe(false);
 		expect(coder.deleteTask).toHaveBeenCalledWith(
-			baseInputs.coderUsername,
+			mockTask.owner_id,
+			mockTask.id,
+		);
+	});
+
+	// Regression: coderUsername is undefined in production for close_task (issue #70)
+	test("uses task.owner_id for deleteTask even when coderUsername is undefined", async () => {
+		const inputsWithoutUsername: HandlerConfig = {
+			...baseInputs,
+			coderUsername: undefined,
+		};
+		coder.getTask.mockResolvedValue({
+			...mockTask,
+			workspace_id: "ws-1",
+		} as never);
+
+		const handler = new CloseTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			inputsWithoutUsername,
+			closeContext,
+			logger,
+		);
+		const result = await handler.run();
+
+		expect(result.skipped).toBe(false);
+		expect(coder.deleteTask).toHaveBeenCalledWith(
+			mockTask.owner_id,
 			mockTask.id,
 		);
 	});

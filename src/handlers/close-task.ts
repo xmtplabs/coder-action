@@ -73,7 +73,7 @@ export class CloseTaskHandler {
 
 		// Delete task — continue even if this fails
 		try {
-			await this.coder.deleteTask(this.inputs.coderUsername, task.id);
+			await this.coder.deleteTask(task.owner_id, task.id);
 		} catch (error: unknown) {
 			this.logger.warn(`Failed to delete task: ${error}`);
 		}
