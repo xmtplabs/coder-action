@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { FailedCheckInputs } from "../schemas";
+import { TestLogger } from "../logger";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -8,14 +9,14 @@ import {
 import { FailedCheckHandler } from "./failed-check";
 import type { FailedCheckContext } from "./failed-check";
 
-const baseInputs: FailedCheckInputs = {
-	action: "failed_check",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const validContext: FailedCheckContext = {
@@ -32,10 +33,12 @@ const validContext: FailedCheckContext = {
 describe("FailedCheckHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 		// Defaults: PR by agent, matching SHA, linked issue, task exists
 		github.getPR.mockResolvedValue({
 			number: 5,
@@ -66,6 +69,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -93,6 +97,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -113,6 +118,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -134,6 +140,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -155,6 +162,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -171,6 +179,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -187,6 +196,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -209,6 +219,7 @@ describe("FailedCheckHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		await handler.run();
 

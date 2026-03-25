@@ -5,19 +5,18 @@ import {
 	mockStoppedTask,
 	mockTask,
 } from "../test-helpers";
-import type { CreateTaskInputs } from "../schemas";
+import type { HandlerConfig } from "../schemas";
+import { TestLogger } from "../logger";
 import { CreateTaskHandler } from "./create-task";
 
-const baseInputs: CreateTaskInputs = {
-	action: "create_task",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
 	coderTemplateName: "task-template",
 	coderOrganization: "default",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const issueContext = {
@@ -31,10 +30,12 @@ const issueContext = {
 describe("CreateTaskHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 	});
 
 	// AC #1: Create task and post comment
@@ -48,6 +49,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -66,6 +68,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -86,6 +89,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			inputs,
 			issueContext,
+			logger,
 		);
 		await handler.run();
 
@@ -111,6 +115,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		await handler.run();
 
@@ -131,6 +136,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -149,6 +155,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -168,6 +175,7 @@ describe("CreateTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			issueContext,
+			logger,
 		);
 		await handler.run();
 
@@ -175,5 +183,24 @@ describe("CreateTaskHandler", () => {
 			coder.getTask.mock.calls[0] as unknown as [string, unknown]
 		)[1];
 		expect(String(taskNameArg)).toBe("gh-libxmtp-42");
+	});
+
+	test("logs task name via injected logger", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			issueContext,
+			logger,
+		);
+		await handler.run();
+
+		expect(
+			logger.messages.some((m) => m.message.includes("gh-libxmtp-42")),
+		).toBe(true);
 	});
 });

@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { CoderClient } from "./coder-client";
+import { TestLogger } from "./logger";
 import {
 	generateTaskName,
 	lookupAndEnsureActiveTask,
@@ -73,10 +74,12 @@ describe("lookupAndEnsureActiveTask", () => {
 			),
 			waitForTaskActive: mock(() => Promise.resolve()),
 		};
+		const logger = new TestLogger();
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
 			undefined,
 			"gh-repo-42",
+			logger,
 		);
 		expect(result).not.toBeNull();
 		expect(String(result?.id)).toBe("uuid");
@@ -88,10 +91,12 @@ describe("lookupAndEnsureActiveTask", () => {
 			getTask: mock(() => Promise.resolve(null)),
 			waitForTaskActive: mock(() => Promise.resolve()),
 		};
+		const logger = new TestLogger();
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
 			undefined,
 			"gh-repo-99",
+			logger,
 		);
 		expect(result).toBeNull();
 	});
@@ -111,10 +116,12 @@ describe("lookupAndEnsureActiveTask", () => {
 			startWorkspace: mock(() => Promise.resolve()),
 			waitForTaskActive: mock(() => Promise.resolve()),
 		};
+		const logger = new TestLogger();
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
 			undefined,
 			"gh-repo-42",
+			logger,
 		);
 		expect(result).not.toBeNull();
 		expect(mockCoder.startWorkspace).toHaveBeenCalledWith("ws-uuid");
@@ -138,10 +145,12 @@ describe("lookupAndEnsureActiveTask", () => {
 			),
 			waitForTaskActive: mock(() => Promise.resolve()),
 		};
+		const logger = new TestLogger();
 		const result = await lookupAndEnsureActiveTask(
 			mockCoder as unknown as CoderClient,
 			undefined,
 			"gh-repo-42",
+			logger,
 		);
 		expect(result).toBeNull();
 	});

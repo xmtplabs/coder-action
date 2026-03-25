@@ -1,8 +1,8 @@
-import * as core from "@actions/core";
 import type { CoderClient } from "../coder-client";
 import { TaskNameSchema } from "../coder-client";
 import type { GitHubClient } from "../github-client";
-import type { ActionOutputs, CreateTaskInputs } from "../schemas";
+import type { Logger } from "../logger";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName } from "../task-utils";
 
 export interface IssueContext {
@@ -17,8 +17,9 @@ export class CreateTaskHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: CreateTaskInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: IssueContext,
+		private readonly logger: Logger,
 	) {}
 
 	async run(): Promise<ActionOutputs> {
@@ -35,7 +36,7 @@ export class CreateTaskHandler {
 			this.context.senderLogin,
 		);
 		if (!hasAccess) {
-			core.info(
+			this.logger.info(
 				`Actor ${this.context.senderLogin} does not have write access to ${this.context.owner}/${this.context.repo}, skipping task creation`,
 			);
 			return { skipped: true, skipReason: "insufficient-permissions" };
@@ -47,14 +48,14 @@ export class CreateTaskHandler {
 			this.context.repo,
 			this.context.issueNumber,
 		);
-		core.info(`Task name: ${taskName}`);
+		this.logger.info(`Task name: ${taskName}`);
 
 		// 3. Check existing task
 		const parsedName = TaskNameSchema.parse(taskName);
 		const existingTask = await this.coder.getTask(coderUsername, parsedName);
 
 		if (existingTask) {
-			core.info(
+			this.logger.info(
 				`Task ${taskName} already exists (status: ${existingTask.status})`,
 			);
 
@@ -65,7 +66,7 @@ export class CreateTaskHandler {
 				await this.coder.waitForTaskActive(
 					coderUsername,
 					existingTask.id,
-					core.debug,
+					(msg) => this.logger.debug(msg),
 				);
 			}
 
@@ -116,7 +117,7 @@ export class CreateTaskHandler {
 		});
 
 		const taskUrl = this.generateTaskUrl(coderUsername, String(createdTask.id));
-		core.info(`Task created: ${taskUrl}`);
+		this.logger.info(`Task created: ${taskUrl}`);
 
 		// 6. Comment on issue
 		await this.github.commentOnIssue(

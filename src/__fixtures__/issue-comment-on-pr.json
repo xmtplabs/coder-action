@@ -1,0 +1,35 @@
+{
+  "action": "created",
+  "issue": {
+    "number": 5,
+    "pull_request": {
+      "url": "https://api.github.com/repos/xmtp/test-repo/pulls/5"
+    },
+    "user": {
+      "login": "xmtp-coder-agent"
+    }
+  },
+  "comment": {
+    "id": 1001,
+    "body": "Looks good, but please fix the naming.",
+    "html_url": "https://github.com/xmtp/test-repo/pull/5#issuecomment-1001",
+    "created_at": "2024-01-15T10:00:00Z",
+    "user": {
+      "login": "human-reviewer"
+    }
+  },
+  "sender": {
+    "id": 67890,
+    "login": "human-reviewer"
+  },
+  "repository": {
+    "name": "test-repo",
+    "owner": {
+      "login": "xmtp"
+    },
+    "full_name": "xmtp/test-repo"
+  },
+  "installation": {
+    "id": 99999
+  }
+}

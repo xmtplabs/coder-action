@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { IssueCommentInputs } from "../schemas";
+import { TestLogger } from "../logger";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -9,14 +10,14 @@ import {
 import { IssueCommentHandler } from "./issue-comment";
 import type { IssueCommentContext } from "./issue-comment";
 
-const baseInputs: IssueCommentInputs = {
-	action: "issue_comment",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const validContext: IssueCommentContext = {
@@ -33,10 +34,12 @@ const validContext: IssueCommentContext = {
 describe("IssueCommentHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 		coder.getTask.mockResolvedValue(mockTask as never);
 	});
 
@@ -47,6 +50,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -66,6 +70,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		await handler.run();
 
@@ -85,6 +90,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		await handler.run();
 
@@ -99,6 +105,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		await handler.run();
 
@@ -113,6 +120,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -129,6 +137,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -144,6 +153,7 @@ describe("IssueCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 

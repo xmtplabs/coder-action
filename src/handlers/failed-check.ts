@@ -1,8 +1,8 @@
-import * as core from "@actions/core";
 import type { CoderClient } from "../coder-client";
 import type { GitHubClient, PRInfo } from "../github-client";
+import type { Logger } from "../logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../messages";
-import type { ActionOutputs, FailedCheckInputs } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../schemas";
 import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
 
 const MAX_LOG_LINES = 100;
@@ -22,8 +22,9 @@ export class FailedCheckHandler {
 	constructor(
 		private readonly coder: CoderClient,
 		private readonly github: GitHubClient,
-		private readonly inputs: FailedCheckInputs,
+		private readonly inputs: HandlerConfig,
 		private readonly context: FailedCheckContext,
+		private readonly logger: Logger,
 	) {}
 
 	async run(): Promise<ActionOutputs> {
@@ -36,7 +37,7 @@ export class FailedCheckHandler {
 				this.context.pullRequests[0].number,
 			);
 		} else {
-			core.info("No pull_requests in event, looking up by head SHA");
+			this.logger.info("No pull_requests in event, looking up by head SHA");
 			pr = await this.github.findPRByHeadSHA(
 				this.context.owner,
 				this.context.repo,
@@ -45,21 +46,21 @@ export class FailedCheckHandler {
 		}
 
 		if (!pr) {
-			core.info("No PR found for workflow run");
+			this.logger.info("No PR found for workflow run");
 			return { skipped: true, skipReason: "no-pr-found" };
 		}
 
 		// 2. Guard: PR author must be the coder agent
-		if (pr.user.login !== this.inputs.coderGithubUsername) {
-			core.info(
-				`PR #${pr.number} not authored by ${this.inputs.coderGithubUsername}`,
+		if (pr.user.login !== this.inputs.agentGithubUsername) {
+			this.logger.info(
+				`PR #${pr.number} not authored by ${this.inputs.agentGithubUsername}`,
 			);
 			return { skipped: true, skipReason: "pr-not-by-coder-agent" };
 		}
 
 		// 3. Guard: Stale commit
 		if (pr.head.sha !== this.context.headSha) {
-			core.info(
+			this.logger.info(
 				`Workflow run is for stale commit ${this.context.headSha}, PR is at ${pr.head.sha}`,
 			);
 			return { skipped: true, skipReason: "stale-commit" };
@@ -72,7 +73,7 @@ export class FailedCheckHandler {
 			pr.number,
 		);
 		if (linkedIssues.length === 0) {
-			core.info("No linked issue found");
+			this.logger.info("No linked issue found");
 			return { skipped: true, skipReason: "no-linked-issue" };
 		}
 		const issue = linkedIssues[0];
@@ -87,9 +88,10 @@ export class FailedCheckHandler {
 			this.coder,
 			this.inputs.coderUsername,
 			taskName,
+			this.logger,
 		);
 		if (!task) {
-			core.info(`Task not found: ${taskName}`);
+			this.logger.info(`Task not found: ${taskName}`);
 			return { skipped: true, skipReason: "task-not-found" };
 		}
 
@@ -123,7 +125,7 @@ export class FailedCheckHandler {
 			failedJobs: jobsWithLogs,
 		});
 		await this.coder.sendTaskInput(task.owner_id, task.id, message);
-		core.info(`Failed check details forwarded to task ${taskName}`);
+		this.logger.info(`Failed check details forwarded to task ${taskName}`);
 
 		return { taskName, taskStatus: task.status, skipped: false };
 	}

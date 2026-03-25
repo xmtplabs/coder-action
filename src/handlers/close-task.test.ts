@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { CoderAPIError } from "../coder-client";
-import type { CloseTaskInputs } from "../schemas";
+import { TestLogger } from "../logger";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -9,14 +10,14 @@ import {
 import { CloseTaskHandler } from "./close-task";
 import type { CloseTaskContext } from "./close-task";
 
-const baseInputs: CloseTaskInputs = {
-	action: "close_task",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const closeContext: CloseTaskContext = {
@@ -28,10 +29,12 @@ const closeContext: CloseTaskContext = {
 describe("CloseTaskHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 	});
 
 	// AC #7: Stop and delete workspace, then delete task
@@ -46,6 +49,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -78,6 +82,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -100,6 +105,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -127,6 +133,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -151,6 +158,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -177,6 +185,7 @@ describe("CloseTaskHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			closeContext,
+			logger,
 		);
 		const result = await handler.run();
 

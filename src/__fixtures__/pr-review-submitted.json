@@ -1,0 +1,32 @@
+{
+  "action": "submitted",
+  "pull_request": {
+    "number": 5,
+    "user": {
+      "login": "xmtp-coder-agent"
+    }
+  },
+  "review": {
+    "id": 3001,
+    "body": "Please fix the naming",
+    "html_url": "https://github.com/xmtp/test-repo/pull/5#pullrequestreview-3001",
+    "submitted_at": "2024-01-15T13:00:00Z",
+    "user": {
+      "login": "human-reviewer"
+    }
+  },
+  "sender": {
+    "id": 67890,
+    "login": "human-reviewer"
+  },
+  "repository": {
+    "name": "test-repo",
+    "owner": {
+      "login": "xmtp"
+    },
+    "full_name": "xmtp/test-repo"
+  },
+  "installation": {
+    "id": 99999
+  }
+}

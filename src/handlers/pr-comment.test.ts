@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { PRCommentInputs } from "../schemas";
+import { TestLogger } from "../logger";
+import type { HandlerConfig } from "../schemas";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
@@ -9,14 +10,14 @@ import {
 import { PRCommentHandler } from "./pr-comment";
 import type { PRCommentContext } from "./pr-comment";
 
-const baseInputs: PRCommentInputs = {
-	action: "pr_comment",
+const baseInputs: HandlerConfig = {
 	coderURL: "https://coder.test",
 	coderToken: "token",
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
-	githubToken: "ghp_123",
-	coderGithubUsername: "xmtp-coder-agent",
+	coderTemplateName: "task-template",
+	coderOrganization: "default",
+	agentGithubUsername: "xmtp-coder-agent",
 };
 
 const validContext: PRCommentContext = {
@@ -34,10 +35,12 @@ const validContext: PRCommentContext = {
 describe("PRCommentHandler", () => {
 	let coder: MockCoderClient;
 	let github: ReturnType<typeof createMockGitHubClient>;
+	let logger: TestLogger;
 
 	beforeEach(() => {
 		coder = new MockCoderClient();
 		github = createMockGitHubClient();
+		logger = new TestLogger();
 		// Default: linked issue exists, task exists
 		github.findLinkedIssues.mockResolvedValue([
 			{
@@ -57,6 +60,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -76,6 +80,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		await handler.run();
 
@@ -95,6 +100,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		await handler.run();
 
@@ -109,6 +115,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -125,9 +132,24 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			ctx,
+			logger,
 		);
 		const result = await handler.run();
 
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("self-comment");
+	});
+
+	test("skips self-comment using agentGithubUsername", async () => {
+		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
+		const handler = new PRCommentHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		const result = await handler.run();
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("self-comment");
 	});
@@ -140,6 +162,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -155,6 +178,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -170,6 +194,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		const result = await handler.run();
 
@@ -193,6 +218,7 @@ describe("PRCommentHandler", () => {
 			github as unknown as import("../github-client").GitHubClient,
 			baseInputs,
 			validContext,
+			logger,
 		);
 		await handler.run();
 
@@ -219,6 +245,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
+				logger,
 			);
 			const result = await handler.run();
 
@@ -241,6 +268,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				ctx,
+				logger,
 			);
 			const result = await handler.run();
 
@@ -256,6 +284,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				ctx,
+				logger,
 			);
 			const result = await handler.run();
 
@@ -269,6 +298,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
+				logger,
 			);
 			await handler.run();
 
@@ -291,6 +321,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				reviewContext,
+				logger,
 			);
 			const result = await handler.run();
 
@@ -304,6 +335,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				reviewContext,
+				logger,
 			);
 			await handler.run();
 
@@ -322,6 +354,7 @@ describe("PRCommentHandler", () => {
 				github as unknown as import("../github-client").GitHubClient,
 				baseInputs,
 				validContext,
+				logger,
 			);
 			await handler.run();
 
