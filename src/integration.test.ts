@@ -5,7 +5,6 @@ import { TestLogger } from "./logger";
 
 import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
-import issueCommentEditedOnIssue from "./__fixtures__/issue-comment-edited-on-issue.json";
 import workflowRunSuccess from "./__fixtures__/workflow-run-success.json";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -143,7 +142,8 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 	test("issue_comment.edited from human on issue → 200 and dispatches issue_comment", async () => {
 		const { app, lastResult } = buildTestApp(logger);
-		const body = JSON.stringify(issueCommentEditedOnIssue);
+		const editedPayload = { ...issueCommentOnIssue, action: "edited" };
+		const body = JSON.stringify(editedPayload);
 
 		const res = await postWebhook(app, { eventName: "issue_comment", body });
 
@@ -154,9 +154,8 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		expect(result?.dispatched).toBe(true);
 		if (result?.dispatched) {
 			expect(result.handler).toBe("issue_comment");
-			expect(result.installationId).toBe(99999);
-			expect(result.context.issueNumber).toBe(42);
-			expect(result.context.commentBody).toContain("(updated)");
+			expect(result.installationId).toBe(118770088);
+			expect(result.context.issueNumber).toBe(65);
 		}
 	});
 

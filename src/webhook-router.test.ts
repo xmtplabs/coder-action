@@ -198,7 +198,7 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("issue_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(42);
+		expect(result.context.issueNumber).toBe(65);
 	});
 
 	test("issue_comment.edited on PR from human → dispatched as pr_comment", async () => {
@@ -213,7 +213,7 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.issueNumber).toBe(64);
 	});
 
 	test("issue_comment.deleted → skipped without validation error", async () => {
@@ -287,7 +287,7 @@ describe("WebhookRouter", () => {
 		if (!result.dispatched) throw new Error("expected dispatched");
 		expect(result.handler).toBe("pr_comment");
 		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.issueNumber).toBe(64);
 		expect(result.context.isReviewComment).toBe(true);
 	});
 

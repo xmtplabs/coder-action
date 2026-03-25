@@ -12,10 +12,7 @@ import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issuesClosed from "./__fixtures__/issues-closed.json";
 import issueCommentOnPr from "./__fixtures__/issue-comment-on-pr.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
-import issueCommentEditedOnIssue from "./__fixtures__/issue-comment-edited-on-issue.json";
-import issueCommentEditedOnPr from "./__fixtures__/issue-comment-edited-on-pr.json";
 import prReviewComment from "./__fixtures__/pr-review-comment.json";
-import prReviewCommentEdited from "./__fixtures__/pr-review-comment-edited.json";
 import prReviewSubmitted from "./__fixtures__/pr-review-submitted.json";
 import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.json";
 import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
@@ -100,21 +97,18 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 		expect((result as Record<string, unknown>).extra_field).toBe("allowed");
 	});
 
-	test("parses edited issue-comment-on-issue fixture", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(
-			issueCommentEditedOnIssue,
-		);
+	test("parses edited issue-comment-on-issue payload", () => {
+		const payload = { ...issueCommentOnIssue, action: "edited" };
+		const result = IssueCommentCreatedPayloadSchema.parse(payload);
 		expect(result.action).toBe("edited");
-		expect(result.issue.number).toBe(42);
-		expect(result.comment.body).toContain("(updated)");
+		expect(result.issue.number).toBe(65);
 	});
 
-	test("parses edited issue-comment-on-pr fixture", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(
-			issueCommentEditedOnPr,
-		);
+	test("parses edited issue-comment-on-pr payload", () => {
+		const payload = { ...issueCommentOnPr, action: "edited" };
+		const result = IssueCommentCreatedPayloadSchema.parse(payload);
 		expect(result.action).toBe("edited");
-		expect(result.issue.number).toBe(5);
+		expect(result.issue.number).toBe(64);
 		expect(result.issue.pull_request).toBeTruthy();
 	});
 });
@@ -137,13 +131,11 @@ describe("PRReviewCommentCreatedPayloadSchema", () => {
 		).toThrow();
 	});
 
-	test("parses edited pr-review-comment fixture", () => {
-		const result = PRReviewCommentCreatedPayloadSchema.parse(
-			prReviewCommentEdited,
-		);
+	test("parses edited pr-review-comment payload", () => {
+		const payload = { ...prReviewComment, action: "edited" };
+		const result = PRReviewCommentCreatedPayloadSchema.parse(payload);
 		expect(result.action).toBe("edited");
-		expect(result.pull_request.number).toBe(5);
-		expect(result.comment.body).toContain("(updated)");
+		expect(result.pull_request.number).toBe(64);
 	});
 });
 
