@@ -60,7 +60,7 @@ export class PRCommentHandler {
 			return { skipped: true, skipReason: "no-linked-issue" };
 		}
 		if (linkedIssues.length > 1) {
-			this.logger.warning(
+			this.logger.warn(
 				`Multiple linked issues found, using first: #${linkedIssues[0].number}`,
 			);
 		}

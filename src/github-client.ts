@@ -209,7 +209,7 @@ export class GitHubClient {
 				content: "eyes",
 			});
 		} catch (error: unknown) {
-			this.logger.warning(
+			this.logger.warn(
 				`Failed to add reaction to comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
@@ -228,7 +228,7 @@ export class GitHubClient {
 				content: "eyes",
 			});
 		} catch (error: unknown) {
-			this.logger.warning(
+			this.logger.warn(
 				`Failed to add reaction to review comment ${commentId}: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}

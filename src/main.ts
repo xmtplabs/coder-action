@@ -1,7 +1,7 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "./config";
-import { ConsoleLogger } from "./logger";
+import { createLogger } from "./logger";
 import { RealCoderClient } from "./coder-client";
 import { WebhookRouter } from "./webhook-router";
 import { HandlerDispatcher } from "./handler-dispatcher";
@@ -35,8 +35,8 @@ export async function createStartupContext(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-	const logger = new ConsoleLogger();
 	const config = loadConfig(process.env);
+	const logger = createLogger({ logFormat: config.logFormat });
 
 	// Create app-level Octokit authenticated as the GitHub App via JWT
 	const appOctokit = new Octokit({
@@ -93,10 +93,10 @@ async function main(): Promise<void> {
 	// Create Hono app
 	const app = createApp({
 		webhookSecret: config.webhookSecret,
-		handleWebhook: async (eventName, deliveryId, payload) => {
+		handleWebhook: async (eventName, deliveryId, payload, reqLogger) => {
 			const result = await router.handleWebhook(eventName, deliveryId, payload);
 			if (result.dispatched) {
-				await dispatcher.dispatch(result);
+				await dispatcher.dispatch(result, reqLogger);
 				return { dispatched: true, handler: result.handler };
 			}
 			// If the failure was due to a Zod schema validation error, signal 400.

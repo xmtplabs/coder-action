@@ -55,7 +55,7 @@ export async function lookupAndEnsureActiveTask(
 	}
 
 	if (task.status === "error") {
-		logger.warning(`Task ${taskName} is in error state, skipping`);
+		logger.warn(`Task ${taskName} is in error state, skipping`);
 		return null;
 	}
 
