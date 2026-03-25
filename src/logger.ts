@@ -1,4 +1,5 @@
 import pino from "pino";
+import pinoPretty from "pino-pretty";
 
 export interface Logger {
 	info(message: string, fields?: Record<string, unknown>): void;
@@ -62,14 +63,7 @@ export interface CreateLoggerOptions {
 export function createLogger(options?: CreateLoggerOptions): Logger {
 	const useJson = options?.logFormat === "json";
 
-	const pinoLogger = useJson
-		? pino()
-		: pino({
-				transport: {
-					target: "pino-pretty",
-					options: { colorize: true },
-				},
-			});
+	const pinoLogger = useJson ? pino() : pino(pinoPretty({ colorize: true }));
 
 	return wrapPino(pinoLogger);
 }

@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"description": "GitHub App webhook server for managing Coder AI task lifecycle",
 	"scripts": {
-		"build": "bun build src/main.ts --outfile dist/server.js --target bun",
+		"build": "bun build src/main.ts --outfile dist/server.js --target bun --external pino --external pino-pretty",
 		"start": "bun run dist/server.js",
 		"dev": "bun run --watch src/main.ts",
 		"test": "bun test",
