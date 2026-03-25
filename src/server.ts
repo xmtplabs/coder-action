@@ -97,9 +97,7 @@ export function createApp(options: CreateAppOptions): Hono {
 		}
 
 		// Create per-request child logger with request context
-		const requestId = crypto.randomUUID();
 		const reqLogger = logger.child({
-			requestId,
 			deliveryId,
 			eventName,
 		});

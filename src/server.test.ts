@@ -255,7 +255,7 @@ describe("POST /api/webhooks", () => {
 		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
 
-	test("per-request child logger includes requestId, deliveryId, and eventName", async () => {
+	test("per-request child logger includes deliveryId and eventName", async () => {
 		const body = JSON.stringify({ action: "opened" });
 		const signature = await computeSignature(TEST_SECRET, body);
 
@@ -283,7 +283,6 @@ describe("POST /api/webhooks", () => {
 			(m) => m.message === "handler executed",
 		);
 		expect(handlerLog).toBeDefined();
-		expect(handlerLog?.fields?.requestId).toBeDefined();
 		expect(handlerLog?.fields?.deliveryId).toBe("delivery-xyz");
 		expect(handlerLog?.fields?.eventName).toBe("issues");
 	});

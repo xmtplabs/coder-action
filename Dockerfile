@@ -12,7 +12,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY src/ src/
 COPY tsconfig.json ./
-RUN bun build src/main.ts --outfile dist/server.js --target bun
+RUN bun build src/main.ts --outfile dist/server.js --target bun --external pino --external pino-pretty
 
 # Runtime
 FROM base AS runtime
