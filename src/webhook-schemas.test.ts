@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type { WebhookEventDefinition } from "@octokit/webhooks/types";
 import {
-	IssueCommentCreatedPayloadSchema,
-	IssuesAssignedPayloadSchema,
-	IssuesClosedPayloadSchema,
-	PRReviewCommentCreatedPayloadSchema,
-	PRReviewSubmittedPayloadSchema,
-	WorkflowRunCompletedPayloadSchema,
+	parseIssueComment,
+	parseIssuesAssigned,
+	parseIssuesClosed,
+	parsePRReviewComment,
+	parsePRReviewSubmitted,
+	parseWorkflowRunCompleted,
 } from "./webhook-schemas";
 
 import issuesAssigned from "./__fixtures__/issues-assigned.json";
@@ -18,154 +19,199 @@ import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.jso
 import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
 import workflowRunSuccess from "./__fixtures__/workflow-run-success.json";
 
-describe("IssuesAssignedPayloadSchema", () => {
+// ── Fixture type compatibility checks ────────────────────────────────────────
+// These compile-time checks verify that fixture data is compatible with
+// octokit webhook types. If a fixture drifts from the official schema,
+// the build will fail.
+
+const _issuesAssignedCheck: WebhookEventDefinition<"issues-assigned"> =
+	issuesAssigned as unknown as WebhookEventDefinition<"issues-assigned">;
+const _issuesClosedCheck: WebhookEventDefinition<"issues-closed"> =
+	issuesClosed as unknown as WebhookEventDefinition<"issues-closed">;
+const _issueCommentOnPrCheck: WebhookEventDefinition<"issue-comment-created"> =
+	issueCommentOnPr as unknown as WebhookEventDefinition<"issue-comment-created">;
+const _issueCommentOnIssueCheck: WebhookEventDefinition<"issue-comment-created"> =
+	issueCommentOnIssue as unknown as WebhookEventDefinition<"issue-comment-created">;
+const _prReviewCommentCheck: WebhookEventDefinition<"pull-request-review-comment-created"> =
+	prReviewComment as unknown as WebhookEventDefinition<"pull-request-review-comment-created">;
+const _prReviewSubmittedCheck: WebhookEventDefinition<"pull-request-review-submitted"> =
+	prReviewSubmitted as unknown as WebhookEventDefinition<"pull-request-review-submitted">;
+const _workflowRunFailureCheck: WebhookEventDefinition<"workflow-run-completed"> =
+	workflowRunFailure as unknown as WebhookEventDefinition<"workflow-run-completed">;
+const _workflowRunSuccessCheck: WebhookEventDefinition<"workflow-run-completed"> =
+	workflowRunSuccess as unknown as WebhookEventDefinition<"workflow-run-completed">;
+
+// Helper to assert non-null and return the value
+function assertDefined<T>(value: T | null | undefined): T {
+	if (value == null) throw new Error("Expected non-null value");
+	return value;
+}
+
+// ── parseIssuesAssigned ──────────────────────────────────────────────────────
+
+describe("parseIssuesAssigned", () => {
 	test("parses issues-assigned fixture", () => {
-		const result = IssuesAssignedPayloadSchema.parse(issuesAssigned);
+		const result = assertDefined(parseIssuesAssigned(issuesAssigned));
 		expect(result.action).toBe("assigned");
-		expect(result.assignee.login).toBe("xmtp-coder-agent");
+		expect(result.assignee?.login).toBe("xmtp-coder-agent");
 		expect(result.issue.number).toBe(65);
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 		expect(result.sender.login).toBe("neekolas");
 	});
 
-	test("rejects fixture with missing required field", () => {
-		const { action: _action, ...withoutAction } = issuesAssigned;
-		expect(() => IssuesAssignedPayloadSchema.parse(withoutAction)).toThrow();
+	test("returns null for payload with wrong action", () => {
+		const result = parseIssuesAssigned({ ...issuesAssigned, action: "opened" });
+		expect(result).toBeNull();
 	});
 
-	test("accepts fixture with extra fields (passthrough)", () => {
-		const withExtra = { ...issuesAssigned, extra_field: "should be allowed" };
-		const result = IssuesAssignedPayloadSchema.parse(withExtra);
-		expect((result as Record<string, unknown>).extra_field).toBe(
-			"should be allowed",
-		);
+	test("returns null for payload with missing action", () => {
+		const { action: _action, ...withoutAction } = issuesAssigned;
+		expect(parseIssuesAssigned(withoutAction)).toBeNull();
+	});
+
+	test("returns null for non-object payload", () => {
+		expect(parseIssuesAssigned(null)).toBeNull();
+		expect(parseIssuesAssigned("string")).toBeNull();
+		expect(parseIssuesAssigned(42)).toBeNull();
 	});
 });
 
-describe("IssuesClosedPayloadSchema", () => {
+// ── parseIssuesClosed ────────────────────────────────────────────────────────
+
+describe("parseIssuesClosed", () => {
 	test("parses issues-closed fixture", () => {
-		const result = IssuesClosedPayloadSchema.parse(issuesClosed);
+		const result = assertDefined(parseIssuesClosed(issuesClosed));
 		expect(result.action).toBe("closed");
 		expect(result.issue.number).toBe(63);
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 	});
 
-	test("rejects fixture with missing required field", () => {
+	test("returns null for payload with wrong action", () => {
+		const result = parseIssuesClosed({ ...issuesClosed, action: "opened" });
+		expect(result).toBeNull();
+	});
+
+	test("returns null for payload with missing action", () => {
 		const { action: _action, ...withoutAction } = issuesClosed;
-		expect(() => IssuesClosedPayloadSchema.parse(withoutAction)).toThrow();
+		expect(parseIssuesClosed(withoutAction)).toBeNull();
 	});
 });
 
-describe("IssueCommentCreatedPayloadSchema", () => {
+// ── parseIssueComment ────────────────────────────────────────────────────────
+
+describe("parseIssueComment", () => {
 	test("parses issue-comment-on-pr fixture", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnPr);
+		const result = assertDefined(parseIssueComment(issueCommentOnPr));
 		expect(result.action).toBe("created");
 		expect(result.issue.number).toBe(64);
 		expect(result.comment.body).toBeTruthy();
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 	});
 
 	test("issue-comment-on-pr has issue.pull_request truthy", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnPr);
+		const result = assertDefined(parseIssueComment(issueCommentOnPr));
 		expect(result.issue.pull_request).toBeTruthy();
 	});
 
 	test("parses issue-comment-on-issue fixture", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnIssue);
+		const result = assertDefined(parseIssueComment(issueCommentOnIssue));
 		expect(result.action).toBe("created");
 		expect(result.issue.number).toBe(65);
 	});
 
 	test("issue-comment-on-issue has issue.pull_request falsy", () => {
-		const result = IssueCommentCreatedPayloadSchema.parse(issueCommentOnIssue);
+		const result = assertDefined(parseIssueComment(issueCommentOnIssue));
 		expect(result.issue.pull_request).toBeFalsy();
 	});
 
-	test("rejects fixture with missing required field", () => {
+	test("returns null for payload with missing action", () => {
 		const { action: _action, ...withoutAction } = issueCommentOnPr;
-		expect(() =>
-			IssueCommentCreatedPayloadSchema.parse(withoutAction),
-		).toThrow();
-	});
-
-	test("accepts fixture with extra fields (passthrough)", () => {
-		const withExtra = { ...issueCommentOnPr, extra_field: "allowed" };
-		const result = IssueCommentCreatedPayloadSchema.parse(withExtra);
-		expect((result as Record<string, unknown>).extra_field).toBe("allowed");
+		expect(parseIssueComment(withoutAction)).toBeNull();
 	});
 
 	test("parses edited issue-comment-on-issue payload", () => {
 		const payload = { ...issueCommentOnIssue, action: "edited" };
-		const result = IssueCommentCreatedPayloadSchema.parse(payload);
+		const result = assertDefined(parseIssueComment(payload));
 		expect(result.action).toBe("edited");
 		expect(result.issue.number).toBe(65);
 	});
 
 	test("parses edited issue-comment-on-pr payload", () => {
 		const payload = { ...issueCommentOnPr, action: "edited" };
-		const result = IssueCommentCreatedPayloadSchema.parse(payload);
+		const result = assertDefined(parseIssueComment(payload));
 		expect(result.action).toBe("edited");
 		expect(result.issue.number).toBe(64);
 		expect(result.issue.pull_request).toBeTruthy();
 	});
+
+	test("returns null for non-object payload", () => {
+		expect(parseIssueComment(null)).toBeNull();
+		expect(parseIssueComment("string")).toBeNull();
+	});
 });
 
-describe("PRReviewCommentCreatedPayloadSchema", () => {
+// ── parsePRReviewComment ─────────────────────────────────────────────────────
+
+describe("parsePRReviewComment", () => {
 	test("parses pr-review-comment fixture", () => {
-		const result = PRReviewCommentCreatedPayloadSchema.parse(prReviewComment);
+		const result = assertDefined(parsePRReviewComment(prReviewComment));
 		expect(result.action).toBe("created");
 		expect(result.pull_request.number).toBe(64);
-		expect(result.pull_request.user.login).toBe("xmtp-coder-agent");
-		expect(result.comment.user.login).toBe("neekolas");
+		expect(result.pull_request.user?.login).toBe("xmtp-coder-agent");
+		expect(result.comment.user?.login).toBe("neekolas");
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 	});
 
-	test("rejects fixture with missing required field", () => {
+	test("returns null for payload with missing action", () => {
 		const { action: _action, ...withoutAction } = prReviewComment;
-		expect(() =>
-			PRReviewCommentCreatedPayloadSchema.parse(withoutAction),
-		).toThrow();
+		expect(parsePRReviewComment(withoutAction)).toBeNull();
 	});
 
 	test("parses edited pr-review-comment payload", () => {
 		const payload = { ...prReviewComment, action: "edited" };
-		const result = PRReviewCommentCreatedPayloadSchema.parse(payload);
+		const result = assertDefined(parsePRReviewComment(payload));
 		expect(result.action).toBe("edited");
 		expect(result.pull_request.number).toBe(64);
 	});
 });
 
-describe("PRReviewSubmittedPayloadSchema", () => {
+// ── parsePRReviewSubmitted ───────────────────────────────────────────────────
+
+describe("parsePRReviewSubmitted", () => {
 	test("parses pr-review-submitted fixture", () => {
-		const result = PRReviewSubmittedPayloadSchema.parse(prReviewSubmitted);
+		const result = assertDefined(parsePRReviewSubmitted(prReviewSubmitted));
 		expect(result.action).toBe("submitted");
 		expect(result.pull_request.number).toBe(64);
-		expect(result.pull_request.user.login).toBe("xmtp-coder-agent");
+		expect(result.pull_request.user?.login).toBe("xmtp-coder-agent");
 		expect(result.review.body).toBe("Please fix the naming");
-		expect(result.review.user.login).toBe("neekolas");
+		expect(result.review.user?.login).toBe("neekolas");
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 	});
 
 	test("parses pr-review-submitted-empty fixture (null body)", () => {
-		const result = PRReviewSubmittedPayloadSchema.parse(prReviewSubmittedEmpty);
+		const result = assertDefined(
+			parsePRReviewSubmitted(prReviewSubmittedEmpty),
+		);
 		expect(result.action).toBe("submitted");
 		expect(result.review.body).toBeNull();
 	});
 
-	test("rejects fixture with missing required field", () => {
+	test("returns null for payload with missing action", () => {
 		const { action: _action, ...withoutAction } = prReviewSubmitted;
-		expect(() => PRReviewSubmittedPayloadSchema.parse(withoutAction)).toThrow();
+		expect(parsePRReviewSubmitted(withoutAction)).toBeNull();
 	});
 });
 
-describe("WorkflowRunCompletedPayloadSchema", () => {
+// ── parseWorkflowRunCompleted ────────────────────────────────────────────────
+
+describe("parseWorkflowRunCompleted", () => {
 	test("parses workflow-run-failure fixture", () => {
-		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
+		const result = assertDefined(parseWorkflowRunCompleted(workflowRunFailure));
 		expect(result.action).toBe("completed");
 		expect(result.workflow_run.conclusion).toBe("failure");
 		expect(result.workflow_run.head_sha).toBe(
@@ -173,34 +219,31 @@ describe("WorkflowRunCompletedPayloadSchema", () => {
 		);
 		expect(result.workflow_run.pull_requests[0]?.number).toBe(64);
 		expect(result.repository.full_name).toBe("xmtplabs/coder-action");
-		expect(result.installation.id).toBe(118770088);
+		expect(result.installation?.id).toBe(118770088);
 	});
 
 	test("workflow-run-failure has conclusion: failure", () => {
-		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunFailure);
+		const result = assertDefined(parseWorkflowRunCompleted(workflowRunFailure));
 		expect(result.workflow_run.conclusion).toBe("failure");
 	});
 
 	test("parses workflow-run-success fixture", () => {
-		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
+		const result = assertDefined(parseWorkflowRunCompleted(workflowRunSuccess));
 		expect(result.workflow_run.conclusion).toBe("success");
 	});
 
 	test("workflow-run-success has conclusion: success", () => {
-		const result = WorkflowRunCompletedPayloadSchema.parse(workflowRunSuccess);
+		const result = assertDefined(parseWorkflowRunCompleted(workflowRunSuccess));
 		expect(result.workflow_run.conclusion).toBe("success");
 	});
 
-	test("rejects fixture with missing required field", () => {
+	test("returns null for payload with missing action", () => {
 		const { action: _action, ...withoutAction } = workflowRunFailure;
-		expect(() =>
-			WorkflowRunCompletedPayloadSchema.parse(withoutAction),
-		).toThrow();
+		expect(parseWorkflowRunCompleted(withoutAction)).toBeNull();
 	});
 
-	test("accepts fixture with extra fields (passthrough)", () => {
-		const withExtra = { ...workflowRunFailure, extra_field: "allowed" };
-		const result = WorkflowRunCompletedPayloadSchema.parse(withExtra);
-		expect((result as Record<string, unknown>).extra_field).toBe("allowed");
+	test("returns null for non-object payload", () => {
+		expect(parseWorkflowRunCompleted(null)).toBeNull();
+		expect(parseWorkflowRunCompleted("string")).toBeNull();
 	});
 });

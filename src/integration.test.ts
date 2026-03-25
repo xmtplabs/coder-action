@@ -1,6 +1,11 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { createApp } from "./server";
-import { WebhookRouter, type RouteResult } from "./webhook-router";
+import {
+	WebhookRouter,
+	type RouteResult,
+	type CreateTaskContext,
+	type IssueCommentContext,
+} from "./webhook-router";
 import { TestLogger } from "./logger";
 
 import issuesAssigned from "./__fixtures__/issues-assigned.json";
@@ -111,9 +116,10 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		if (result?.dispatched) {
 			expect(result.handler).toBe("create_task");
 			expect(result.installationId).toBe(118770088);
-			expect(result.context.issueNumber).toBe(65);
-			expect(result.context.repoName).toBe("coder-action");
-			expect(result.context.repoOwner).toBe("xmtplabs");
+			const ctx = result.context as CreateTaskContext;
+			expect(ctx.issueNumber).toBe(65);
+			expect(ctx.repoName).toBe("coder-action");
+			expect(ctx.repoOwner).toBe("xmtplabs");
 		}
 	});
 
@@ -131,12 +137,13 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		if (result?.dispatched) {
 			expect(result.handler).toBe("issue_comment");
 			expect(result.installationId).toBe(118770088);
-			expect(result.context.issueNumber).toBe(65);
-			expect(result.context.commentBody).toBe(
+			const ctx = result.context as IssueCommentContext;
+			expect(ctx.issueNumber).toBe(65);
+			expect(ctx.commentBody).toBe(
 				"Can you also handle the edge case for empty inputs?",
 			);
-			expect(result.context.repoName).toBe("coder-action");
-			expect(result.context.repoOwner).toBe("xmtplabs");
+			expect(ctx.repoName).toBe("coder-action");
+			expect(ctx.repoOwner).toBe("xmtplabs");
 		}
 	});
 
@@ -155,7 +162,7 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		if (result?.dispatched) {
 			expect(result.handler).toBe("issue_comment");
 			expect(result.installationId).toBe(118770088);
-			expect(result.context.issueNumber).toBe(65);
+			expect((result.context as IssueCommentContext).issueNumber).toBe(65);
 		}
 	});
 
