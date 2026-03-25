@@ -254,4 +254,37 @@ describe("POST /api/webhooks", () => {
 		expect(lastLog.fields?.dispatched).toBe(true);
 		expect(typeof lastLog.fields?.duration_ms).toBe("number");
 	});
+
+	test("per-request child logger includes requestId, deliveryId, and eventName", async () => {
+		const body = JSON.stringify({ action: "opened" });
+		const signature = await computeSignature(TEST_SECRET, body);
+
+		const app = createApp({
+			webhookSecret: TEST_SECRET,
+			handleWebhook: async (_ev, _del, _pay, reqLogger) => {
+				reqLogger.info("handler executed");
+				return { dispatched: false };
+			},
+			logger,
+		});
+
+		await app.request("/api/webhooks", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Hub-Signature-256": signature,
+				"X-GitHub-Event": "issues",
+				"X-GitHub-Delivery": "delivery-xyz",
+			},
+			body,
+		});
+
+		const handlerLog = logger.messages.find(
+			(m) => m.message === "handler executed",
+		);
+		expect(handlerLog).toBeDefined();
+		expect(handlerLog?.fields?.requestId).toBeDefined();
+		expect(handlerLog?.fields?.deliveryId).toBe("delivery-xyz");
+		expect(handlerLog?.fields?.eventName).toBe("issues");
+	});
 });

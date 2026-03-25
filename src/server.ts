@@ -16,6 +16,7 @@ export interface CreateAppOptions {
 		eventName: string,
 		deliveryId: string,
 		payload: unknown,
+		logger: Logger,
 	) => Promise<WebhookHandleResult>;
 	logger: Logger;
 }
@@ -95,18 +96,29 @@ export function createApp(options: CreateAppOptions): Hono {
 			return c.text("Bad Request: invalid JSON body", 400);
 		}
 
+		// Create per-request child logger with request context
+		const requestId = crypto.randomUUID();
+		const reqLogger = logger.child({
+			requestId,
+			deliveryId,
+			eventName,
+		});
+
 		// Extract action and repository for structured logging
 		const payloadAction = safeStringField(payload, "action");
 		const payloadRepo = safeStringField(payload, "repository", "full_name");
 
 		let handleResult: WebhookHandleResult;
 		try {
-			handleResult = await handleWebhook(eventName, deliveryId, payload);
+			handleResult = await handleWebhook(
+				eventName,
+				deliveryId,
+				payload,
+				reqLogger,
+			);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
-			logger.error(`Webhook handler error: ${message}`, {
-				event: eventName,
-				delivery_id: deliveryId,
+			reqLogger.error(`Webhook handler error: ${message}`, {
 				action: payloadAction,
 				repository: payloadRepo,
 				status: 500,
@@ -117,9 +129,7 @@ export function createApp(options: CreateAppOptions): Hono {
 		}
 
 		const responseStatus = (handleResult.status ?? 200) as ContentfulStatusCode;
-		logger.info("Webhook processed", {
-			event: eventName,
-			delivery_id: deliveryId,
+		reqLogger.info("Webhook processed", {
 			action: payloadAction,
 			repository: payloadRepo,
 			handler: handleResult.handler ?? null,

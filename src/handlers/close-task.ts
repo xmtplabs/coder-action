@@ -50,7 +50,7 @@ export class CloseTaskHandler {
 			await this.coder.stopWorkspace(workspaceId);
 			stopSucceeded = true;
 		} catch (error: unknown) {
-			this.logger.warning(`Failed to stop workspace: ${error}`);
+			this.logger.warn(`Failed to stop workspace: ${error}`);
 		}
 
 		// Wait for workspace to reach stopped state before deleting — continue even if this times out
@@ -60,9 +60,7 @@ export class CloseTaskHandler {
 					this.logger.info(msg),
 				);
 			} catch (error: unknown) {
-				this.logger.warning(
-					`Timed out waiting for workspace to stop: ${error}`,
-				);
+				this.logger.warn(`Timed out waiting for workspace to stop: ${error}`);
 			}
 		}
 
@@ -70,14 +68,14 @@ export class CloseTaskHandler {
 		try {
 			await this.coder.deleteWorkspace(workspaceId);
 		} catch (error: unknown) {
-			this.logger.warning(`Failed to delete workspace: ${error}`);
+			this.logger.warn(`Failed to delete workspace: ${error}`);
 		}
 
 		// Delete task — continue even if this fails
 		try {
 			await this.coder.deleteTask(this.inputs.coderUsername, task.id);
 		} catch (error: unknown) {
-			this.logger.warning(`Failed to delete task: ${error}`);
+			this.logger.warn(`Failed to delete task: ${error}`);
 		}
 
 		await this.github.commentOnIssue(

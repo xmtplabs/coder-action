@@ -13,6 +13,7 @@ const AppConfigSchema = z.object({
 	coderTemplateName: z.string().min(1).default("task-template"),
 	coderTemplatePreset: z.string().min(1).optional(),
 	coderOrganization: z.string().min(1).default("default"),
+	logFormat: z.string().optional(),
 	port: z.coerce.number().default(3000),
 });
 
@@ -36,6 +37,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
 		coderTemplateName: env.CODER_TEMPLATE_NAME,
 		coderTemplatePreset: env.CODER_TEMPLATE_PRESET,
 		coderOrganization: env.CODER_ORGANIZATION,
+		logFormat: env.LOG_FORMAT,
 		port: env.PORT,
 	};
 

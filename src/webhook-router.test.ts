@@ -21,8 +21,9 @@ const INSTALLATION_ID = 99999;
 const noopLogger: Logger = {
 	info: () => {},
 	debug: () => {},
-	warning: () => {},
+	warn: () => {},
 	error: () => {},
+	child: () => noopLogger,
 };
 
 function makeRouter(overrides?: Partial<WebhookRouterOptions>): WebhookRouter {

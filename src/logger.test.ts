@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ConsoleLogger, TestLogger } from "./logger";
+import { createLogger, TestLogger } from "./logger";
 
 describe("TestLogger", () => {
 	test("captures info messages", () => {
@@ -12,12 +12,12 @@ describe("TestLogger", () => {
 		const logger = new TestLogger();
 		logger.info("i");
 		logger.debug("d");
-		logger.warning("w");
+		logger.warn("w");
 		logger.error("e");
 		expect(logger.messages).toHaveLength(4);
 		expect(logger.messages[0].level).toBe("info");
 		expect(logger.messages[1].level).toBe("debug");
-		expect(logger.messages[2].level).toBe("warning");
+		expect(logger.messages[2].level).toBe("warn");
 		expect(logger.messages[3].level).toBe("error");
 	});
 
@@ -47,14 +47,43 @@ describe("TestLogger", () => {
 		logger.info("simple message");
 		expect(logger.messages[0].fields).toBeUndefined();
 	});
+
+	test("child logger shares messages array with parent", () => {
+		const logger = new TestLogger();
+		const child = logger.child({ requestId: "req-1" });
+		child.info("from child");
+		expect(logger.messages).toHaveLength(1);
+		expect(logger.messages[0].fields).toEqual({ requestId: "req-1" });
+	});
+
+	test("child logger merges bindings with per-call fields", () => {
+		const logger = new TestLogger();
+		const child = logger.child({ requestId: "req-1" });
+		child.info("webhook", { event: "issues" });
+		expect(logger.messages[0].fields).toEqual({
+			requestId: "req-1",
+			event: "issues",
+		});
+	});
 });
 
-describe("ConsoleLogger", () => {
-	test("implements Logger interface", () => {
-		const logger = new ConsoleLogger();
+describe("createLogger", () => {
+	test("returns a logger with all required methods", () => {
+		const logger = createLogger({ logFormat: "json" });
 		expect(typeof logger.info).toBe("function");
 		expect(typeof logger.debug).toBe("function");
-		expect(typeof logger.warning).toBe("function");
+		expect(typeof logger.warn).toBe("function");
 		expect(typeof logger.error).toBe("function");
+		expect(typeof logger.child).toBe("function");
+	});
+
+	test("child returns a logger with all required methods", () => {
+		const logger = createLogger({ logFormat: "json" });
+		const child = logger.child({ requestId: "test" });
+		expect(typeof child.info).toBe("function");
+		expect(typeof child.debug).toBe("function");
+		expect(typeof child.warn).toBe("function");
+		expect(typeof child.error).toBe("function");
+		expect(typeof child.child).toBe("function");
 	});
 });

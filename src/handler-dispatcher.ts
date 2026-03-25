@@ -32,13 +32,15 @@ export class HandlerDispatcher {
 
 	async dispatch(
 		result: RouteResult & { dispatched: true },
+		requestLogger?: Logger,
 	): Promise<ActionOutputs> {
+		const logger = requestLogger ?? this.options.logger;
 		const octokit = this.options.createInstallationOctokit(
 			result.installationId,
 		);
 		const createGitHubClient =
 			this.options.createGitHubClient ??
-			((oct: Octokit) => new GitHubClient(oct, this.options.logger));
+			((oct: Octokit) => new GitHubClient(oct, logger));
 		const github = createGitHubClient(octokit);
 
 		const handlerConfig: HandlerConfig = {
@@ -72,7 +74,7 @@ export class HandlerDispatcher {
 						issueUrl: String(ctx.issueUrl),
 						senderLogin: String(ctx.senderLogin),
 					},
-					this.options.logger,
+					logger,
 				);
 				return handler.run();
 			}
@@ -87,7 +89,7 @@ export class HandlerDispatcher {
 						repo: String(ctx.repoName),
 						issueNumber: Number(ctx.issueNumber),
 					},
-					this.options.logger,
+					logger,
 				);
 				return handler.run();
 			}
@@ -110,7 +112,7 @@ export class HandlerDispatcher {
 						isReviewComment: Boolean(ctx.isReviewComment),
 						isReviewSubmission: Boolean(ctx.isReviewSubmission),
 					},
-					this.options.logger,
+					logger,
 				);
 				return handler.run();
 			}
@@ -130,7 +132,7 @@ export class HandlerDispatcher {
 						commentBody: String(ctx.commentBody),
 						commentCreatedAt: String(ctx.commentCreatedAt),
 					},
-					this.options.logger,
+					logger,
 				);
 				return handler.run();
 			}
@@ -156,7 +158,7 @@ export class HandlerDispatcher {
 								: "unknown",
 						pullRequests: pullRequestNumbers.map((n) => ({ number: n })),
 					},
-					this.options.logger,
+					logger,
 				);
 				return handler.run();
 			}
