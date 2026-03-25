@@ -12,7 +12,10 @@ import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issuesClosed from "./__fixtures__/issues-closed.json";
 import issueCommentOnPr from "./__fixtures__/issue-comment-on-pr.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
+import issueCommentEditedOnIssue from "./__fixtures__/issue-comment-edited-on-issue.json";
+import issueCommentEditedOnPr from "./__fixtures__/issue-comment-edited-on-pr.json";
 import prReviewComment from "./__fixtures__/pr-review-comment.json";
+import prReviewCommentEdited from "./__fixtures__/pr-review-comment-edited.json";
 import prReviewSubmitted from "./__fixtures__/pr-review-submitted.json";
 import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.json";
 import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
@@ -96,6 +99,24 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 		const result = IssueCommentCreatedPayloadSchema.parse(withExtra);
 		expect((result as Record<string, unknown>).extra_field).toBe("allowed");
 	});
+
+	test("parses edited issue-comment-on-issue fixture", () => {
+		const result = IssueCommentCreatedPayloadSchema.parse(
+			issueCommentEditedOnIssue,
+		);
+		expect(result.action).toBe("edited");
+		expect(result.issue.number).toBe(42);
+		expect(result.comment.body).toContain("(updated)");
+	});
+
+	test("parses edited issue-comment-on-pr fixture", () => {
+		const result = IssueCommentCreatedPayloadSchema.parse(
+			issueCommentEditedOnPr,
+		);
+		expect(result.action).toBe("edited");
+		expect(result.issue.number).toBe(5);
+		expect(result.issue.pull_request).toBeTruthy();
+	});
 });
 
 describe("PRReviewCommentCreatedPayloadSchema", () => {
@@ -114,6 +135,15 @@ describe("PRReviewCommentCreatedPayloadSchema", () => {
 		expect(() =>
 			PRReviewCommentCreatedPayloadSchema.parse(withoutAction),
 		).toThrow();
+	});
+
+	test("parses edited pr-review-comment fixture", () => {
+		const result = PRReviewCommentCreatedPayloadSchema.parse(
+			prReviewCommentEdited,
+		);
+		expect(result.action).toBe("edited");
+		expect(result.pull_request.number).toBe(5);
+		expect(result.comment.body).toContain("(updated)");
 	});
 });
 

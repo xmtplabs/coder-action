@@ -65,7 +65,7 @@ export const IssuesClosedPayloadSchema = z
 
 export const IssueCommentCreatedPayloadSchema = z
 	.object({
-		action: z.literal("created"),
+		action: z.enum(["created", "edited"]),
 		issue: z
 			.object({
 				number: z.number(),
@@ -104,7 +104,7 @@ export const IssueCommentCreatedPayloadSchema = z
 
 export const PRReviewCommentCreatedPayloadSchema = z
 	.object({
-		action: z.literal("created"),
+		action: z.enum(["created", "edited"]),
 		pull_request: z
 			.object({
 				number: z.number(),

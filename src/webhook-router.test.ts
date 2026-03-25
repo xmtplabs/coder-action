@@ -7,7 +7,10 @@ import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issuesClosed from "./__fixtures__/issues-closed.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
 import issueCommentOnPr from "./__fixtures__/issue-comment-on-pr.json";
+import issueCommentEditedOnIssue from "./__fixtures__/issue-comment-edited-on-issue.json";
+import issueCommentEditedOnPr from "./__fixtures__/issue-comment-edited-on-pr.json";
 import prReviewComment from "./__fixtures__/pr-review-comment.json";
+import prReviewCommentEdited from "./__fixtures__/pr-review-comment-edited.json";
 import prReviewSubmitted from "./__fixtures__/pr-review-submitted.json";
 import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.json";
 import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
@@ -184,6 +187,38 @@ describe("WebhookRouter", () => {
 		expect(result.reason).toMatch(/PR author/i);
 	});
 
+	// ── issue_comment.edited — dispatch ─────────────────────────────────────
+
+	test("issue_comment.edited on issue from human → dispatched as issue_comment", async () => {
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006a",
+			issueCommentEditedOnIssue,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("issue_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(42);
+		expect(result.context.commentBody).toContain("(updated)");
+	});
+
+	test("issue_comment.edited on PR from human → dispatched as pr_comment", async () => {
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006b",
+			issueCommentEditedOnPr,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("pr_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.commentBody).toContain("(updated)");
+	});
+
 	test("issue_comment.created on PR from human → dispatched as pr_comment", async () => {
 		const result = await router.handleWebhook(
 			"issue_comment",
@@ -224,6 +259,22 @@ describe("WebhookRouter", () => {
 		expect(result.context.isReviewSubmission).toBe(false);
 		expect(result.context.repoName).toBe("coder-action");
 		expect(result.context.repoOwner).toBe("xmtplabs");
+	});
+
+	test("pull_request_review_comment.edited, PR by agent, comment by human → dispatched as pr_comment", async () => {
+		const result = await router.handleWebhook(
+			"pull_request_review_comment",
+			"delivery-008a",
+			prReviewCommentEdited,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("pr_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(5);
+		expect(result.context.commentBody).toContain("(updated)");
+		expect(result.context.isReviewComment).toBe(true);
 	});
 
 	test("pull_request_review_comment.created, comment from app bot → skipped", async () => {
