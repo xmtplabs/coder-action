@@ -169,7 +169,7 @@ export interface CoderClient {
 		timeoutMs?: number,
 	): Promise<void>;
 	deleteWorkspace(workspaceId: string): Promise<void>;
-	deleteTask(owner: string | undefined, taskId: TaskId): Promise<void>;
+	deleteTask(owner: string, taskId: TaskId): Promise<void>;
 }
 
 const POLL_INTERVAL_MS = 2000;
@@ -470,10 +470,7 @@ export class RealCoderClient implements CoderClient {
 	/**
 	 * deleteTask deletes a task via Coder's experimental Tasks API.
 	 */
-	async deleteTask(owner: string | undefined, taskId: TaskId): Promise<void> {
-		if (!owner) {
-			throw new Error("Cannot delete task: owner username is unknown");
-		}
+	async deleteTask(owner: string, taskId: TaskId): Promise<void> {
 		await this.request(
 			`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`,
 			{ method: "DELETE" },
