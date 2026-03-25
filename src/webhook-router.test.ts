@@ -219,6 +219,23 @@ describe("WebhookRouter", () => {
 		expect(result.context.commentBody).toContain("(updated)");
 	});
 
+	test("issue_comment.deleted → skipped without validation error", async () => {
+		const payload = {
+			...issueCommentOnIssue,
+			action: "deleted",
+		};
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006c",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(false);
+		if (result.dispatched) throw new Error("expected skipped");
+		expect(result.reason).toMatch(/unhandled/i);
+		expect(result.validationError).toBeUndefined();
+	});
+
 	test("issue_comment.created on PR from human → dispatched as pr_comment", async () => {
 		const result = await router.handleWebhook(
 			"issue_comment",
