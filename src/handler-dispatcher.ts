@@ -25,13 +25,16 @@ export interface HandlerDispatcherOptions {
 	createGitHubClient?: (octokit: Octokit) => GitHubClient;
 }
 
+// Helper type to extract dispatched route results
+type DispatchedResult = Extract<RouteResult, { dispatched: true }>;
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 export class HandlerDispatcher {
 	constructor(private readonly options: HandlerDispatcherOptions) {}
 
 	async dispatch(
-		result: RouteResult & { dispatched: true },
+		result: DispatchedResult,
 		requestLogger?: Logger,
 	): Promise<ActionOutputs> {
 		const logger = requestLogger ?? this.options.logger;
@@ -53,26 +56,24 @@ export class HandlerDispatcher {
 			agentGithubUsername: this.options.config.agentGithubUsername,
 		};
 
-		const ctx = result.context;
-
 		switch (result.handler) {
 			case "create_task": {
+				const ctx = result.context;
 				// Resolve coder username from sender GitHub user ID
-				const senderId =
-					typeof ctx.senderId === "number" ? ctx.senderId : undefined;
-				const coderUser =
-					await this.options.coderClient.getCoderUserByGitHubId(senderId);
+				const coderUser = await this.options.coderClient.getCoderUserByGitHubId(
+					ctx.senderId,
+				);
 				const config = { ...handlerConfig, coderUsername: coderUser.username };
 				const handler = new CreateTaskHandler(
 					this.options.coderClient,
 					github,
 					config,
 					{
-						owner: String(ctx.repoOwner),
-						repo: String(ctx.repoName),
-						issueNumber: Number(ctx.issueNumber),
-						issueUrl: String(ctx.issueUrl),
-						senderLogin: String(ctx.senderLogin),
+						owner: ctx.repoOwner,
+						repo: ctx.repoName,
+						issueNumber: ctx.issueNumber,
+						issueUrl: ctx.issueUrl,
+						senderLogin: ctx.senderLogin,
 					},
 					logger,
 				);
@@ -80,14 +81,15 @@ export class HandlerDispatcher {
 			}
 
 			case "close_task": {
+				const ctx = result.context;
 				const handler = new CloseTaskHandler(
 					this.options.coderClient,
 					github,
 					handlerConfig,
 					{
-						owner: String(ctx.repoOwner),
-						repo: String(ctx.repoName),
-						issueNumber: Number(ctx.issueNumber),
+						owner: ctx.repoOwner,
+						repo: ctx.repoName,
+						issueNumber: ctx.issueNumber,
 					},
 					logger,
 				);
@@ -95,22 +97,23 @@ export class HandlerDispatcher {
 			}
 
 			case "pr_comment": {
+				const ctx = result.context;
 				const handler = new PRCommentHandler(
 					this.options.coderClient,
 					github,
 					handlerConfig,
 					{
-						owner: String(ctx.repoOwner),
-						repo: String(ctx.repoName),
-						prNumber: Number(ctx.issueNumber),
-						prAuthor: String(ctx.prAuthor),
-						commenterLogin: String(ctx.commenterLogin),
-						commentId: Number(ctx.commentId),
-						commentUrl: String(ctx.commentUrl),
-						commentBody: String(ctx.commentBody),
-						commentCreatedAt: String(ctx.commentCreatedAt),
-						isReviewComment: Boolean(ctx.isReviewComment),
-						isReviewSubmission: Boolean(ctx.isReviewSubmission),
+						owner: ctx.repoOwner,
+						repo: ctx.repoName,
+						prNumber: ctx.issueNumber,
+						prAuthor: ctx.prAuthor,
+						commenterLogin: ctx.commenterLogin,
+						commentId: ctx.commentId,
+						commentUrl: ctx.commentUrl,
+						commentBody: ctx.commentBody,
+						commentCreatedAt: ctx.commentCreatedAt,
+						isReviewComment: ctx.isReviewComment,
+						isReviewSubmission: ctx.isReviewSubmission,
 					},
 					logger,
 				);
@@ -118,19 +121,20 @@ export class HandlerDispatcher {
 			}
 
 			case "issue_comment": {
+				const ctx = result.context;
 				const handler = new IssueCommentHandler(
 					this.options.coderClient,
 					github,
 					handlerConfig,
 					{
-						owner: String(ctx.repoOwner),
-						repo: String(ctx.repoName),
-						issueNumber: Number(ctx.issueNumber),
-						commentId: Number(ctx.commentId),
-						commenterLogin: String(ctx.commenterLogin),
-						commentUrl: String(ctx.commentUrl),
-						commentBody: String(ctx.commentBody),
-						commentCreatedAt: String(ctx.commentCreatedAt),
+						owner: ctx.repoOwner,
+						repo: ctx.repoName,
+						issueNumber: ctx.issueNumber,
+						commentId: ctx.commentId,
+						commenterLogin: ctx.commenterLogin,
+						commentUrl: ctx.commentUrl,
+						commentBody: ctx.commentBody,
+						commentCreatedAt: ctx.commentCreatedAt,
 					},
 					logger,
 				);
@@ -138,25 +142,23 @@ export class HandlerDispatcher {
 			}
 
 			case "failed_check": {
-				const pullRequestNumbers = Array.isArray(ctx.pullRequestNumbers)
-					? (ctx.pullRequestNumbers as number[])
-					: [];
+				const ctx = result.context;
 				const handler = new FailedCheckHandler(
 					this.options.coderClient,
 					github,
 					handlerConfig,
 					{
-						owner: String(ctx.repoOwner),
-						repo: String(ctx.repoName),
-						runId: Number(ctx.workflowRunId),
-						runUrl: String(ctx.workflowRunUrl),
-						headSha: String(ctx.headSha),
-						workflowName: String(ctx.workflowName),
+						owner: ctx.repoOwner,
+						repo: ctx.repoName,
+						runId: ctx.workflowRunId,
+						runUrl: ctx.workflowRunUrl,
+						headSha: ctx.headSha,
+						workflowName: ctx.workflowName ?? "unknown",
 						workflowFile:
 							ctx.workflowPath != null
-								? (String(ctx.workflowPath).split("/").pop() ?? "unknown")
+								? (ctx.workflowPath.split("/").pop() ?? "unknown")
 								: "unknown",
-						pullRequests: pullRequestNumbers.map((n) => ({ number: n })),
+						pullRequests: ctx.pullRequestNumbers.map((n) => ({ number: n })),
 					},
 					logger,
 				);

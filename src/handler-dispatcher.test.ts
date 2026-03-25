@@ -8,7 +8,14 @@ import {
 } from "./test-helpers";
 import { TestLogger } from "./logger";
 import type { AppConfig } from "./config";
-import type { RouteResult } from "./webhook-router";
+import type {
+	RouteResult,
+	CreateTaskContext,
+	CloseTaskContext,
+	PRCommentContext,
+	IssueCommentContext,
+	FailedCheckContext,
+} from "./webhook-router";
 import type { GitHubClient, Octokit } from "./github-client";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,18 +36,23 @@ const mockConfig: AppConfig = {
 
 const INSTALLATION_ID = 99999;
 
+type DispatchedResult = Extract<RouteResult, { dispatched: true }>;
+
 function makeDispatchedResult(
-	handler: string,
-	context: Record<string, unknown>,
-): RouteResult & { dispatched: true } {
+	handler: DispatchedResult["handler"],
+	context:
+		| CreateTaskContext
+		| CloseTaskContext
+		| PRCommentContext
+		| IssueCommentContext
+		| FailedCheckContext,
+): DispatchedResult {
 	return {
 		dispatched: true,
-		handler: handler as RouteResult extends { dispatched: true }
-			? (RouteResult & { dispatched: true })["handler"]
-			: never,
+		handler,
 		installationId: INSTALLATION_ID,
 		context,
-	} as RouteResult & { dispatched: true };
+	} as DispatchedResult;
 }
 
 describe("HandlerDispatcher", () => {
