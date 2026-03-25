@@ -184,6 +184,55 @@ describe("WebhookRouter", () => {
 		expect(result.reason).toMatch(/PR author/i);
 	});
 
+	// ── issue_comment.edited — dispatch ─────────────────────────────────────
+
+	test("issue_comment.edited on issue from human → dispatched as issue_comment", async () => {
+		const payload = { ...issueCommentOnIssue, action: "edited" };
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006a",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("issue_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(65);
+	});
+
+	test("issue_comment.edited on PR from human → dispatched as pr_comment", async () => {
+		const payload = { ...issueCommentOnPr, action: "edited" };
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006b",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("pr_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(64);
+	});
+
+	test("issue_comment.deleted → skipped without validation error", async () => {
+		const payload = {
+			...issueCommentOnIssue,
+			action: "deleted",
+		};
+		const result = await router.handleWebhook(
+			"issue_comment",
+			"delivery-006c",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(false);
+		if (result.dispatched) throw new Error("expected skipped");
+		expect(result.reason).toMatch(/unhandled/i);
+		expect(result.validationError).toBeUndefined();
+	});
+
 	test("issue_comment.created on PR from human → dispatched as pr_comment", async () => {
 		const result = await router.handleWebhook(
 			"issue_comment",
@@ -224,6 +273,22 @@ describe("WebhookRouter", () => {
 		expect(result.context.isReviewSubmission).toBe(false);
 		expect(result.context.repoName).toBe("coder-action");
 		expect(result.context.repoOwner).toBe("xmtplabs");
+	});
+
+	test("pull_request_review_comment.edited, PR by agent, comment by human → dispatched as pr_comment", async () => {
+		const payload = { ...prReviewComment, action: "edited" };
+		const result = await router.handleWebhook(
+			"pull_request_review_comment",
+			"delivery-008a",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		expect(result.handler).toBe("pr_comment");
+		expect(result.installationId).toBe(INSTALLATION_ID);
+		expect(result.context.issueNumber).toBe(64);
+		expect(result.context.isReviewComment).toBe(true);
 	});
 
 	test("pull_request_review_comment.created, comment from app bot → skipped", async () => {

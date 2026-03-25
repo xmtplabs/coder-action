@@ -140,6 +140,25 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		}
 	});
 
+	test("issue_comment.edited from human on issue → 200 and dispatches issue_comment", async () => {
+		const { app, lastResult } = buildTestApp(logger);
+		const editedPayload = { ...issueCommentOnIssue, action: "edited" };
+		const body = JSON.stringify(editedPayload);
+
+		const res = await postWebhook(app, { eventName: "issue_comment", body });
+
+		expect(res.status).toBe(200);
+
+		const result = lastResult();
+		expect(result).not.toBeNull();
+		expect(result?.dispatched).toBe(true);
+		if (result?.dispatched) {
+			expect(result.handler).toBe("issue_comment");
+			expect(result.installationId).toBe(118770088);
+			expect(result.context.issueNumber).toBe(65);
+		}
+	});
+
 	test("workflow_run.completed with success conclusion → 200 and skipped", async () => {
 		const { app, lastResult } = buildTestApp(logger);
 		const body = JSON.stringify(workflowRunSuccess);

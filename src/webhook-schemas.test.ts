@@ -96,6 +96,21 @@ describe("IssueCommentCreatedPayloadSchema", () => {
 		const result = IssueCommentCreatedPayloadSchema.parse(withExtra);
 		expect((result as Record<string, unknown>).extra_field).toBe("allowed");
 	});
+
+	test("parses edited issue-comment-on-issue payload", () => {
+		const payload = { ...issueCommentOnIssue, action: "edited" };
+		const result = IssueCommentCreatedPayloadSchema.parse(payload);
+		expect(result.action).toBe("edited");
+		expect(result.issue.number).toBe(65);
+	});
+
+	test("parses edited issue-comment-on-pr payload", () => {
+		const payload = { ...issueCommentOnPr, action: "edited" };
+		const result = IssueCommentCreatedPayloadSchema.parse(payload);
+		expect(result.action).toBe("edited");
+		expect(result.issue.number).toBe(64);
+		expect(result.issue.pull_request).toBeTruthy();
+	});
 });
 
 describe("PRReviewCommentCreatedPayloadSchema", () => {
@@ -114,6 +129,13 @@ describe("PRReviewCommentCreatedPayloadSchema", () => {
 		expect(() =>
 			PRReviewCommentCreatedPayloadSchema.parse(withoutAction),
 		).toThrow();
+	});
+
+	test("parses edited pr-review-comment payload", () => {
+		const payload = { ...prReviewComment, action: "edited" };
+		const result = PRReviewCommentCreatedPayloadSchema.parse(payload);
+		expect(result.action).toBe("edited");
+		expect(result.pull_request.number).toBe(64);
 	});
 });
 

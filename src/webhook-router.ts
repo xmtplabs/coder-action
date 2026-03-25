@@ -130,7 +130,15 @@ export class WebhookRouter {
 			};
 		}
 
-		const { issue, comment, repository, installation } = parsed.data;
+		const { action, issue, comment, repository, installation } = parsed.data;
+
+		// Only handle created and edited actions
+		if (action !== "created" && action !== "edited") {
+			return {
+				dispatched: false,
+				reason: `Unhandled issue_comment action: ${action}`,
+			};
+		}
 
 		if (this.ignoredLogins.has(comment.user.login)) {
 			return {
@@ -196,7 +204,16 @@ export class WebhookRouter {
 			};
 		}
 
-		const { pull_request, comment, repository, installation } = parsed.data;
+		const { action, pull_request, comment, repository, installation } =
+			parsed.data;
+
+		// Only handle created and edited actions
+		if (action !== "created" && action !== "edited") {
+			return {
+				dispatched: false,
+				reason: `Unhandled pull_request_review_comment action: ${action}`,
+			};
+		}
 
 		if (pull_request.user.login !== this.options.agentGithubUsername) {
 			return {
