@@ -3,7 +3,11 @@ import type { GitHubClient, PRInfo } from "../github-client";
 import type { Logger } from "../logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../messages";
 import type { ActionOutputs, HandlerConfig } from "../schemas";
-import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
+import {
+	generateTaskName,
+	lookupAndEnsureActiveTask,
+	sendInputWithRetry,
+} from "../task-utils";
 
 const MAX_LOG_LINES = 100;
 
@@ -124,7 +128,7 @@ export class FailedCheckHandler {
 			workflowFile: this.context.workflowFile,
 			failedJobs: jobsWithLogs,
 		});
-		await this.coder.sendTaskInput(task.owner_id, task.id, message);
+		await sendInputWithRetry(this.coder, task, message, this.logger);
 		this.logger.info(`Failed check details forwarded to task ${taskName}`);
 
 		return { taskName, taskStatus: task.status, skipped: false };

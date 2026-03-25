@@ -3,7 +3,11 @@ import type { GitHubClient } from "../github-client";
 import type { Logger } from "../logger";
 import { formatPRCommentMessage } from "../messages";
 import type { ActionOutputs, HandlerConfig } from "../schemas";
-import { generateTaskName, lookupAndEnsureActiveTask } from "../task-utils";
+import {
+	generateTaskName,
+	lookupAndEnsureActiveTask,
+	sendInputWithRetry,
+} from "../task-utils";
 
 export interface PRCommentContext {
 	owner: string;
@@ -90,7 +94,7 @@ export class PRCommentHandler {
 			timestamp: this.context.commentCreatedAt,
 			body: this.context.commentBody,
 		});
-		await this.coder.sendTaskInput(task.owner_id, task.id, message);
+		await sendInputWithRetry(this.coder, task, message, this.logger);
 		this.logger.info(`Comment forwarded to task ${taskName}`);
 
 		if (this.context.isReviewSubmission) {
