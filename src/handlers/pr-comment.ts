@@ -21,6 +21,8 @@ export interface PRCommentContext {
 	commentCreatedAt: string;
 	isReviewComment?: boolean;
 	isReviewSubmission?: boolean;
+	filePath?: string;
+	lineNumber?: number;
 }
 
 export class PRCommentHandler {
@@ -93,6 +95,8 @@ export class PRCommentHandler {
 			commenter: this.context.commenterLogin,
 			timestamp: this.context.commentCreatedAt,
 			body: this.context.commentBody,
+			filePath: this.context.filePath,
+			lineNumber: this.context.lineNumber,
 		});
 		await sendInputWithRetry(this.coder, task, message, this.logger);
 		this.logger.info(`Comment forwarded to task ${taskName}`);

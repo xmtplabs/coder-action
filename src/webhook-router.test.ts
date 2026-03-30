@@ -283,6 +283,8 @@ describe("WebhookRouter", () => {
 		expect(ctx.isReviewSubmission).toBe(false);
 		expect(ctx.repoName).toBe("coder-action");
 		expect(ctx.repoOwner).toBe("xmtplabs");
+		expect(ctx.filePath).toBe("dist/server.js");
+		expect(ctx.lineNumber).toBe(1);
 	});
 
 	test("pull_request_review_comment.edited, PR by agent, comment by human → dispatched as pr_comment", async () => {

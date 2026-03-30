@@ -48,6 +48,40 @@ describe("formatPRCommentMessage", () => {
 		expect(msg).toContain("👍");
 		expect(msg).toContain("automated");
 	});
+
+	test("includes file path and line number for review comments", () => {
+		const msg = formatPRCommentMessage({
+			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
+			commenter: "reviewer",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "This variable name is unclear",
+			filePath: "src/handlers/pr-comment.ts",
+			lineNumber: 42,
+		});
+		expect(msg).toContain("File: src/handlers/pr-comment.ts:42");
+	});
+
+	test("includes file path without line number when line is undefined", () => {
+		const msg = formatPRCommentMessage({
+			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
+			commenter: "reviewer",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "This variable name is unclear",
+			filePath: "src/handlers/pr-comment.ts",
+		});
+		expect(msg).toContain("File: src/handlers/pr-comment.ts");
+		expect(msg).not.toContain("File: src/handlers/pr-comment.ts:");
+	});
+
+	test("omits file line when filePath is not provided", () => {
+		const msg = formatPRCommentMessage({
+			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
+			commenter: "reviewer",
+			timestamp: "2026-03-17T12:00:00Z",
+			body: "General comment",
+		});
+		expect(msg).not.toContain("File:");
+	});
 });
 
 describe("formatIssueCommentMessage", () => {

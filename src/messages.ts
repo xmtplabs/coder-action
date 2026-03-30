@@ -5,6 +5,8 @@ interface CommentMessageParams {
 	commenter: string;
 	timestamp: string;
 	body: string;
+	filePath?: string;
+	lineNumber?: number;
 }
 
 interface FailedCheckParams {
@@ -16,9 +18,13 @@ interface FailedCheckParams {
 }
 
 export function formatPRCommentMessage(params: CommentMessageParams): string {
+	const locationLine =
+		params.filePath != null
+			? `\nFile: ${params.filePath}${params.lineNumber != null ? `:${params.lineNumber}` : ""}`
+			: "";
 	return `New Comment on PR: ${params.commentUrl}
 Commenter: ${params.commenter}
-Timestamp: ${params.timestamp}
+Timestamp: ${params.timestamp}${locationLine}
 
 [INSTRUCTIONS]
 First, determine whether this comment requires action.

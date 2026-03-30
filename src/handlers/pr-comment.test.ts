@@ -329,6 +329,35 @@ describe("PRCommentHandler", () => {
 			expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
 		});
 
+		test("includes file path and line number in forwarded message", async () => {
+			const ctx: PRCommentContext = {
+				...validContext,
+				commentUrl:
+					"https://github.com/xmtp/libxmtp/pull/5/changes#r2962833476",
+				commentBody: "This variable name is unclear",
+				isReviewComment: true,
+				filePath: "src/handlers/pr-comment.ts",
+				lineNumber: 42,
+			};
+			const handler = new PRCommentHandler(
+				coder,
+				github as unknown as import("../github-client").GitHubClient,
+				baseInputs,
+				ctx,
+				logger,
+			);
+			await handler.run();
+
+			const sentMessage = (
+				coder.sendTaskInput.mock.calls[0] as unknown as [
+					string,
+					unknown,
+					string,
+				]
+			)[2];
+			expect(sentMessage).toContain("File: src/handlers/pr-comment.ts:42");
+		});
+
 		test("adds 👀 reaction via review comment endpoint", async () => {
 			const handler = new PRCommentHandler(
 				coder,
