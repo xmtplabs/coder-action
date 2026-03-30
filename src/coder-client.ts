@@ -354,7 +354,7 @@ export class RealCoderClient implements CoderClient {
 		owner: string,
 		taskId: TaskId,
 		logFn: (msg: string) => void,
-		timeoutMs = 120000,
+		timeoutMs = 600000,
 	): Promise<void> {
 		const startTime = Date.now();
 
