@@ -114,6 +114,8 @@ export class HandlerDispatcher {
 						commentCreatedAt: ctx.commentCreatedAt,
 						isReviewComment: ctx.isReviewComment,
 						isReviewSubmission: ctx.isReviewSubmission,
+						filePath: ctx.filePath,
+						lineNumber: ctx.lineNumber,
 					},
 					logger,
 				);

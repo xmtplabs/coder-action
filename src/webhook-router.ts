@@ -46,6 +46,8 @@ export type PRCommentContext = {
 	commenterLogin: string;
 	isReviewComment: boolean;
 	isReviewSubmission: boolean;
+	filePath?: string;
+	lineNumber?: number;
 };
 
 export type IssueCommentContext = {
@@ -363,6 +365,8 @@ export class WebhookRouter {
 				commenterLogin: commentUserLogin,
 				isReviewComment: true,
 				isReviewSubmission: false,
+				filePath: payload.comment.path,
+				lineNumber: payload.comment.line ?? undefined,
 			},
 		};
 	}
