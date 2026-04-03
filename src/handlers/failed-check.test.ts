@@ -15,6 +15,7 @@ const baseInputs: HandlerConfig = {
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
 	coderTemplateName: "task-template",
+	coderTemplateNameCodex: "task-template-codex",
 	coderOrganization: "default",
 	agentGithubUsername: "xmtp-coder-agent",
 };
