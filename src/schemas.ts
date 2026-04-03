@@ -7,6 +7,7 @@ export interface HandlerConfig {
 	coderToken: string;
 	coderTaskNamePrefix: string;
 	coderTemplateName: string;
+	coderTemplateNameCodex: string;
 	coderTemplatePreset?: string;
 	coderOrganization: string;
 	agentGithubUsername: string; // replaces coderGithubUsername

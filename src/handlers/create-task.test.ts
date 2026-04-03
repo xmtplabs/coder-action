@@ -15,6 +15,7 @@ const baseInputs: HandlerConfig = {
 	coderUsername: "coder-agent",
 	coderTaskNamePrefix: "gh",
 	coderTemplateName: "task-template",
+	coderTemplateNameCodex: "task-template-codex",
 	coderOrganization: "default",
 	agentGithubUsername: "xmtp-coder-agent",
 };
@@ -24,6 +25,8 @@ const issueContext = {
 	repo: "libxmtp",
 	issueNumber: 42,
 	issueUrl: "https://github.com/xmtp/libxmtp/issues/42",
+	issueTitle: "Fix some bug",
+	issueLabels: [],
 	senderLogin: "human-dev",
 };
 
@@ -183,6 +186,94 @@ describe("CreateTaskHandler", () => {
 			coder.getTask.mock.calls[0] as unknown as [string, unknown]
 		)[1];
 		expect(String(taskNameArg)).toBe("gh-libxmtp-42");
+	});
+
+	test("uses codex template when issue title contains codex", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const ctx = {
+			...issueContext,
+			issueTitle: "Add Codex Support",
+		};
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		await handler.run();
+
+		const templateCall = coder.getTemplateByOrganizationAndName.mock
+			.calls[0] as unknown as [string, string];
+		expect(templateCall[1]).toBe("task-template-codex");
+	});
+
+	test("uses codex template when issue has codex label", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const ctx = {
+			...issueContext,
+			issueLabels: ["enhancement", "codex"],
+		};
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		await handler.run();
+
+		const templateCall = coder.getTemplateByOrganizationAndName.mock
+			.calls[0] as unknown as [string, string];
+		expect(templateCall[1]).toBe("task-template-codex");
+	});
+
+	test("uses default template when no codex indicator", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			issueContext,
+			logger,
+		);
+		await handler.run();
+
+		const templateCall = coder.getTemplateByOrganizationAndName.mock
+			.calls[0] as unknown as [string, string];
+		expect(templateCall[1]).toBe("task-template");
+	});
+
+	test("codex match in title is case insensitive", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const ctx = {
+			...issueContext,
+			issueTitle: "Use CODEX for processing",
+		};
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		await handler.run();
+
+		const templateCall = coder.getTemplateByOrganizationAndName.mock
+			.calls[0] as unknown as [string, string];
+		expect(templateCall[1]).toBe("task-template-codex");
 	});
 
 	test("logs task name via injected logger", async () => {

@@ -10,6 +10,8 @@ export interface IssueContext {
 	repo: string;
 	issueNumber: number;
 	issueUrl: string;
+	issueTitle: string;
+	issueLabels: string[];
 	senderLogin: string;
 }
 
@@ -88,9 +90,10 @@ export class CreateTaskHandler {
 			: this.context.issueUrl;
 
 		// 5. Get template and create task
+		const templateName = this.resolveTemplateName();
 		const template = await this.coder.getTemplateByOrganizationAndName(
 			this.inputs.coderOrganization,
-			this.inputs.coderTemplateName,
+			templateName,
 		);
 
 		const presets = await this.coder.getTemplateVersionPresets(
@@ -134,6 +137,20 @@ export class CreateTaskHandler {
 			taskStatus: createdTask.status,
 			skipped: false,
 		};
+	}
+
+	private resolveTemplateName(): string {
+		const titleHasCodex = /codex/i.test(this.context.issueTitle);
+		const labelsHaveCodex = this.context.issueLabels.some(
+			(label) => label.toLowerCase() === "codex",
+		);
+		if (titleHasCodex || labelsHaveCodex) {
+			this.logger.info(
+				`Using codex template: ${this.inputs.coderTemplateNameCodex}`,
+			);
+			return this.inputs.coderTemplateNameCodex;
+		}
+		return this.inputs.coderTemplateName;
 	}
 
 	private generateTaskUrl(coderUsername: string, taskId: string): string {

@@ -22,6 +22,8 @@ export type HandlerType =
 export type CreateTaskContext = {
 	issueNumber: number;
 	issueUrl: string;
+	issueTitle: string;
+	issueLabels: string[];
 	repoName: string;
 	repoOwner: string;
 	senderLogin: string;
@@ -243,6 +245,10 @@ export class WebhookRouter {
 			context: {
 				issueNumber: payload.issue.number,
 				issueUrl: payload.issue.html_url,
+				issueTitle: payload.issue.title,
+				issueLabels: (payload.issue.labels ?? []).map((l) =>
+					typeof l === "string" ? l : (l.name ?? ""),
+				),
 				repoName: payload.repository.name,
 				repoOwner: payload.repository.owner.login,
 				senderLogin: payload.sender.login,

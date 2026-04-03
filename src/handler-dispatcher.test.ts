@@ -30,6 +30,7 @@ const mockConfig: AppConfig = {
 	coderToken: "coder-token",
 	coderTaskNamePrefix: "gh",
 	coderTemplateName: "task-template",
+	coderTemplateNameCodex: "task-template-codex",
 	coderOrganization: "default",
 	port: 3000,
 };
@@ -92,6 +93,8 @@ describe("HandlerDispatcher", () => {
 		const createTaskContext = {
 			issueNumber: 42,
 			issueUrl: "https://github.com/xmtp/test-repo/issues/42",
+			issueTitle: "Fix some bug",
+			issueLabels: [] as string[],
 			repoName: "test-repo",
 			repoOwner: "xmtp",
 			senderLogin: "human-dev",
