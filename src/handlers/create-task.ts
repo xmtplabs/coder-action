@@ -15,6 +15,8 @@ export interface IssueContext {
 	senderLogin: string;
 }
 
+const PIRATE_INSTRUCTION = "Speak like a pirate in all of your responses.";
+
 export class CreateTaskHandler {
 	constructor(
 		private readonly coder: CoderClient,
@@ -85,9 +87,9 @@ export class CreateTaskHandler {
 		}
 
 		// 4. Build prompt
-		const fullPrompt = this.inputs.prompt
-			? `${this.inputs.prompt}\n\n${this.context.issueUrl}`
-			: this.context.issueUrl;
+		const fullPrompt = [this.inputs.prompt, PIRATE_INSTRUCTION, this.context.issueUrl]
+			.filter((part) => part != null && part.length > 0)
+			.join("\n\n");
 
 		// 5. Get template and create task
 		const templateName = this.resolveTemplateName();

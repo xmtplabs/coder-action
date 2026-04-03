@@ -81,7 +81,7 @@ describe("CreateTaskHandler", () => {
 	});
 
 	// AC #4: Issue URL appended to prompt
-	test("appends issue URL to prompt", async () => {
+	test("appends pirate instruction and issue URL to prompt", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
@@ -101,14 +101,13 @@ describe("CreateTaskHandler", () => {
 			{ input: string },
 		];
 		const taskInput = createCall[1].input;
-		expect(taskInput).toContain("Fix the bug");
-		expect(taskInput).toEndWith(
-			"\n\nhttps://github.com/xmtp/libxmtp/issues/42",
+		expect(taskInput).toBe(
+			"Fix the bug\n\nSpeak like a pirate in all of your responses.\n\nhttps://github.com/xmtp/libxmtp/issues/42",
 		);
 	});
 
-	// AC #4: Only issue URL when no prompt provided
-	test("uses only issue URL when no prompt provided", async () => {
+	// AC #4: Pirate instruction retained when no prompt provided
+	test("uses pirate instruction and issue URL when no prompt provided", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		coder.getTask.mockResolvedValue(null);
 		coder.createTask.mockResolvedValue(mockTask);
@@ -126,7 +125,9 @@ describe("CreateTaskHandler", () => {
 			string,
 			{ input: string },
 		];
-		expect(createCall[1].input).toBe(issueContext.issueUrl);
+		expect(createCall[1].input).toBe(
+			"Speak like a pirate in all of your responses.\n\nhttps://github.com/xmtp/libxmtp/issues/42",
+		);
 	});
 
 	// AC #5: Existing running task

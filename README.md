@@ -30,7 +30,7 @@ See [docs/github-app-setup.md](docs/github-app-setup.md) for step-by-step instru
 | `GITHUB_APP_WEBHOOK_SECRET` | Yes | GitHub App webhook secret for payload verification |
 | `GITHUB_AGENT_USERNAME` | No | GitHub username of the designated coder agent (default: `xmtp-coder-agent`) |
 | `PORT` | No | HTTP server port (default: `3000`) |
-| `PROMPT` | No | Custom prompt text — issue URL is always appended (`create_task` only) |
+| `PROMPT` | No | Custom prompt text — pirate instruction and issue URL are appended (`create_task` only) |
 
 ## Running
 
