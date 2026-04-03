@@ -69,7 +69,7 @@ describe("CloseTaskHandler", () => {
 			closeContext.repo,
 			closeContext.issueNumber,
 			"Task completed.",
-			"Task created:",
+			"Task completed",
 		);
 	});
 

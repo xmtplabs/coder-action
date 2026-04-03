@@ -83,7 +83,7 @@ export class CloseTaskHandler {
 			this.context.repo,
 			this.context.issueNumber,
 			"Task completed.",
-			"Task created:",
+			"Task completed",
 		);
 
 		return { taskName, taskStatus: "deleted", skipped: false };
