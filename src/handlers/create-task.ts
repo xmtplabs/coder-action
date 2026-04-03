@@ -87,7 +87,11 @@ export class CreateTaskHandler {
 		}
 
 		// 4. Build prompt
-		const fullPrompt = [this.inputs.prompt, PIRATE_INSTRUCTION, this.context.issueUrl]
+		const fullPrompt = [
+			this.inputs.prompt,
+			PIRATE_INSTRUCTION,
+			this.context.issueUrl,
+		]
 			.filter((part) => part != null && part.length > 0)
 			.join("\n\n");
 
