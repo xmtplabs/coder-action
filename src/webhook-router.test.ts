@@ -75,6 +75,29 @@ describe("WebhookRouter", () => {
 		expect(ctx.senderId).toBe(65710);
 	});
 
+	test("issues.assigned extracts senderLogin from sender, not issue author", async () => {
+		// Simulate: external user created the issue, maintainer assigned the bot
+		const payload = {
+			...issuesAssigned,
+			issue: {
+				...issuesAssigned.issue,
+				user: { login: "external-user", id: 11111 },
+			},
+			sender: { login: "org-maintainer", id: 22222 },
+		};
+		const result = await router.handleWebhook(
+			"issues",
+			"delivery-001b",
+			payload,
+		);
+
+		expect(result.dispatched).toBe(true);
+		if (!result.dispatched) throw new Error("expected dispatched");
+		const ctx = result.context as CreateTaskContext;
+		expect(ctx.senderLogin).toBe("org-maintainer");
+		expect(ctx.senderId).toBe(22222);
+	});
+
 	test("issues.assigned with non-matching assignee login → skipped", async () => {
 		const payload = {
 			...issuesAssigned,

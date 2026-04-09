@@ -113,6 +113,18 @@ describe("HandlerDispatcher", () => {
 			expect(coder.getCoderUserByGitHubId).toHaveBeenCalledWith(67890);
 		});
 
+		test("resolves coder user from sender (assigner), not issue author", async () => {
+			// senderId represents the person who assigned the bot, not the issue author
+			const ctx = {
+				...createTaskContext,
+				senderLogin: "org-maintainer",
+				senderId: 99999,
+			};
+			const result = makeDispatchedResult("create_task", ctx);
+			await dispatcher.dispatch(result);
+			expect(coder.getCoderUserByGitHubId).toHaveBeenCalledWith(99999);
+		});
+
 		test("creates a task and returns ActionOutputs", async () => {
 			coder.getTask.mockResolvedValue(null);
 			coder.createTask.mockResolvedValue(mockTask);

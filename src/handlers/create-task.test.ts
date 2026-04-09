@@ -80,6 +80,63 @@ describe("CreateTaskHandler", () => {
 		expect(coder.createTask).not.toHaveBeenCalled();
 	});
 
+	// Permission check must use the sender (assigner), not the issue author.
+	// This covers the case where an external user without write access creates
+	// the issue and a maintainer with write access assigns the bot.
+	test("checks permission for senderLogin (the assigner)", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		const ctx = {
+			...issueContext,
+			senderLogin: "maintainer-who-assigned",
+		};
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		await handler.run();
+
+		expect(github.checkActorPermission).toHaveBeenCalledWith(
+			ctx.owner,
+			ctx.repo,
+			"maintainer-who-assigned",
+		);
+	});
+
+	test("creates task when assigner has write access regardless of issue author", async () => {
+		github.checkActorPermission.mockResolvedValue(true);
+		coder.getTask.mockResolvedValue(null);
+		coder.createTask.mockResolvedValue(mockTask);
+
+		// senderLogin is the maintainer who assigned the bot, not the issue author
+		const ctx = {
+			...issueContext,
+			senderLogin: "org-maintainer",
+		};
+		const handler = new CreateTaskHandler(
+			coder,
+			github as unknown as import("../github-client").GitHubClient,
+			baseInputs,
+			ctx,
+			logger,
+		);
+		const result = await handler.run();
+
+		expect(result.skipped).toBe(false);
+		expect(coder.createTask).toHaveBeenCalledTimes(1);
+		// Verify permission was checked for the assigner, not anyone else
+		expect(github.checkActorPermission).toHaveBeenCalledWith(
+			"xmtp",
+			"libxmtp",
+			"org-maintainer",
+		);
+	});
+
 	// AC #4: Issue URL appended to prompt
 	test("appends issue URL to prompt", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
