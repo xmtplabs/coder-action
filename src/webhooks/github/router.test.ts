@@ -8,7 +8,7 @@ import type {
 	CheckFailedEvent,
 	Event,
 } from "../../events/types";
-import type { Logger } from "../../infra/logger";
+import type { Logger } from "../../utils/logger";
 
 import issuesAssigned from "../../testing/fixtures/issues-assigned.json";
 import issuesClosed from "../../testing/fixtures/issues-closed.json";

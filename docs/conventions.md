@@ -22,7 +22,7 @@ Never cast with `as TaskName` / `as TaskId` — the brand has no runtime represe
 
 ## Logger
 
-`src/infra/logger.ts` exports `createLogger` (production) and `TestLogger` (tests). Log structured objects:
+`src/utils/logger.ts` exports `createLogger` (production) and `TestLogger` (tests). Log structured objects:
 
 ```ts
 logger.info("Webhook received", { deliveryId, eventName });

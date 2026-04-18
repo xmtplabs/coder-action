@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { TaskStatus } from "../task-runner";
 import { TaskNameSchema, TaskIdSchema } from "../task-runner";
-import { TestLogger } from "../../infra/logger";
+import { TestLogger } from "../../utils/logger";
 import { CoderService } from "./service";
 import { CoderAPIError } from "./errors";
 

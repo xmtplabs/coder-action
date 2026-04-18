@@ -60,7 +60,7 @@ src/
     app-bot-login.ts                  App bot login cache + GET /app resolver
   config/app-config.ts                loadConfig(env) — Zod-validated, no secret leakage
   events/types.ts                     Event discriminated union
-  infra/logger.ts                     console.log({...}) JSON logger + TestLogger
+  utils/logger.ts                     console.log({...}) JSON logger + TestLogger
   services/
     task-runner.ts                    TaskRunner interface + branded Task types
     coder/service.ts                  HTTP primitives (no polling — workflow orchestrates)

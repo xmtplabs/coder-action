@@ -7,7 +7,7 @@ import {
 	parseWebhookRequest,
 	WebhookRequestError,
 } from "./http/parse-webhook-request";
-import { createLogger } from "./infra/logger";
+import { createLogger } from "./utils/logger";
 import { WebhookRouter } from "./webhooks/github/router";
 import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
 import {
