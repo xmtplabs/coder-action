@@ -28,10 +28,6 @@ export default {
 	): Promise<Response> {
 		const url = new URL(request.url);
 
-		if (request.method === "GET" && url.pathname === "/healthz") {
-			return new Response("ok", { status: 200 });
-		}
-
 		if (request.method === "POST" && url.pathname === "/api/webhooks") {
 			return handleWebhook(request, env);
 		}

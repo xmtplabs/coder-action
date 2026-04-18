@@ -64,16 +64,6 @@ function makeEnv(
 describe("Worker fetch handler — HTTP status surface", () => {
 	// ── 200 ─────────────────────────────────────────────────────────────────
 
-	test("GET /healthz → 200 'ok'", async () => {
-		const res = await worker.fetch(
-			new Request("https://w/healthz", { method: "GET" }),
-			makeEnv(),
-			{} as ExecutionContext,
-		);
-		expect(res.status).toBe(200);
-		expect(await res.text()).toBe("ok");
-	});
-
 	test("workflow_run success → 200 and no workflow created (skip)", async () => {
 		let created = false;
 		const env = makeEnv(() => {
