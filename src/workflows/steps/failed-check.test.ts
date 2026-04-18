@@ -1,0 +1,170 @@
+import { describe, expect, test, vi } from "vitest";
+import type { AppConfig } from "../../config/app-config";
+import type { CheckFailedEvent } from "../../events/types";
+import { runFailedCheck } from "./failed-check";
+
+function makeStep() {
+	const calls: string[] = [];
+	const step = {
+		calls,
+		do: vi.fn(async (name: string, ...rest: unknown[]) => {
+			calls.push(name);
+			const fn = rest[rest.length - 1] as () => Promise<unknown>;
+			return fn();
+		}),
+		sleep: vi.fn(async () => {}),
+	};
+	return step;
+}
+
+const config = {
+	coderTaskNamePrefix: "gh",
+	agentGithubUsername: "xmtp-coder-agent",
+} as unknown as AppConfig;
+
+function event(pullRequestNumbers: number[] = [5]): CheckFailedEvent {
+	return {
+		type: "check_failed",
+		source: { type: "github", installationId: 1 },
+		repository: { owner: "acme", name: "repo" },
+		run: {
+			id: 999,
+			url: "https://github.com/acme/repo/runs/999",
+			headSha: "abc123",
+			workflowName: "ci",
+			workflowFile: ".github/workflows/ci.yml",
+		},
+		pullRequestNumbers,
+	};
+}
+
+describe("runFailedCheck", () => {
+	test("returns early when no PR linked", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => null),
+			getTaskById: vi.fn(async () => ({})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			getPR: vi.fn(async () => null),
+			findPRByHeadSHA: vi.fn(async () => null),
+			findLinkedIssues: vi.fn(async () => []),
+			getFailedJobs: vi.fn(async () => []),
+			getJobLogs: vi.fn(async () => ""),
+		};
+		await runFailedCheck({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: event([]),
+		});
+		// fetch-pr-info ran; no fetch-failed-jobs / send-task-input
+		expect(step.calls).toContain("fetch-pr-info");
+		expect(step.calls).not.toContain("send-task-input");
+	});
+
+	test("emits expected step sequence when PR + task exist", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				owner_id: "owner-uuid",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			getTaskById: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			getPR: vi.fn(async () => ({
+				number: 5,
+				user: { login: "xmtp-coder-agent" },
+				head: { sha: "abc123" },
+			})),
+			findPRByHeadSHA: vi.fn(async () => null),
+			findLinkedIssues: vi.fn(async () => [
+				{
+					number: 7,
+					title: "Bug",
+					state: "OPEN",
+					url: "https://github.com/acme/repo/issues/7",
+				},
+			]),
+			getFailedJobs: vi.fn(async () => [
+				{ id: 1, name: "test", conclusion: "failure" },
+			]),
+			getJobLogs: vi.fn(async () => "log line 1"),
+		};
+		await runFailedCheck({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: event(),
+		});
+		expect(step.calls).toContain("fetch-pr-info");
+		expect(step.calls).toContain("find-linked-issues");
+		expect(step.calls).toContain("locate-task");
+		expect(step.calls).toContain("fetch-failed-jobs");
+		expect(step.calls).toContain("fetch-job-logs");
+		expect(step.calls).toContain("send-task-input");
+	});
+
+	test("fetch-failed-jobs returns plain array", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				owner_id: "owner-uuid",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			getTaskById: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			getPR: vi.fn(async () => ({
+				number: 5,
+				user: { login: "xmtp-coder-agent" },
+				head: { sha: "abc123" },
+			})),
+			findPRByHeadSHA: vi.fn(async () => null),
+			findLinkedIssues: vi.fn(async () => [
+				{ number: 7, title: "B", state: "OPEN", url: "u" },
+			]),
+			getFailedJobs: vi.fn(async () => [
+				{ id: 1, name: "unit", conclusion: "failure" },
+			]),
+			getJobLogs: vi.fn(async () => "log"),
+		};
+		await runFailedCheck({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: event(),
+		});
+		const idx = step.do.mock.calls.findIndex(
+			(c: unknown[]) => c[0] === "fetch-failed-jobs",
+		);
+		const result = await step.do.mock.results[idx]?.value;
+		expect(Array.isArray(result)).toBe(true);
+	});
+});
