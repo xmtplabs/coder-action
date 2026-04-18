@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { HandlerDispatcher } from "./dispatcher";
 import type { HandlerDispatcherOptions } from "./dispatcher";
 import {
-	MockCoderClient,
+	MockTaskRunner,
+	mockTaskNeutral,
 	createMockGitHubClient,
-	mockTask,
 } from "../testing/helpers";
 import { TestLogger } from "../infra/logger";
 import type { AppConfig } from "../config/app-config";
@@ -57,7 +57,7 @@ function makeDispatchedResult(
 }
 
 describe("HandlerDispatcher", () => {
-	let coder: MockCoderClient;
+	let runner: MockTaskRunner;
 	let gh: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 	let mockOctokit: Octokit;
@@ -65,7 +65,7 @@ describe("HandlerDispatcher", () => {
 	let dispatcher: HandlerDispatcher;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		gh = createMockGitHubClient();
 		logger = new TestLogger();
 
@@ -79,7 +79,7 @@ describe("HandlerDispatcher", () => {
 			createInstallationOctokit: createInstallationOctokit as unknown as (
 				installationId: number,
 			) => Octokit,
-			coderClient: coder,
+			taskRunner: runner,
 			logger,
 			// Inject mock GitHubClient to avoid real API calls
 			createGitHubClient: () => gh as unknown as GitHubClient,
@@ -107,15 +107,21 @@ describe("HandlerDispatcher", () => {
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
-		test("resolves coder username via getCoderUserByGitHubId with senderId", async () => {
+		test("resolves owner via runner.lookupUser with senderId", async () => {
 			const result = makeDispatchedResult("create_task", createTaskContext);
 			await dispatcher.dispatch(result);
-			expect(coder.getCoderUserByGitHubId).toHaveBeenCalledWith(67890);
+			expect(runner.lookupUser).toHaveBeenCalledWith({
+				user: {
+					type: "github",
+					id: "67890",
+					username: "human-dev",
+				},
+			});
 		});
 
 		test("creates a task and returns ActionOutputs", async () => {
-			coder.getTask.mockResolvedValue(null);
-			coder.createTask.mockResolvedValue(mockTask);
+			runner.getStatus.mockResolvedValue(null);
+			runner.create.mockResolvedValue(mockTaskNeutral);
 
 			const result = makeDispatchedResult("create_task", createTaskContext);
 			const outputs = await dispatcher.dispatch(result);
@@ -140,24 +146,13 @@ describe("HandlerDispatcher", () => {
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
-		test("skips when no task is found", async () => {
-			coder.getTask.mockResolvedValue(null);
-
-			const result = makeDispatchedResult("close_task", closeTaskContext);
-			const outputs = await dispatcher.dispatch(result);
-
-			expect(outputs.skipped).toBe(true);
-			expect(outputs.skipReason).toBe("task-not-found");
-		});
-
-		test("deletes task and returns outputs when task exists", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
-
+		test("deletes task and returns outputs", async () => {
 			const result = makeDispatchedResult("close_task", closeTaskContext);
 			const outputs = await dispatcher.dispatch(result);
 
 			expect(outputs.skipped).toBe(false);
 			expect(outputs.taskStatus).toBe("deleted");
+			expect(runner.delete).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -185,13 +180,13 @@ describe("HandlerDispatcher", () => {
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTaskNeutral);
 
 			const result = makeDispatchedResult("pr_comment", prCommentContext);
 			const outputs = await dispatcher.dispatch(result);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 
 		test("skips when PR not authored by agent", async () => {
@@ -226,17 +221,17 @@ describe("HandlerDispatcher", () => {
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTaskNeutral);
 
 			const result = makeDispatchedResult("issue_comment", issueCommentContext);
 			const outputs = await dispatcher.dispatch(result);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 
 		test("skips when task is not found", async () => {
-			coder.getTask.mockResolvedValue(null);
+			runner.getStatus.mockResolvedValue(null);
 
 			const result = makeDispatchedResult("issue_comment", issueCommentContext);
 			const outputs = await dispatcher.dispatch(result);
@@ -288,13 +283,13 @@ describe("HandlerDispatcher", () => {
 				user: { login: "xmtp-coder-agent" },
 				head: { sha: "abc123def456" },
 			});
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTaskNeutral);
 
 			const result = makeDispatchedResult("failed_check", failedCheckContext);
 			const outputs = await dispatcher.dispatch(result);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 	});
 });

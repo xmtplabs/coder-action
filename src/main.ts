@@ -2,7 +2,7 @@ import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "./config/app-config";
 import { createLogger } from "./infra/logger";
-import { RealCoderClient } from "./services/coder/client";
+import { CoderService } from "./services/coder/service";
 import { WebhookRouter } from "./webhooks/github/router";
 import { HandlerDispatcher } from "./events/dispatcher";
 import { createApp } from "./http/server";
@@ -56,7 +56,16 @@ async function main(): Promise<void> {
 	logger.info(`Discovered app identity: ${appSlug} (bot: ${appBotLogin})`);
 
 	// Wire up dependencies
-	const coder = new RealCoderClient(config.coderURL, config.coderToken);
+	const taskRunner = new CoderService({
+		serverURL: config.coderURL,
+		apiToken: config.coderToken,
+		config: {
+			organization: config.coderOrganization,
+			templateName: config.coderTemplateName,
+			templatePreset: config.coderTemplatePreset,
+		},
+		logger,
+	});
 	const router = new WebhookRouter({
 		agentGithubUsername: config.agentGithubUsername,
 		appBotLogin,
@@ -86,7 +95,7 @@ async function main(): Promise<void> {
 	const dispatcher = new HandlerDispatcher({
 		config,
 		createInstallationOctokit,
-		coderClient: coder,
+		taskRunner,
 		logger,
 	});
 

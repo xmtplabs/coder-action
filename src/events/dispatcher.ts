@@ -1,10 +1,10 @@
-import type { CoderClient } from "../services/coder/client";
+import type { TaskRunner } from "../services/task-runner";
 import { GitHubClient, type Octokit } from "../services/github/client";
-import { CloseTaskHandler } from "../actions/close-task";
-import { CreateTaskHandler } from "../actions/create-task";
-import { FailedCheckHandler } from "../actions/failed-check";
-import { IssueCommentHandler } from "../actions/issue-comment";
-import { PRCommentHandler } from "../actions/pr-comment";
+import { CloseTaskAction } from "../actions/close-task";
+import { CreateTaskAction } from "../actions/create-task";
+import { FailedCheckAction } from "../actions/failed-check";
+import { IssueCommentAction } from "../actions/issue-comment";
+import { PRCommentAction } from "../actions/pr-comment";
 import type { Logger } from "../infra/logger";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
 import type { AppConfig } from "../config/app-config";
@@ -15,7 +15,7 @@ import type { RouteResult } from "../webhooks/github/router";
 export interface HandlerDispatcherOptions {
 	config: AppConfig;
 	createInstallationOctokit: (installationId: number) => Octokit;
-	coderClient: CoderClient;
+	taskRunner: TaskRunner;
 	logger: Logger;
 	/**
 	 * Optional factory for creating a GitHubClient from an Octokit instance.
@@ -60,15 +60,10 @@ export class HandlerDispatcher {
 		switch (result.handler) {
 			case "create_task": {
 				const ctx = result.context;
-				// Resolve coder username from sender GitHub user ID
-				const coderUser = await this.options.coderClient.getCoderUserByGitHubId(
-					ctx.senderId,
-				);
-				const config = { ...handlerConfig, coderUsername: coderUser.username };
-				const handler = new CreateTaskHandler(
-					this.options.coderClient,
+				const action = new CreateTaskAction(
+					this.options.taskRunner,
 					github,
-					config,
+					handlerConfig,
 					{
 						owner: ctx.repoOwner,
 						repo: ctx.repoName,
@@ -77,16 +72,17 @@ export class HandlerDispatcher {
 						issueTitle: ctx.issueTitle,
 						issueLabels: ctx.issueLabels,
 						senderLogin: ctx.senderLogin,
+						senderId: ctx.senderId,
 					},
 					logger,
 				);
-				return handler.run();
+				return action.run();
 			}
 
 			case "close_task": {
 				const ctx = result.context;
-				const handler = new CloseTaskHandler(
-					this.options.coderClient,
+				const action = new CloseTaskAction(
+					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
@@ -96,13 +92,13 @@ export class HandlerDispatcher {
 					},
 					logger,
 				);
-				return handler.run();
+				return action.run();
 			}
 
 			case "pr_comment": {
 				const ctx = result.context;
-				const handler = new PRCommentHandler(
-					this.options.coderClient,
+				const action = new PRCommentAction(
+					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
@@ -122,13 +118,13 @@ export class HandlerDispatcher {
 					},
 					logger,
 				);
-				return handler.run();
+				return action.run();
 			}
 
 			case "issue_comment": {
 				const ctx = result.context;
-				const handler = new IssueCommentHandler(
-					this.options.coderClient,
+				const action = new IssueCommentAction(
+					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
@@ -143,13 +139,13 @@ export class HandlerDispatcher {
 					},
 					logger,
 				);
-				return handler.run();
+				return action.run();
 			}
 
 			case "failed_check": {
 				const ctx = result.context;
-				const handler = new FailedCheckHandler(
-					this.options.coderClient,
+				const action = new FailedCheckAction(
+					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
@@ -167,7 +163,7 @@ export class HandlerDispatcher {
 					},
 					logger,
 				);
-				return handler.run();
+				return action.run();
 			}
 		}
 	}
