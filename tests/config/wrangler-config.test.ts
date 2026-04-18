@@ -1,13 +1,9 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, test } from "vitest";
+// Import the wrangler.toml as a raw string at build time (Vite ?raw suffix).
+// This avoids relying on filesystem access from inside workerd.
+import content from "../../wrangler.toml?raw";
 
 describe("wrangler.toml", () => {
-	const content = readFileSync(
-		path.join(process.cwd(), "wrangler.toml"),
-		"utf8",
-	);
-
 	test("declares the worker name and main entry", () => {
 		expect(content).toMatch(/^name\s*=\s*"coder-action"/m);
 		expect(content).toMatch(/^main\s*=\s*"src\/main\.ts"/m);
