@@ -5,6 +5,8 @@ import type {
 } from "../services/coder/client";
 import { TaskIdSchema, TaskNameSchema } from "../services/coder/client";
 import type { GitHubClient } from "../services/github/client";
+import type { Task, TaskName, TaskRunner } from "../services/task-runner";
+import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner";
 
 // ── Mock Task Data ──────────────────────────────────────────────────────────
 
@@ -76,6 +78,51 @@ export class MockCoderClient implements CoderClient {
 	waitForWorkspaceStopped = mock(() => Promise.resolve());
 	deleteWorkspace = mock(() => Promise.resolve());
 	deleteTask = mock(() => Promise.resolve());
+}
+
+// ── Neutral Task Fixtures (TaskRunner-shape) ────────────────────────────────
+
+export const mockTaskNeutral: Task = {
+	name: TaskRunnerNameSchema.parse("gh-test-repo-42"),
+	status: "ready",
+	owner: "test-coder-user",
+	url: "https://coder.example.com/tasks/test-coder-user/550e8400-e29b-41d4-a716-446655440000",
+};
+
+export const mockTaskNeutralStopped: Task = {
+	...mockTaskNeutral,
+	status: "stopped",
+};
+
+export const mockTaskNeutralError: Task = {
+	...mockTaskNeutral,
+	status: "error",
+};
+
+// ── Mock Task Runner ────────────────────────────────────────────────────────
+
+export class MockTaskRunner implements TaskRunner {
+	lookupUser = mock(
+		async (_: { user: { type: "github"; id: string; username: string } }) =>
+			"test-coder-user",
+	);
+	create = mock(
+		async (_: { taskName: TaskName; owner: string; input: string }) =>
+			mockTaskNeutral,
+	);
+	sendInput = mock(
+		async (_: {
+			taskName: TaskName;
+			owner?: string;
+			input: string;
+			timeout?: number;
+		}) => {},
+	);
+	getStatus = mock(
+		async (_: { taskName: TaskName; owner?: string }): Promise<Task | null> =>
+			null,
+	);
+	delete = mock(async (_: { taskName: TaskName; owner?: string }) => {});
 }
 
 // ── Mock GitHub Client ──────────────────────────────────────────────────────
