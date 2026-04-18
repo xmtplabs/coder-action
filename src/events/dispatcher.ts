@@ -1,14 +1,14 @@
-import type { CoderClient } from "./services/coder/client";
-import { GitHubClient, type Octokit } from "./services/github/client";
-import { CloseTaskHandler } from "./handlers/close-task";
-import { CreateTaskHandler } from "./handlers/create-task";
-import { FailedCheckHandler } from "./handlers/failed-check";
-import { IssueCommentHandler } from "./handlers/issue-comment";
-import { PRCommentHandler } from "./handlers/pr-comment";
-import type { Logger } from "./infra/logger";
-import type { ActionOutputs, HandlerConfig } from "./config/handler-config";
-import type { AppConfig } from "./config/app-config";
-import type { RouteResult } from "./webhooks/github/router";
+import type { CoderClient } from "../services/coder/client";
+import { GitHubClient, type Octokit } from "../services/github/client";
+import { CloseTaskHandler } from "../handlers/close-task";
+import { CreateTaskHandler } from "../handlers/create-task";
+import { FailedCheckHandler } from "../handlers/failed-check";
+import { IssueCommentHandler } from "../handlers/issue-comment";
+import { PRCommentHandler } from "../handlers/pr-comment";
+import type { Logger } from "../infra/logger";
+import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
+import type { AppConfig } from "../config/app-config";
+import type { RouteResult } from "../webhooks/github/router";
 
 // ── Public interface ──────────────────────────────────────────────────────────
 

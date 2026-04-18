@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { HandlerDispatcher } from "./handler-dispatcher";
-import type { HandlerDispatcherOptions } from "./handler-dispatcher";
+import { HandlerDispatcher } from "./dispatcher";
+import type { HandlerDispatcherOptions } from "./dispatcher";
 import {
 	MockCoderClient,
 	createMockGitHubClient,
 	mockTask,
-} from "./testing/helpers";
-import { TestLogger } from "./infra/logger";
-import type { AppConfig } from "./config/app-config";
+} from "../testing/helpers";
+import { TestLogger } from "../infra/logger";
+import type { AppConfig } from "../config/app-config";
 import type {
 	RouteResult,
 	CreateTaskContext,
@@ -15,8 +15,8 @@ import type {
 	PRCommentContext,
 	IssueCommentContext,
 	FailedCheckContext,
-} from "./webhooks/github/router";
-import type { GitHubClient, Octokit } from "./services/github/client";
+} from "../webhooks/github/router";
+import type { GitHubClient, Octokit } from "../services/github/client";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
