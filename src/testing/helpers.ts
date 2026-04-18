@@ -1,4 +1,4 @@
-import { mock } from "bun:test";
+import { vi } from "vitest";
 import type { GitHubClient } from "../services/github/client";
 import type { Task, TaskName, TaskRunner } from "../services/task-runner";
 import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner";
@@ -25,14 +25,14 @@ export const mockErrorTask: Task = {
 // ── Mock Task Runner ────────────────────────────────────────────────────────
 
 export class MockTaskRunner implements TaskRunner {
-	lookupUser = mock(
+	lookupUser = vi.fn(
 		async (_: { user: { type: "github"; id: string; username: string } }) =>
 			"test-coder-user",
 	);
-	create = mock(
+	create = vi.fn(
 		async (_: { taskName: TaskName; owner: string; input: string }) => mockTask,
 	);
-	sendInput = mock(
+	sendInput = vi.fn(
 		async (_: {
 			taskName: TaskName;
 			owner?: string;
@@ -40,11 +40,11 @@ export class MockTaskRunner implements TaskRunner {
 			timeout?: number;
 		}) => {},
 	);
-	getStatus = mock(
+	getStatus = vi.fn(
 		async (_: { taskName: TaskName; owner?: string }): Promise<Task | null> =>
 			null,
 	);
-	delete = mock(
+	delete = vi.fn(
 		async (_: { taskName: TaskName; owner?: string }) =>
 			({ deleted: true }) as { deleted: boolean },
 	);
@@ -53,11 +53,11 @@ export class MockTaskRunner implements TaskRunner {
 // ── Mock GitHub Client ──────────────────────────────────────────────────────
 
 export function createMockGitHubClient(): {
-	[K in keyof GitHubClient]: ReturnType<typeof mock>;
+	[K in keyof GitHubClient]: ReturnType<typeof vi.fn>;
 } {
 	return {
-		checkActorPermission: mock(() => Promise.resolve(true)),
-		findLinkedIssues: mock(() =>
+		checkActorPermission: vi.fn(() => Promise.resolve(true)),
+		findLinkedIssues: vi.fn(() =>
 			Promise.resolve([
 				{
 					number: 42,
@@ -67,20 +67,20 @@ export function createMockGitHubClient(): {
 				},
 			]),
 		),
-		commentOnIssue: mock(() => Promise.resolve()),
-		findPRByHeadSHA: mock(() => Promise.resolve(null)),
-		getPR: mock(() =>
+		commentOnIssue: vi.fn(() => Promise.resolve()),
+		findPRByHeadSHA: vi.fn(() => Promise.resolve(null)),
+		getPR: vi.fn(() =>
 			Promise.resolve({
 				number: 1,
 				user: { login: "xmtp-coder-agent" },
 				head: { sha: "abc123" },
 			}),
 		),
-		getFailedJobs: mock(() =>
+		getFailedJobs: vi.fn(() =>
 			Promise.resolve([{ id: 1, name: "test", conclusion: "failure" }]),
 		),
-		getJobLogs: mock(() => Promise.resolve("Error: test failed")),
-		addReactionToComment: mock(() => Promise.resolve()),
-		addReactionToReviewComment: mock(() => Promise.resolve()),
-	} as unknown as { [K in keyof GitHubClient]: ReturnType<typeof mock> };
+		getJobLogs: vi.fn(() => Promise.resolve("Error: test failed")),
+		addReactionToComment: vi.fn(() => Promise.resolve()),
+		addReactionToReviewComment: vi.fn(() => Promise.resolve()),
+	} as unknown as { [K in keyof GitHubClient]: ReturnType<typeof vi.fn> };
 }

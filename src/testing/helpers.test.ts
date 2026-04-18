@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { TaskRunner } from "../services/task-runner";
 import { MockTaskRunner } from "./helpers";
 

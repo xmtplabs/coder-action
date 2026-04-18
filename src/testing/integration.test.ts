@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach } from "vitest";
 import { createApp } from "../http/server";
 import { WebhookRouter, type SkipResult } from "../webhooks/github/router";
 import type {

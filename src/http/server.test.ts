@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach } from "vitest";
 import { createApp } from "./server";
 import { TestLogger } from "../infra/logger";
 

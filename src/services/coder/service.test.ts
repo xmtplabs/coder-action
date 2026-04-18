@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import type { TaskStatus } from "../task-runner";
 import { TaskNameSchema, TaskIdSchema } from "../task-runner";
 import { TestLogger } from "../../infra/logger";
@@ -129,7 +129,7 @@ function makeService(
 describe("CoderService.create", () => {
 	test("single call, no polling — returns new task (EARS-REQ-7)", async () => {
 		const calls: string[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			calls.push(`${method} ${url}`);
 
@@ -192,7 +192,7 @@ describe("CoderService.create", () => {
 	});
 
 	test("returns existing task when same name+owner exists — no POST (EARS-REQ-7 idempotent)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// pre-create lookup returns a match
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -217,7 +217,7 @@ describe("CoderService.create", () => {
 
 	test("fetches default preset when no templatePreset configured and uses it in POST body", async () => {
 		const postBodies: unknown[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -256,7 +256,7 @@ describe("CoderService.create", () => {
 
 describe("CoderService.sendInput", () => {
 	test("active+idle task — no wait, single send POST (EARS-REQ-14 direct path)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task by name
@@ -276,7 +276,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -303,7 +303,7 @@ describe("CoderService.sendInput", () => {
 
 	test("paused task — resume POST, then waitForTaskIdle, then send (EARS-REQ-14)", async () => {
 		const fetchOrder: string[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			fetchOrder.push(`${method} ${url}`);
 
@@ -327,7 +327,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -355,7 +355,7 @@ describe("CoderService.sendInput", () => {
 	// ── Test 5: initializing task — waits then sends ───────────────────────────
 
 	test("initializing task — waitForTaskIdle then single send (EARS-REQ-15)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task — initializing
@@ -372,7 +372,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -396,7 +396,7 @@ describe("CoderService.sendInput", () => {
 	// ── Test 5b: active+working task — waits before sending ───────────────────
 
 	test("active+working task — waitForTaskIdle called once before send", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task — active+working
@@ -418,7 +418,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -440,7 +440,7 @@ describe("CoderService.sendInput", () => {
 	// ── Test 6: no retry on send failure ──────────────────────────────────────
 
 	test("does NOT retry on send failure — rejects after first failed send (EARS-REQ-9)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -457,7 +457,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -478,7 +478,7 @@ describe("CoderService.sendInput", () => {
 	// ── Test 7: default timeout 120000ms ──────────────────────────────────────
 
 	test("passes 120_000 ms default timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -494,7 +494,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -512,7 +512,7 @@ describe("CoderService.sendInput", () => {
 	});
 
 	test("passes explicit timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -528,7 +528,7 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
 		const service = makeService(fetchFn as unknown as typeof fetch, {
 			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
 		});
@@ -549,7 +549,7 @@ describe("CoderService.sendInput", () => {
 
 describe("CoderService.delete", () => {
 	test("single DELETE API call — no workspace stop/delete (EARS-REQ-18)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task by name
@@ -584,7 +584,7 @@ describe("CoderService.delete", () => {
 		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // makeTask() owner_id
 		const RESOLVED_USERNAME = "resolved-username";
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (
 				method === "GET" &&
@@ -622,7 +622,7 @@ describe("CoderService.delete", () => {
 	});
 
 	test("no-op when task missing — no DELETE call, returns { deleted: false } (EARS-REQ-11)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -647,7 +647,7 @@ describe("CoderService.delete", () => {
 
 describe("CoderService.getStatus", () => {
 	test("resolves to null when task missing (EARS-REQ-12)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
@@ -669,7 +669,7 @@ describe("CoderService.getStatus", () => {
 		// task owner_id is a UUID — resolveOwnerUsername will call /api/v2/users/<uuid>
 		const OWNER_UUID = task1.owner_id;
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [task1, task2] }));
@@ -743,7 +743,7 @@ describe("CoderService status normalization (EARS-REQ-20)", () => {
 
 	for (const { status, current_state, expected } of cases) {
 		test(`Coder status="${status}" current_state=${current_state?.state ?? "null"} → TaskStatus="${expected}"`, async () => {
-			const fetchFn = mock((url: string, init?: RequestInit) => {
+			const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 				const method = init?.method ?? "GET";
 				if (method === "GET" && url.includes("/api/experimental/tasks")) {
 					return Promise.resolve(
@@ -769,7 +769,7 @@ describe("CoderService status normalization (EARS-REQ-20)", () => {
 
 describe("CoderService Task.url", () => {
 	test("url is composed as coderURL/tasks/owner/taskId", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
@@ -790,7 +790,7 @@ describe("CoderService Task.url", () => {
 		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // matches makeTask() owner_id
 		const RESOLVED_USERNAME = "resolved-username";
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// findTask (no owner) returns the task
 			if (
@@ -827,7 +827,7 @@ describe("CoderService Task.url", () => {
 
 describe("CoderService.lookupUser", () => {
 	test("resolves github user to coder username", async () => {
-		const fetchFn = mock((url: string) => {
+		const fetchFn = vi.fn((url: string) => {
 			if (url.includes("/api/v2/users")) {
 				return Promise.resolve(createMockResponse(makeUserList("coderuser")));
 			}
@@ -842,7 +842,7 @@ describe("CoderService.lookupUser", () => {
 	});
 
 	test("throws when user not found", async () => {
-		const fetchFn = mock(() => {
+		const fetchFn = vi.fn(() => {
 			return Promise.resolve(createMockResponse({ users: [] }));
 		});
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, vi, test } from "vitest";
 import { EventDispatcher } from "./dispatcher";
 import type { EventDispatcherOptions } from "./dispatcher";
 import {
@@ -140,7 +140,7 @@ describe("EventDispatcher", () => {
 	let gh: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 	let mockOctokit: Octokit;
-	let createInstallationOctokit: ReturnType<typeof mock>;
+	let createInstallationOctokit: ReturnType<typeof vi.fn>;
 	let dispatcher: EventDispatcher;
 
 	beforeEach(() => {
@@ -151,7 +151,7 @@ describe("EventDispatcher", () => {
 		// Minimal mock Octokit — we intercept GitHubClient creation so the
 		// real octokit is never used; the mock GitHub client methods are called instead.
 		mockOctokit = {} as Octokit;
-		createInstallationOctokit = mock(() => mockOctokit);
+		createInstallationOctokit = vi.fn(() => mockOctokit);
 
 		const options: EventDispatcherOptions = {
 			config: mockConfig,

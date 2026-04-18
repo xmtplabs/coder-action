@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import {
 	MockTaskRunner,
 	mockTask,
@@ -135,9 +135,7 @@ describe("CreateTaskAction", () => {
 		];
 		const taskInput = createCall[0].input;
 		expect(taskInput).toContain("Fix the bug");
-		expect(taskInput).toEndWith(
-			"\n\nhttps://github.com/xmtp/libxmtp/issues/42",
-		);
+		expect(taskInput.endsWith("\n\nhttps://github.com/xmtp/libxmtp/issues/42")).toBe(true);
 	});
 
 	// AC #4: Only issue URL when no prompt provided
