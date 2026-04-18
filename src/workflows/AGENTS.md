@@ -44,11 +44,32 @@ for (const job of failedJobs) {
 }
 ```
 
-## Tasks are keyed on issue number, not PR number
+## Task naming: deterministic, issue-scoped, `generateTaskName` only
 
-Tasks are named `{prefix}-{repo}-{issueNumber}` — always the **issue** number. PR-scoped events (`pull_request_review_comment`, `pull_request_review`, `workflow_run` failures) must call `github.findLinkedIssues(owner, repo, prNumber)` first and use the first linked issue's number. PR has no linked issue → silently no-op; no task exists to route to.
+Tasks are named `{prefix}-{repo}-{issueNumber}` (e.g. `gh-myrepo-42`). Two hard rules:
 
-`runFailedCheck` is the reference pattern. `runComment` shipped this bug once — see `docs/gotchas.md`.
+1. **Always use `generateTaskName()` from `src/actions/task-naming.ts`** — never build names by string interpolation. The helper truncates the repo name to stay under Coder's 32-character limit and trims trailing dashes.
+2. **Key on the issue number, not the PR number.** PR-scoped events (`pull_request_review_comment`, `pull_request_review`, `workflow_run` failures) must call `github.findLinkedIssues(owner, repo, prNumber)` first and use the first linked issue's number. PR with no linked issue → silently no-op; no task exists to route to.
+
+`runFailedCheck` is the reference pattern. `runComment` shipped the issue-vs-PR bug once — see `docs/gotchas.md`.
+
+## Step factory signature
+
+Every `src/workflows/steps/*.ts` export follows the same shape:
+
+```ts
+export interface RunFooContext {
+  step: WorkflowStep;
+  coder: CoderService;
+  github: GitHubClient;
+  config: AppConfig;
+  event: FooEvent;
+}
+
+export async function runFoo(ctx: RunFooContext): Promise<void> { /* ... */ }
+```
+
+`CoderTaskWorkflow.run()` constructs `coder` and `github` once at the top and passes them through. That's the DI seam — tests pass fakes directly without patching module-level imports. Adding a new factory? Mirror the shape exactly; the workflow dispatch relies on it.
 
 ## Paused tasks: resume only in pre-poll dispatch
 
