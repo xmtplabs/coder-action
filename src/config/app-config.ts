@@ -23,8 +23,10 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 // ── Loader ───────────────────────────────────────────────────────────────────
 
 /**
- * Maps SCREAMING_SNAKE_CASE environment variables to camelCase, validates with
- * Zod, and throws on error WITHOUT including secret values in the error message.
+ * Maps SCREAMING_SNAKE_CASE env entries to camelCase config fields, validates
+ * with Zod, and throws on error WITHOUT including secret values in the error
+ * message. Accepts any `Record<string, string | undefined>` — in production the
+ * caller passes the Workers `env` binding; in tests it's a fixture object.
  */
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
 	const raw = {

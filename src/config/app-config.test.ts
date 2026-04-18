@@ -61,4 +61,27 @@ describe("loadConfig", () => {
 			expect(msg).not.toContain("RSA PRIVATE KEY");
 		}
 	});
+
+	test("accepts a Workers env binding object (no process.env dependency)", () => {
+		const env = {
+			APP_ID: "123",
+			PRIVATE_KEY: "fake-key",
+			WEBHOOK_SECRET: "secret",
+			CODER_URL: "https://coder.example.com",
+			CODER_TOKEN: "token",
+		} as unknown as Record<string, string | undefined>;
+		expect(() => loadConfig(env)).not.toThrow();
+	});
+
+	test("does not read process.env implicitly", () => {
+		const env = {
+			APP_ID: "123",
+			PRIVATE_KEY: "fake-key",
+			WEBHOOK_SECRET: "secret",
+			CODER_URL: "https://coder.example.com",
+			CODER_TOKEN: "token",
+		} as unknown as Record<string, string | undefined>;
+		const config = loadConfig(env);
+		expect(config.appId).toBe("123");
+	});
 });
