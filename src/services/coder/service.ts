@@ -1,0 +1,512 @@
+import type { Logger } from "../../infra/logger";
+import type { GithubUser, Task, TaskRunner, TaskStatus } from "../task-runner";
+import type { TaskId, TaskName } from "../task-runner";
+import { CoderAPIError } from "./errors";
+import { waitForTaskIdle } from "./polling";
+import {
+	CoderSDKGetUsersResponseSchema,
+	CoderSDKUserSchema,
+	CoderSDKTemplateSchema,
+	CoderSDKTemplateVersionPresetsResponseSchema,
+	ExperimentalCoderSDKTaskListResponseSchema,
+	ExperimentalCoderSDKTaskSchema,
+	type ExperimentalCoderSDKTask,
+	type ExperimentalCoderSDKTaskStatus,
+	type ExperimentalCoderSDKTaskStateEntry,
+} from "./schemas";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface CoderServiceConfig {
+	/** Coder organization name */
+	organization: string;
+	/** Coder template name */
+	templateName: string;
+	/** Optional preset name; when omitted the default preset is used (or none if no default). */
+	templatePreset?: string;
+}
+
+export interface CoderServiceOptions {
+	serverURL: string;
+	apiToken: string;
+	config: CoderServiceConfig;
+	/** Defaults to `globalThis.fetch`. Injectable for testing. */
+	fetchFn?: typeof fetch;
+	/** Defaults to a no-op logger. Injectable for testing. */
+	logger?: Logger;
+	/**
+	 * Defaults to `waitForTaskIdle` from `./polling`.
+	 * Injectable to allow timeout assertions without real timers.
+	 */
+	waitForTaskIdleFn?: (
+		params: Parameters<typeof waitForTaskIdle>[0],
+	) => Promise<void>;
+}
+
+// ── No-op logger ──────────────────────────────────────────────────────────────
+
+const noopLogger: Logger = {
+	info: () => {},
+	debug: () => {},
+	warn: () => {},
+	error: () => {},
+	child: () => noopLogger,
+};
+
+// ── Status normalization ──────────────────────────────────────────────────────
+
+/**
+ * Normalize a Coder SDK task status + current_state into a provider-agnostic
+ * TaskStatus value.
+ *
+ * Mapping (per design spec §4):
+ *
+ * | Coder `status`          | Coder `current_state.state` | TaskStatus      |
+ * |-------------------------|-----------------------------|-----------------|
+ * | `pending`/`initializing`| any                         | `initializing`  |
+ * | `active`                | `idle`/`complete`/`failed`  | `ready`         |
+ * | `active`                | `working`                   | `initializing`  |
+ * | `active`                | `null`                      | `ready`         |
+ * | `paused`                | any                         | `stopped`       |
+ * | `error`/`unknown`       | any                         | `error`         |
+ */
+function normalizeStatus(
+	status: ExperimentalCoderSDKTaskStatus,
+	currentState: ExperimentalCoderSDKTaskStateEntry | null,
+): TaskStatus {
+	switch (status) {
+		case "pending":
+		case "initializing":
+			return "initializing";
+
+		case "active": {
+			const state = currentState?.state ?? null;
+			if (state === "idle" || state === "complete" || state === "failed") {
+				return "ready";
+			}
+			if (state === "working") {
+				return "initializing";
+			}
+			// null current_state — treat as ready (spec: active+null after grace → ready;
+			// for one-shot getStatus observations we treat it as ready immediately)
+			return "ready";
+		}
+
+		case "paused":
+			return "stopped";
+
+		case "error":
+		case "unknown":
+			return "error";
+
+		default: {
+			const _exhaustive: never = status;
+			return "error";
+		}
+	}
+}
+
+// ── URL composition ───────────────────────────────────────────────────────────
+
+function composeTaskUrl(
+	serverURL: string,
+	ownerUsername: string,
+	taskId: string,
+): string {
+	return `${serverURL}/tasks/${ownerUsername}/${taskId}`;
+}
+
+// ── CoderService ──────────────────────────────────────────────────────────────
+
+/**
+ * CoderService implements the `TaskRunner` interface using Coder's experimental
+ * Tasks API. Lifecycle semantics are aligned with the Coder CLI
+ * (`coder/coder/cli/task_*.go`):
+ *
+ * - `create`: single POST, no post-create wait (matches `task_create.go`).
+ * - `delete`: single DELETE, no workspace stop/wait/delete (matches `task_delete.go`).
+ * - `sendInput`: resume if paused, wait-for-idle, single send — no retry loop
+ *   (matches `task_send.go`).
+ */
+export class CoderService implements TaskRunner {
+	private readonly serverURL: string;
+	private readonly headers: Record<string, string>;
+	private readonly fetchFn: typeof fetch;
+	private readonly config: CoderServiceConfig;
+	private readonly logger: Logger;
+	private readonly waitForTaskIdleFn: (
+		params: Parameters<typeof waitForTaskIdle>[0],
+	) => Promise<void>;
+
+	constructor(options: CoderServiceOptions) {
+		this.serverURL = options.serverURL;
+		this.headers = {
+			"Coder-Session-Token": options.apiToken,
+			"Content-Type": "application/json",
+		};
+		this.fetchFn = options.fetchFn ?? globalThis.fetch;
+		this.config = options.config;
+		this.logger = options.logger ?? noopLogger;
+		this.waitForTaskIdleFn = options.waitForTaskIdleFn ?? waitForTaskIdle;
+	}
+
+	// ── HTTP plumbing ───────────────────────────────────────────────────────────
+
+	private async request<T>(
+		endpoint: string,
+		options?: RequestInit,
+	): Promise<T> {
+		const url = `${this.serverURL}${endpoint}`;
+		const response = await this.fetchFn(url, {
+			...options,
+			headers: { ...this.headers, ...options?.headers },
+		});
+
+		if (!response.ok) {
+			const body = await response.text().catch(() => "");
+			const detail = body ? `: ${body}` : "";
+			throw new CoderAPIError(
+				`Coder API error ${response.status} ${response.statusText} (${url})${detail}`,
+				response.status,
+				body,
+			);
+		}
+
+		// Handle 204 No Content and other responses with no body
+		if (
+			response.status === 204 ||
+			response.headers?.get("content-length") === "0"
+		) {
+			return undefined as T;
+		}
+
+		return response.json() as Promise<T>;
+	}
+
+	// ── Internal helpers ────────────────────────────────────────────────────────
+
+	/**
+	 * Look up a task by owner+name. Returns the raw Coder task or null.
+	 * When owner is omitted, scans all tasks by name (may log a warning on
+	 * multiple matches — EARS-REQ-19).
+	 */
+	private async findTask(
+		taskName: TaskName,
+		owner?: string,
+	): Promise<ExperimentalCoderSDKTask | null> {
+		try {
+			let endpoint: string;
+			if (owner) {
+				endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}?q=${encodeURIComponent(`name:${taskName}`)}`;
+			} else {
+				endpoint = `/api/experimental/tasks?q=${encodeURIComponent(`name:${taskName}`)}`;
+			}
+
+			const raw = await this.request<unknown>(endpoint);
+			const parsed = ExperimentalCoderSDKTaskListResponseSchema.parse(raw);
+
+			const matches = parsed.tasks.filter((t) => t.name === taskName);
+
+			if (matches.length === 0) return null;
+
+			if (matches.length > 1 && !owner) {
+				this.logger.warn(
+					"Multiple tasks found with the same name; returning the first match",
+					{ taskName, count: matches.length },
+				);
+			}
+
+			return matches[0] ?? null;
+		} catch (error: unknown) {
+			if (error instanceof CoderAPIError && error.statusCode === 404) {
+				return null;
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Build a normalized `Task` from a raw Coder task and the owner username
+	 * (which may differ from the owner ID used in API paths).
+	 */
+	private toTask(raw: ExperimentalCoderSDKTask, ownerUsername: string): Task {
+		return {
+			name: raw.name,
+			status: normalizeStatus(raw.status, raw.current_state),
+			owner: ownerUsername,
+			url: composeTaskUrl(this.serverURL, ownerUsername, raw.id),
+		};
+	}
+
+	/**
+	 * A minimal client adapter compatible with `waitForTaskIdle`'s `client`
+	 * parameter, whose `getTaskById` signature is `(id, owner?)`.
+	 */
+	private makePollingClient() {
+		const self = this;
+		return {
+			async getTaskById(
+				taskId: string,
+				owner?: string,
+			): Promise<ExperimentalCoderSDKTask> {
+				let endpoint: string;
+				if (owner) {
+					endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`;
+				} else {
+					endpoint = `/api/experimental/tasks/${encodeURIComponent(taskId)}`;
+				}
+				const raw = await self.request<unknown>(endpoint);
+				return ExperimentalCoderSDKTaskSchema.parse(raw);
+			},
+		};
+	}
+
+	// ── Owner resolution ────────────────────────────────────────────────────────
+
+	/**
+	 * If `userIdOrUsername` looks like a UUID, fetch the Coder user via
+	 * `GET /api/v2/users/<id>` and return their username. Otherwise return the
+	 * value unchanged (already a username).
+	 *
+	 * This ensures `Task.owner` and `Task.url` always carry a human-readable
+	 * username rather than an internal UUID (spec §4 URL composition).
+	 */
+	private async resolveOwnerUsername(
+		userIdOrUsername: string,
+	): Promise<string> {
+		const uuidPattern =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		if (!uuidPattern.test(userIdOrUsername)) {
+			return userIdOrUsername;
+		}
+		const raw = await this.request<unknown>(
+			`/api/v2/users/${encodeURIComponent(userIdOrUsername)}`,
+		);
+		const parsed = CoderSDKUserSchema.parse(raw);
+		return parsed.username;
+	}
+
+	// ── TaskRunner interface ────────────────────────────────────────────────────
+
+	/**
+	 * Resolve a GitHub user identity to a Coder username.
+	 *
+	 * Uses `GET /api/v2/users?q=github_com_user_id:<id>`.
+	 */
+	async lookupUser(params: { user: GithubUser }): Promise<string> {
+		const { user } = params;
+		const githubUserId = Number(user.id);
+
+		if (!githubUserId || githubUserId === 0) {
+			throw new CoderAPIError("GitHub user ID cannot be 0 or undefined", 400);
+		}
+
+		const endpoint = `/api/v2/users?q=${encodeURIComponent(`github_com_user_id:${githubUserId}`)}`;
+		const raw = await this.request<unknown>(endpoint);
+		const userList = CoderSDKGetUsersResponseSchema.parse(raw);
+
+		if (userList.users.length === 0) {
+			throw new CoderAPIError(
+				`No Coder user found with GitHub user ID ${githubUserId}`,
+				404,
+			);
+		}
+		if (userList.users.length > 1) {
+			throw new CoderAPIError(
+				`Multiple Coder users found with GitHub user ID ${githubUserId}`,
+				409,
+			);
+		}
+
+		const coderUser = userList.users[0];
+		if (!coderUser) {
+			throw new CoderAPIError(
+				`No Coder user found with GitHub user ID ${githubUserId}`,
+				404,
+			);
+		}
+		return coderUser.username;
+	}
+
+	/**
+	 * Create a new Coder task (single POST — no post-create wait).
+	 *
+	 * If a task with the same `(owner, taskName)` already exists, the existing
+	 * task is returned without modification (EARS-REQ-7).
+	 */
+	async create(params: {
+		taskName: TaskName;
+		owner: string;
+		input: string;
+	}): Promise<Task> {
+		const { taskName, owner, input } = params;
+
+		// 1. Check for an existing task
+		const existing = await this.findTask(taskName, owner);
+		if (existing) {
+			this.logger.info("Task already exists; returning existing task", {
+				taskName,
+				owner,
+				taskId: existing.id,
+			});
+			return this.toTask(existing, owner);
+		}
+
+		// 2. Resolve template
+		const templateEndpoint = `/api/v2/organizations/${encodeURIComponent(this.config.organization)}/templates/${encodeURIComponent(this.config.templateName)}`;
+		const rawTemplate = await this.request<unknown>(templateEndpoint);
+		const template = CoderSDKTemplateSchema.parse(rawTemplate);
+		const templateVersionId = template.active_version_id;
+
+		// 3. Resolve preset
+		const presetsEndpoint = `/api/v2/templateversions/${encodeURIComponent(templateVersionId)}/presets`;
+		const rawPresets = await this.request<unknown>(presetsEndpoint);
+		const presets =
+			CoderSDKTemplateVersionPresetsResponseSchema.parse(rawPresets);
+
+		let presetId: string | undefined;
+		if (this.config.templatePreset) {
+			const named = presets.find((p) => p.Name === this.config.templatePreset);
+			presetId = named?.ID;
+		} else {
+			const defaultPreset = presets.find((p) => p.Default);
+			presetId = defaultPreset?.ID;
+		}
+
+		// 4. POST create
+		const createEndpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}`;
+		const body: Record<string, unknown> = {
+			name: taskName,
+			template_version_id: templateVersionId,
+			input,
+		};
+		if (presetId) {
+			body.template_version_preset_id = presetId;
+		}
+
+		const rawCreated = await this.request<unknown>(createEndpoint, {
+			method: "POST",
+			body: JSON.stringify(body),
+		});
+		const created = ExperimentalCoderSDKTaskSchema.parse(rawCreated);
+
+		// 5. Return — no wait (EARS-REQ-7)
+		return this.toTask(created, owner);
+	}
+
+	/**
+	 * Send input to an existing task, preparing it as needed:
+	 *
+	 * - `active` + terminal `current_state`: send directly (no wait).
+	 * - `active` + `working` | `null`, or `initializing`/`pending`: wait-for-idle first.
+	 * - `paused`: resume (POST workspace start), then wait-for-idle.
+	 * - `error`: wait-for-idle (5-min grace inside polling.ts).
+	 * - `unknown`: reject immediately.
+	 *
+	 * The send call itself is NOT retried on failure (EARS-REQ-9).
+	 * Default timeout is 120 000 ms (EARS-REQ-10).
+	 */
+	async sendInput(params: {
+		taskName: TaskName;
+		owner?: string;
+		input: string;
+		timeout?: number;
+	}): Promise<void> {
+		const { taskName, owner, input, timeout = 120_000 } = params;
+
+		const raw = await this.findTask(taskName, owner);
+		if (!raw) {
+			throw new Error(`Task not found: ${taskName}`);
+		}
+
+		const taskId = raw.id as TaskId;
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
+
+		const pollingClient = this.makePollingClient();
+
+		const state = raw.current_state?.state ?? null;
+
+		// Determine whether to skip the wait-for-idle
+		const isDirectlyReady =
+			raw.status === "active" &&
+			(state === "idle" || state === "complete" || state === "failed");
+
+		if (raw.status === "unknown") {
+			throw new Error(`Task ${taskId} has unknown status; cannot send input`);
+		}
+
+		if (!isDirectlyReady) {
+			// Resume paused task first
+			if (raw.status === "paused") {
+				await this.request(
+					`/api/v2/workspaces/${encodeURIComponent(raw.workspace_id)}/builds`,
+					{
+						method: "POST",
+						body: JSON.stringify({ transition: "start" }),
+					},
+				);
+			}
+
+			// Wait for task to become idle
+			await this.waitForTaskIdleFn({
+				client: pollingClient,
+				taskId,
+				owner: resolvedOwner,
+				log: (msg) => this.logger.debug(msg),
+				timeoutMs: timeout,
+			});
+		}
+
+		// Single send call — no retry (EARS-REQ-9)
+		const sendEndpoint = `/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(taskId)}/send`;
+		await this.request(sendEndpoint, {
+			method: "POST",
+			body: JSON.stringify({ input }),
+		});
+	}
+
+	/**
+	 * Return the current status of a task, or null if it does not exist.
+	 *
+	 * When `owner` is omitted, scans all tasks by name and warns if multiple
+	 * matches are found (EARS-REQ-12, EARS-REQ-19).
+	 */
+	async getStatus(params: {
+		taskName: TaskName;
+		owner?: string;
+	}): Promise<Task | null> {
+		const { taskName, owner } = params;
+		const raw = await this.findTask(taskName, owner);
+		if (!raw) return null;
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
+		return this.toTask(raw, resolvedOwner);
+	}
+
+	/**
+	 * Delete a task by issuing a single DELETE API call.
+	 *
+	 * Idempotent — resolves without error when the task does not exist
+	 * (EARS-REQ-11). No workspace stop, wait, or delete (EARS-REQ-18).
+	 *
+	 * Returns `{ deleted: true }` when a task was found and removed, or
+	 * `{ deleted: false }` when no task was found (no-op).
+	 */
+	async delete(params: {
+		taskName: TaskName;
+		owner?: string;
+	}): Promise<{ deleted: boolean }> {
+		const { taskName, owner } = params;
+		const raw = await this.findTask(taskName, owner);
+		if (!raw) return { deleted: false };
+
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
+		await this.request(
+			`/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(raw.id)}`,
+			{ method: "DELETE" },
+		);
+		return { deleted: true };
+	}
+}

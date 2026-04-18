@@ -1,13 +1,13 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { WebhookRouter } from "./router";
+import type { WebhookRouterOptions, SkipResult } from "./router";
 import type {
-	WebhookRouterOptions,
-	CreateTaskContext,
-	CloseTaskContext,
-	PRCommentContext,
-	IssueCommentContext,
-	FailedCheckContext,
-} from "./router";
+	TaskRequestedEvent,
+	TaskClosedEvent,
+	CommentPostedEvent,
+	CheckFailedEvent,
+	Event,
+} from "../../events/types";
 import type { Logger } from "../../infra/logger";
 
 import issuesAssigned from "../../testing/fixtures/issues-assigned.json";
@@ -42,6 +42,14 @@ function makeRouter(overrides?: Partial<WebhookRouterOptions>): WebhookRouter {
 	});
 }
 
+function isEvent(r: Event | SkipResult): r is Event {
+	return !("dispatched" in r);
+}
+
+function isSkip(r: Event | SkipResult): r is SkipResult {
+	return "dispatched" in r && r.dispatched === false;
+}
+
 describe("WebhookRouter", () => {
 	let router: WebhookRouter;
 
@@ -51,28 +59,29 @@ describe("WebhookRouter", () => {
 
 	// ── issues.assigned ────────────────────────────────────────────────────────
 
-	test("issues.assigned with matching agent login → dispatched as create_task", async () => {
+	test("issues.assigned with matching agent login → task_requested event", async () => {
 		const result = await router.handleWebhook(
 			"issues",
 			"delivery-001",
 			issuesAssigned,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("create_task");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as CreateTaskContext;
-		expect(ctx.issueNumber).toBe(65);
-		expect(ctx.issueUrl).toBe(
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as TaskRequestedEvent;
+		expect(event.type).toBe("task_requested");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.issue.number).toBe(65);
+		expect(event.issue.url).toBe(
 			"https://github.com/xmtplabs/coder-action/issues/65",
 		);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
-		// senderLogin and senderId must be present for permission checks and
-		// Coder username resolution
-		expect(ctx.senderLogin).toBe("neekolas");
-		expect(ctx.senderId).toBe(65710);
+		// requester is sender (the human who triggered the assignment)
+		expect(event.requester.login).toBe("neekolas");
+		expect(event.requester.externalId).toBe(65710);
 	});
 
 	test("issues.assigned with non-matching assignee login → skipped", async () => {
@@ -86,28 +95,30 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/assignee/i);
 	});
 
 	// ── issues.closed ──────────────────────────────────────────────────────────
 
-	test("issues.closed → dispatched as close_task", async () => {
+	test("issues.closed → task_closed event", async () => {
 		const result = await router.handleWebhook(
 			"issues",
 			"delivery-003",
 			issuesClosed,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("close_task");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as CloseTaskContext;
-		expect(ctx.issueNumber).toBe(63);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as TaskClosedEvent;
+		expect(event.type).toBe("task_closed");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.issue.number).toBe(63);
 	});
 
 	// ── issue_comment.created — self-comment suppression ──────────────────────
@@ -126,8 +137,8 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/ignored/i);
 	});
 
@@ -145,34 +156,39 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/ignored/i);
 	});
 
 	// ── issue_comment.created — dispatch ──────────────────────────────────────
 
-	test("issue_comment.created on issue from human → dispatched as issue_comment", async () => {
+	test("issue_comment.created on issue from human → comment_posted event (kind: issue)", async () => {
 		const result = await router.handleWebhook(
 			"issue_comment",
 			"delivery-006",
 			issueCommentOnIssue,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("issue_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as IssueCommentContext;
-		expect(ctx.issueNumber).toBe(65);
-		expect(ctx.commentBody).toBe(
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.target.kind).toBe("issue");
+		expect(event.target.number).toBe(65);
+		expect(event.comment.body).toBe(
 			"Can you also handle the edge case for empty inputs?",
 		);
-		expect(ctx.commentUrl).toBe(
+		expect(event.comment.url).toBe(
 			"https://github.com/xmtplabs/coder-action/issues/65#issuecomment-4123912472",
 		);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
+		expect(event.comment.isReviewComment).toBe(false);
+		expect(event.comment.isReviewSubmission).toBe(false);
 	});
 
 	test("issue_comment.created on PR where PR author is not agent → skipped", async () => {
@@ -189,14 +205,14 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/PR author/i);
 	});
 
 	// ── issue_comment.edited — dispatch ─────────────────────────────────────
 
-	test("issue_comment.edited on issue from human → dispatched as issue_comment", async () => {
+	test("issue_comment.edited on issue from human → comment_posted event (kind: issue)", async () => {
 		const payload = { ...issueCommentOnIssue, action: "edited" };
 		const result = await router.handleWebhook(
 			"issue_comment",
@@ -204,14 +220,17 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("issue_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect((result.context as IssueCommentContext).issueNumber).toBe(65);
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.target.kind).toBe("issue");
+		expect(event.target.number).toBe(65);
 	});
 
-	test("issue_comment.edited on PR from human → dispatched as pr_comment", async () => {
+	test("issue_comment.edited on PR from human → comment_posted event (kind: pull_request)", async () => {
 		const payload = { ...issueCommentOnPr, action: "edited" };
 		const result = await router.handleWebhook(
 			"issue_comment",
@@ -219,11 +238,14 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("pr_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		expect((result.context as PRCommentContext).issueNumber).toBe(64);
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.target.kind).toBe("pull_request");
+		expect(event.target.number).toBe(64);
 	});
 
 	test("issue_comment.deleted → skipped without validation error", async () => {
@@ -237,57 +259,77 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/unhandled/i);
 		expect(result.validationError).toBeUndefined();
 	});
 
-	test("issue_comment.created on PR from human → dispatched as pr_comment", async () => {
+	test("issue_comment.created on PR from human → comment_posted event (kind: pull_request)", async () => {
 		const result = await router.handleWebhook(
 			"issue_comment",
 			"delivery-007",
 			issueCommentOnPr,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("pr_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as PRCommentContext;
-		expect(ctx.issueNumber).toBe(64);
-		expect(ctx.commentBody).toBe("Looks good, but please fix the naming.");
-		expect(ctx.isReviewComment).toBe(false);
-		expect(ctx.isReviewSubmission).toBe(false);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.target.kind).toBe("pull_request");
+		expect(event.target.number).toBe(64);
+		expect(event.comment.body).toBe("Looks good, but please fix the naming.");
+		expect(event.comment.isReviewComment).toBe(false);
+		expect(event.comment.isReviewSubmission).toBe(false);
 	});
 
 	// ── pull_request_review_comment.created ───────────────────────────────────
 
-	test("pull_request_review_comment.created, PR by agent, comment by human → dispatched as pr_comment with isReviewComment", async () => {
+	test("pull_request_review_comment.created, PR by agent, comment by human → comment_posted with isReviewComment", async () => {
 		const result = await router.handleWebhook(
 			"pull_request_review_comment",
 			"delivery-008",
 			prReviewComment,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("pr_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as PRCommentContext;
-		expect(ctx.issueNumber).toBe(64);
-		expect(ctx.commentBody).toBe("Why didn't you respond to this?");
-		expect(ctx.isReviewComment).toBe(true);
-		expect(ctx.isReviewSubmission).toBe(false);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
-		expect(ctx.filePath).toBe("dist/server.js");
-		expect(ctx.lineNumber).toBe(1);
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.target.kind).toBe("pull_request");
+		expect(event.target.number).toBe(64);
+		expect(event.comment.body).toBe("Why didn't you respond to this?");
+		expect(event.comment.isReviewComment).toBe(true);
+		expect(event.comment.isReviewSubmission).toBe(false);
 	});
 
-	test("pull_request_review_comment.edited, PR by agent, comment by human → dispatched as pr_comment", async () => {
+	test("pull_request_review_comment.created populates comment.filePath and comment.lineNumber from payload", async () => {
+		const result = await router.handleWebhook(
+			"pull_request_review_comment",
+			"delivery-008b",
+			prReviewComment,
+		);
+
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		// Fixture has path="dist/server.js", line=1, position=1
+		expect(event.comment.filePath).toBe("dist/server.js");
+		expect(event.comment.lineNumber).toBe(1);
+	});
+
+	test("pull_request_review_comment.edited, PR by agent, comment by human → comment_posted event", async () => {
 		const payload = { ...prReviewComment, action: "edited" };
 		const result = await router.handleWebhook(
 			"pull_request_review_comment",
@@ -295,13 +337,14 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("pr_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as PRCommentContext;
-		expect(ctx.issueNumber).toBe(64);
-		expect(ctx.isReviewComment).toBe(true);
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.target.number).toBe(64);
+		expect(event.comment.isReviewComment).toBe(true);
 	});
 
 	test("pull_request_review_comment.created, comment from app bot → skipped", async () => {
@@ -315,8 +358,8 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/ignored/i);
 	});
 
@@ -334,31 +377,34 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/pull_request\.user/i);
 	});
 
 	// ── pull_request_review.submitted ─────────────────────────────────────────
 
-	test("pull_request_review.submitted with body, PR by agent, reviewer is human → dispatched as pr_comment with isReviewSubmission", async () => {
+	test("pull_request_review.submitted with body, PR by agent, reviewer is human → comment_posted with isReviewSubmission", async () => {
 		const result = await router.handleWebhook(
 			"pull_request_review",
 			"delivery-011",
 			prReviewSubmitted,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("pr_comment");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as PRCommentContext;
-		expect(ctx.issueNumber).toBe(64);
-		expect(ctx.commentBody).toBe("Please fix the naming");
-		expect(ctx.isReviewComment).toBe(false);
-		expect(ctx.isReviewSubmission).toBe(true);
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		expect(event.type).toBe("comment_posted");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.target.kind).toBe("pull_request");
+		expect(event.target.number).toBe(64);
+		expect(event.comment.body).toBe("Please fix the naming");
+		expect(event.comment.isReviewComment).toBe(false);
+		expect(event.comment.isReviewSubmission).toBe(true);
 	});
 
 	test("pull_request_review.submitted, reviewer is agent → skipped", async () => {
@@ -375,8 +421,8 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/ignored/i);
 	});
 
@@ -387,30 +433,32 @@ describe("WebhookRouter", () => {
 			prReviewSubmittedEmpty,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/body/i);
 	});
 
 	// ── workflow_run.completed ─────────────────────────────────────────────────
 
-	test("workflow_run.completed failure → dispatched as failed_check", async () => {
+	test("workflow_run.completed failure → check_failed event", async () => {
 		const result = await router.handleWebhook(
 			"workflow_run",
 			"delivery-014",
 			workflowRunFailure,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.handler).toBe("failed_check");
-		expect(result.installationId).toBe(INSTALLATION_ID);
-		const ctx = result.context as FailedCheckContext;
-		expect(ctx.repoName).toBe("coder-action");
-		expect(ctx.repoOwner).toBe("xmtplabs");
-		expect(ctx.workflowRunId).toBe(23526809052);
-		expect(ctx.workflowName).toBe("CI");
-		expect(ctx.conclusion).toBe("failure");
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CheckFailedEvent;
+		expect(event.type).toBe("check_failed");
+		expect(event.source.type).toBe("github");
+		expect(event.source.installationId).toBe(INSTALLATION_ID);
+		expect(event.repository.owner).toBe("xmtplabs");
+		expect(event.repository.name).toBe("coder-action");
+		expect(event.run.id).toBe(23526809052);
+		expect(event.run.workflowName).toBe("CI");
+		expect(event.run.workflowFile).toBe("ci.yml");
 	});
 
 	test("workflow_run.completed success → skipped", async () => {
@@ -420,8 +468,8 @@ describe("WebhookRouter", () => {
 			workflowRunSuccess,
 		);
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/conclusion/i);
 	});
 
@@ -432,8 +480,8 @@ describe("WebhookRouter", () => {
 			ref: "refs/heads/main",
 		});
 
-		expect(result.dispatched).toBe(false);
-		if (result.dispatched) throw new Error("expected skipped");
+		expect(isSkip(result)).toBe(true);
+		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/unhandled/i);
 	});
 
@@ -450,8 +498,10 @@ describe("WebhookRouter", () => {
 			payload,
 		);
 
-		expect(result.dispatched).toBe(true);
-		if (!result.dispatched) throw new Error("expected dispatched");
-		expect(result.installationId).toBe(77777);
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as TaskRequestedEvent;
+		expect(event.source.installationId).toBe(77777);
 	});
 });

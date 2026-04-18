@@ -1,11 +1,11 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { createApp } from "../http/server";
-import {
-	WebhookRouter,
-	type RouteResult,
-	type CreateTaskContext,
-	type IssueCommentContext,
-} from "../webhooks/github/router";
+import { WebhookRouter, type SkipResult } from "../webhooks/github/router";
+import type {
+	Event,
+	TaskRequestedEvent,
+	CommentPostedEvent,
+} from "../events/types";
 import { TestLogger } from "../infra/logger";
 
 import issuesAssigned from "./fixtures/issues-assigned.json";
@@ -34,11 +34,21 @@ const TEST_SECRET = "test-webhook-secret";
 const AGENT_LOGIN = "xmtp-coder-agent";
 const BOT_LOGIN = "xmtp-coder-tasks[bot]";
 
+type RouterResult = Event | SkipResult;
+
+function isEvent(r: RouterResult): r is Event {
+	return !("dispatched" in r);
+}
+
+function isSkip(r: RouterResult): r is SkipResult {
+	return "dispatched" in r && r.dispatched === false;
+}
+
 // ── Test setup helpers ────────────────────────────────────────────────────────
 
 function buildTestApp(logger: TestLogger): {
 	app: ReturnType<typeof createApp>;
-	lastResult: () => RouteResult | null;
+	lastResult: () => RouterResult | null;
 } {
 	const router = new WebhookRouter({
 		agentGithubUsername: AGENT_LOGIN,
@@ -46,7 +56,7 @@ function buildTestApp(logger: TestLogger): {
 		logger,
 	});
 
-	let capturedResult: RouteResult | null = null;
+	let capturedResult: RouterResult | null = null;
 
 	const app = createApp({
 		webhookSecret: TEST_SECRET,
@@ -56,8 +66,8 @@ function buildTestApp(logger: TestLogger): {
 				deliveryId,
 				payload,
 			);
-			if (capturedResult.dispatched) {
-				return { dispatched: true, handler: capturedResult.handler };
+			if (isEvent(capturedResult)) {
+				return { dispatched: true, handler: capturedResult.type };
 			}
 			const status = capturedResult.validationError === true ? 400 : 200;
 			return { dispatched: false, status };
@@ -102,7 +112,7 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 		logger = new TestLogger();
 	});
 
-	test("issues.assigned to agent → 200 and dispatches create_task", async () => {
+	test("issues.assigned to agent → 200 and dispatches task_requested event", async () => {
 		const { app, lastResult } = buildTestApp(logger);
 		const body = JSON.stringify(issuesAssigned);
 
@@ -112,18 +122,19 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 		const result = lastResult();
 		expect(result).not.toBeNull();
-		expect(result?.dispatched).toBe(true);
-		if (result?.dispatched) {
-			expect(result.handler).toBe("create_task");
-			expect(result.installationId).toBe(118770088);
-			const ctx = result.context as CreateTaskContext;
-			expect(ctx.issueNumber).toBe(65);
-			expect(ctx.repoName).toBe("coder-action");
-			expect(ctx.repoOwner).toBe("xmtplabs");
+		if (result == null) throw new Error("result is null");
+		expect(isEvent(result)).toBe(true);
+		if (isEvent(result)) {
+			const event = result as TaskRequestedEvent;
+			expect(event.type).toBe("task_requested");
+			expect(event.source.installationId).toBe(118770088);
+			expect(event.repository.name).toBe("coder-action");
+			expect(event.repository.owner).toBe("xmtplabs");
+			expect(event.issue.number).toBe(65);
 		}
 	});
 
-	test("issue_comment.created from human on issue → 200 and dispatches issue_comment", async () => {
+	test("issue_comment.created from human on issue → 200 and dispatches comment_posted event (kind: issue)", async () => {
 		const { app, lastResult } = buildTestApp(logger);
 		const body = JSON.stringify(issueCommentOnIssue);
 
@@ -133,21 +144,23 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 		const result = lastResult();
 		expect(result).not.toBeNull();
-		expect(result?.dispatched).toBe(true);
-		if (result?.dispatched) {
-			expect(result.handler).toBe("issue_comment");
-			expect(result.installationId).toBe(118770088);
-			const ctx = result.context as IssueCommentContext;
-			expect(ctx.issueNumber).toBe(65);
-			expect(ctx.commentBody).toBe(
+		if (result == null) throw new Error("result is null");
+		expect(isEvent(result)).toBe(true);
+		if (isEvent(result)) {
+			const event = result as CommentPostedEvent;
+			expect(event.type).toBe("comment_posted");
+			expect(event.source.installationId).toBe(118770088);
+			expect(event.target.kind).toBe("issue");
+			expect(event.target.number).toBe(65);
+			expect(event.comment.body).toBe(
 				"Can you also handle the edge case for empty inputs?",
 			);
-			expect(ctx.repoName).toBe("coder-action");
-			expect(ctx.repoOwner).toBe("xmtplabs");
+			expect(event.repository.name).toBe("coder-action");
+			expect(event.repository.owner).toBe("xmtplabs");
 		}
 	});
 
-	test("issue_comment.edited from human on issue → 200 and dispatches issue_comment", async () => {
+	test("issue_comment.edited from human on issue → 200 and dispatches comment_posted event", async () => {
 		const { app, lastResult } = buildTestApp(logger);
 		const editedPayload = { ...issueCommentOnIssue, action: "edited" };
 		const body = JSON.stringify(editedPayload);
@@ -158,11 +171,13 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 		const result = lastResult();
 		expect(result).not.toBeNull();
-		expect(result?.dispatched).toBe(true);
-		if (result?.dispatched) {
-			expect(result.handler).toBe("issue_comment");
-			expect(result.installationId).toBe(118770088);
-			expect((result.context as IssueCommentContext).issueNumber).toBe(65);
+		if (result == null) throw new Error("result is null");
+		expect(isEvent(result)).toBe(true);
+		if (isEvent(result)) {
+			const event = result as CommentPostedEvent;
+			expect(event.type).toBe("comment_posted");
+			expect(event.source.installationId).toBe(118770088);
+			expect(event.target.number).toBe(65);
 		}
 	});
 
@@ -176,9 +191,10 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 		const result = lastResult();
 		expect(result).not.toBeNull();
-		expect(result?.dispatched).toBe(false);
-		if (!result?.dispatched) {
-			expect(result?.reason).toContain("success");
+		if (result == null) throw new Error("result is null");
+		expect(isSkip(result)).toBe(true);
+		if (isSkip(result)) {
+			expect(result.reason).toContain("success");
 		}
 	});
 
@@ -216,9 +232,10 @@ describe("End-to-end integration: webhook → router pipeline", () => {
 
 		const result = lastResult();
 		expect(result).not.toBeNull();
-		expect(result?.dispatched).toBe(false);
-		if (!result?.dispatched) {
-			expect(result?.reason).toContain(AGENT_LOGIN);
+		if (result == null) throw new Error("result is null");
+		expect(isSkip(result)).toBe(true);
+		if (isSkip(result)) {
+			expect(result.reason).toContain(AGENT_LOGIN);
 		}
 	});
 });

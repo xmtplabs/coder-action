@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
-	MockCoderClient,
-	createMockGitHubClient,
-	mockStoppedTask,
+	MockTaskRunner,
 	mockTask,
+	mockErrorTask,
+	createMockGitHubClient,
 } from "../testing/helpers";
-import { IssueCommentHandler } from "./issue-comment";
+import { IssueCommentAction } from "./issue-comment";
 import type { IssueCommentContext } from "./issue-comment";
 
 const baseInputs: HandlerConfig = {
@@ -32,48 +32,50 @@ const validContext: IssueCommentContext = {
 	commentCreatedAt: "2026-03-17T12:00:00Z",
 };
 
-describe("IssueCommentHandler", () => {
-	let coder: MockCoderClient;
+describe("IssueCommentAction", () => {
+	let runner: MockTaskRunner;
 	let github: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		github = createMockGitHubClient();
 		logger = new TestLogger();
-		coder.getTask.mockResolvedValue(mockTask as never);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
-	// AC #20: Forward comment to task
+	// AC #20: Happy path — sendInput called once with timeout; reaction added
 	test("sends formatted message to task for valid issue comment", async () => {
-		const handler = new IssueCommentHandler(
-			coder,
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(false);
-		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
-		const sentMessage = (
-			coder.sendTaskInput.mock.calls[0] as unknown as [string, unknown, string]
-		)[2];
-		expect(sentMessage).toContain("New Comment on Issue:");
-		expect(sentMessage).toContain("Actually, the requirement changed");
+		expect(runner.sendInput).toHaveBeenCalledTimes(1);
+		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
+			{ taskName: string; input: string; timeout: number },
+		];
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
+		expect(sendArgs[0].input).toContain("New Comment on Issue:");
+		expect(sendArgs[0].input).toContain("Actually, the requirement changed");
+		expect(sendArgs[0].timeout).toBe(120_000);
 	});
 
 	// Issue #23: React with 👀 when comment is forwarded to agent
 	test("adds 👀 reaction when comment is forwarded to agent", async () => {
-		const handler = new IssueCommentHandler(
-			coder,
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
 		expect(github.addReactionToComment).toHaveBeenCalledWith(
@@ -83,32 +85,32 @@ describe("IssueCommentHandler", () => {
 		);
 	});
 
-	// Issue #23: No reaction when comment is skipped
+	// Issue #23: No reaction when comment is skipped (self-comment)
 	test("does not add reaction when comment is skipped (self-comment)", async () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
-		const handler = new IssueCommentHandler(
-			coder,
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		expect(github.addReactionToComment).not.toHaveBeenCalled();
 	});
 
 	// Issue #23: No reaction when task not found
 	test("does not add reaction when task is not found", async () => {
-		coder.getTask.mockResolvedValue(null);
-		const handler = new IssueCommentHandler(
-			coder,
+		runner.getStatus.mockResolvedValue(null);
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		expect(github.addReactionToComment).not.toHaveBeenCalled();
 	});
@@ -116,54 +118,49 @@ describe("IssueCommentHandler", () => {
 	// AC #21: Self-comment
 	test("skips self-comments from coder agent", async () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
-		const handler = new IssueCommentHandler(
-			coder,
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("self-comment");
-		expect(coder.sendTaskInput).not.toHaveBeenCalled();
+		expect(runner.sendInput).not.toHaveBeenCalled();
 	});
 
 	// AC #22: Task not found
 	test("skips when no task found for issue", async () => {
-		coder.getTask.mockResolvedValue(null);
-		const handler = new IssueCommentHandler(
-			coder,
+		runner.getStatus.mockResolvedValue(null);
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
-	// Edge: restart stopped (paused) task
-	test("resumes paused task before sending", async () => {
-		coder.getTask.mockResolvedValue(mockStoppedTask as never);
-		const handler = new IssueCommentHandler(
-			coder,
+	// Task in error state — skip
+	test("skips when task is in error state", async () => {
+		runner.getStatus.mockResolvedValue(mockErrorTask);
+		const action = new IssueCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
-		expect(result.skipped).toBe(false);
-		expect(coder.startWorkspace).toHaveBeenCalledTimes(1);
-		expect(coder.startWorkspace).toHaveBeenCalledWith(
-			mockStoppedTask.workspace_id,
-		);
-		expect(coder.waitForTaskActive).toHaveBeenCalledTimes(1);
-		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("task-not-found");
 	});
 });

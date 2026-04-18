@@ -1,13 +1,9 @@
-import type { CoderClient } from "../services/coder/client";
+import type { TaskRunner } from "../services/task-runner";
 import type { GitHubClient, PRInfo } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "./messages";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import {
-	generateTaskName,
-	lookupAndEnsureActiveTask,
-	sendInputWithRetry,
-} from "./task-utils";
+import { generateTaskName } from "./task-naming";
 
 const MAX_LOG_LINES = 100;
 
@@ -22,9 +18,9 @@ export interface FailedCheckContext {
 	pullRequests: Array<{ number: number }>;
 }
 
-export class FailedCheckHandler {
+export class FailedCheckAction {
 	constructor(
-		private readonly coder: CoderClient,
+		private readonly runner: TaskRunner,
 		private readonly github: GitHubClient,
 		private readonly inputs: HandlerConfig,
 		private readonly context: FailedCheckContext,
@@ -32,21 +28,20 @@ export class FailedCheckHandler {
 	) {}
 
 	async run(): Promise<ActionOutputs> {
+		const owner = this.context.owner;
+		const repo = this.context.repo;
+
 		// 1. Get PR from event or fall back to SHA lookup
 		let pr: PRInfo | null = null;
 		if (this.context.pullRequests.length > 0) {
 			pr = await this.github.getPR(
-				this.context.owner,
-				this.context.repo,
+				owner,
+				repo,
 				this.context.pullRequests[0].number,
 			);
 		} else {
 			this.logger.info("No pull_requests in event, looking up by head SHA");
-			pr = await this.github.findPRByHeadSHA(
-				this.context.owner,
-				this.context.repo,
-				this.context.headSha,
-			);
+			pr = await this.github.findPRByHeadSHA(owner, repo, this.context.headSha);
 		}
 
 		if (!pr) {
@@ -72,8 +67,8 @@ export class FailedCheckHandler {
 
 		// 4. Find linked issue
 		const linkedIssues = await this.github.findLinkedIssues(
-			this.context.owner,
-			this.context.repo,
+			owner,
+			repo,
 			pr.number,
 		);
 		if (linkedIssues.length === 0) {
@@ -82,27 +77,22 @@ export class FailedCheckHandler {
 		}
 		const issue = linkedIssues[0];
 
-		// 5. Compute task name and look up
+		// 5. Compute task name and look up via TaskRunner
 		const taskName = generateTaskName(
 			this.inputs.coderTaskNamePrefix,
-			this.context.repo,
+			repo,
 			issue.number,
 		);
-		const task = await lookupAndEnsureActiveTask(
-			this.coder,
-			this.inputs.coderUsername,
-			taskName,
-			this.logger,
-		);
-		if (!task) {
+		const existing = await this.runner.getStatus({ taskName });
+		if (!existing || existing.status === "error") {
 			this.logger.info(`Task not found: ${taskName}`);
 			return { skipped: true, skipReason: "task-not-found" };
 		}
 
 		// 6. Fetch failed jobs (capped)
 		const allFailedJobs = await this.github.getFailedJobs(
-			this.context.owner,
-			this.context.repo,
+			owner,
+			repo,
 			this.context.runId,
 		);
 		const cappedJobs = allFailedJobs.slice(0, MAX_FAILED_JOBS);
@@ -111,26 +101,21 @@ export class FailedCheckHandler {
 		const jobsWithLogs = await Promise.all(
 			cappedJobs.map(async (job) => ({
 				name: job.name,
-				logs: await this.github.getJobLogs(
-					this.context.owner,
-					this.context.repo,
-					job.id,
-					MAX_LOG_LINES,
-				),
+				logs: await this.github.getJobLogs(owner, repo, job.id, MAX_LOG_LINES),
 			})),
 		);
 
 		// 8. Format and send
 		const message = formatFailedCheckMessage({
-			prUrl: `https://github.com/${this.context.owner}/${this.context.repo}/pull/${pr.number}`,
+			prUrl: `https://github.com/${owner}/${repo}/pull/${pr.number}`,
 			workflowName: this.context.workflowName,
 			runUrl: this.context.runUrl,
 			workflowFile: this.context.workflowFile,
 			failedJobs: jobsWithLogs,
 		});
-		await sendInputWithRetry(this.coder, task, message, this.logger);
+		await this.runner.sendInput({ taskName, input: message, timeout: 120_000 });
 		this.logger.info(`Failed check details forwarded to task ${taskName}`);
 
-		return { taskName, taskStatus: task.status, skipped: false };
+		return { taskName, taskStatus: existing.status, skipped: false };
 	}
 }

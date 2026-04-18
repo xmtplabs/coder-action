@@ -1,9 +1,8 @@
-import type { CoderClient } from "../services/coder/client";
-import { TaskNameSchema } from "../services/coder/client";
+import type { TaskRunner } from "../services/task-runner";
 import type { GitHubClient } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import { generateTaskName } from "./task-utils";
+import { generateTaskName } from "./task-naming";
 
 export interface IssueContext {
 	owner: string;
@@ -13,11 +12,12 @@ export interface IssueContext {
 	issueTitle: string;
 	issueLabels: string[];
 	senderLogin: string;
+	senderId: number;
 }
 
-export class CreateTaskHandler {
+export class CreateTaskAction {
 	constructor(
-		private readonly coder: CoderClient,
+		private readonly runner: TaskRunner,
 		private readonly github: GitHubClient,
 		private readonly inputs: HandlerConfig,
 		private readonly context: IssueContext,
@@ -25,12 +25,6 @@ export class CreateTaskHandler {
 	) {}
 
 	async run(): Promise<ActionOutputs> {
-		// coderUsername is always resolved for create_task before this handler runs
-		const coderUsername = this.inputs.coderUsername;
-		if (!coderUsername) {
-			throw new Error("coderUsername is required for create_task");
-		}
-
 		// 1. Validate actor has write access to the repo
 		const hasAccess = await this.github.checkActorPermission(
 			this.context.owner,
@@ -52,109 +46,53 @@ export class CreateTaskHandler {
 		);
 		this.logger.info(`Task name: ${taskName}`);
 
-		// 3. Check existing task
-		const parsedName = TaskNameSchema.parse(taskName);
-		const existingTask = await this.coder.getTask(coderUsername, parsedName);
+		// 3. Resolve owner
+		const owner = await this.runner.lookupUser({
+			user: {
+				type: "github",
+				id: String(this.context.senderId),
+				username: this.context.senderLogin,
+			},
+		});
 
-		if (existingTask) {
+		// 4. Check existing task — return immediately if found, no wait/create
+		const existing = await this.runner.getStatus({ taskName, owner });
+		if (existing) {
 			this.logger.info(
-				`Task ${taskName} already exists (status: ${existingTask.status})`,
-			);
-
-			if (
-				existingTask.status !== "active" ||
-				existingTask.current_state?.state !== "idle"
-			) {
-				await this.coder.waitForTaskActive(
-					coderUsername,
-					existingTask.id,
-					(msg) => this.logger.debug(msg),
-				);
-			}
-
-			const taskUrl = this.generateTaskUrl(
-				coderUsername,
-				String(existingTask.id),
+				`Task ${taskName} already exists (status: ${existing.status})`,
 			);
 			return {
 				taskName,
-				taskUrl,
-				taskStatus: existingTask.status,
+				taskUrl: existing.url,
+				taskStatus: existing.status,
 				skipped: false,
 			};
 		}
 
-		// 4. Build prompt
-		const fullPrompt = this.inputs.prompt
+		// 5. Build prompt
+		const input = this.inputs.prompt
 			? `${this.inputs.prompt}\n\n${this.context.issueUrl}`
 			: this.context.issueUrl;
 
-		// 5. Get template and create task
-		const templateName = this.resolveTemplateName();
-		const template = await this.coder.getTemplateByOrganizationAndName(
-			this.inputs.coderOrganization,
-			templateName,
-		);
+		// 6. Create task
+		const task = await this.runner.create({ taskName, owner, input });
+		this.logger.info(`Task created: ${task.url}`);
 
-		const presets = await this.coder.getTemplateVersionPresets(
-			template.active_version_id,
-		);
-		let presetId: string | undefined;
-		if (this.inputs.coderTemplatePreset) {
-			const found = presets.find(
-				(p) => p.Name === this.inputs.coderTemplatePreset,
-			);
-			if (!found)
-				throw new Error(`Preset ${this.inputs.coderTemplatePreset} not found`);
-			presetId = found.ID;
-		} else {
-			const defaultPreset = presets.find((p) => p.Default);
-			presetId = defaultPreset?.ID;
-		}
-
-		const createdTask = await this.coder.createTask(coderUsername, {
-			name: taskName,
-			template_version_id: template.active_version_id,
-			template_version_preset_id: presetId,
-			input: fullPrompt,
-		});
-
-		const taskUrl = this.generateTaskUrl(coderUsername, String(createdTask.id));
-		this.logger.info(`Task created: ${taskUrl}`);
-
-		// 6. Comment on issue
+		// 7. Comment on issue
 		await this.github.commentOnIssue(
 			this.context.owner,
 			this.context.repo,
 			this.context.issueNumber,
-			`Task created: ${taskUrl}`,
+			`Task created: ${task.url}`,
 			"Task created:",
 		);
 
+		// 8. Return
 		return {
 			taskName,
-			taskUrl,
-			taskStatus: createdTask.status,
+			taskUrl: task.url,
+			taskStatus: task.status,
 			skipped: false,
 		};
-	}
-
-	private resolveTemplateName(): string {
-		const titleHasCodex = /codex/i.test(this.context.issueTitle);
-		const labelsHaveCodex = this.context.issueLabels.some(
-			(label) => label.toLowerCase() === "codex",
-		);
-		if (titleHasCodex || labelsHaveCodex) {
-			this.logger.info(
-				`Using codex template: ${this.inputs.coderTemplateNameCodex}`,
-			);
-			return this.inputs.coderTemplateNameCodex;
-		}
-		return this.inputs.coderTemplateName;
-	}
-
-	private generateTaskUrl(coderUsername: string, taskId: string): string {
-		const baseURL = this.inputs.coderURL.replace(/\/$/, "");
-		return `${baseURL}/tasks/${coderUsername}/${taskId}`;
 	}
 }

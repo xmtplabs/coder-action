@@ -11,7 +11,8 @@
 		"format:check": "biome format .",
 		"lint": "biome lint --error-on-warnings .",
 		"typecheck": "tsc --noEmit",
-		"check": "bun run typecheck && bun run lint && bun run format:check && bun test"
+		"architecture-check": "bash scripts/check-architecture.sh",
+		"check": "bun run typecheck && bun run lint && bun run format:check && bun test && bun run architecture-check"
 	},
 	"dependencies": {
 		"@octokit/auth-app": "^8.2.0",

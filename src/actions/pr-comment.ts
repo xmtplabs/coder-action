@@ -1,13 +1,9 @@
-import type { CoderClient } from "../services/coder/client";
+import type { TaskRunner } from "../services/task-runner";
 import type { GitHubClient } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import { formatPRCommentMessage } from "./messages";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import {
-	generateTaskName,
-	lookupAndEnsureActiveTask,
-	sendInputWithRetry,
-} from "./task-utils";
+import { generateTaskName } from "./task-naming";
 
 export interface PRCommentContext {
 	owner: string;
@@ -25,9 +21,9 @@ export interface PRCommentContext {
 	lineNumber?: number;
 }
 
-export class PRCommentHandler {
+export class PRCommentAction {
 	constructor(
-		private readonly coder: CoderClient,
+		private readonly runner: TaskRunner,
 		private readonly github: GitHubClient,
 		private readonly inputs: HandlerConfig,
 		private readonly context: PRCommentContext,
@@ -72,19 +68,14 @@ export class PRCommentHandler {
 		}
 		const issue = linkedIssues[0];
 
-		// Compute task name and look up
+		// Compute task name and look up status
 		const taskName = generateTaskName(
 			this.inputs.coderTaskNamePrefix,
 			this.context.repo,
 			issue.number,
 		);
-		const task = await lookupAndEnsureActiveTask(
-			this.coder,
-			this.inputs.coderUsername,
-			taskName,
-			this.logger,
-		);
-		if (!task) {
+		const existing = await this.runner.getStatus({ taskName });
+		if (!existing || existing.status === "error") {
 			this.logger.info(`Task not found: ${taskName}`);
 			return { skipped: true, skipReason: "task-not-found" };
 		}
@@ -98,7 +89,7 @@ export class PRCommentHandler {
 			filePath: this.context.filePath,
 			lineNumber: this.context.lineNumber,
 		});
-		await sendInputWithRetry(this.coder, task, message, this.logger);
+		await this.runner.sendInput({ taskName, input: message, timeout: 120_000 });
 		this.logger.info(`Comment forwarded to task ${taskName}`);
 
 		if (this.context.isReviewSubmission) {
@@ -117,6 +108,6 @@ export class PRCommentHandler {
 			);
 		}
 
-		return { taskName, taskStatus: task.status, skipped: false };
+		return { taskName, taskStatus: existing.status, skipped: false };
 	}
 }

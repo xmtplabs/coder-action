@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { CoderAPIError } from "../services/coder/client";
 import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
-import {
-	MockCoderClient,
-	createMockGitHubClient,
-	mockTask,
-} from "../testing/helpers";
-import { CloseTaskHandler } from "./close-task";
+import { MockTaskRunner, createMockGitHubClient } from "../testing/helpers";
+import { CloseTaskAction } from "./close-task";
 import type { CloseTaskContext } from "./close-task";
 
 const baseInputs: HandlerConfig = {
@@ -27,44 +22,37 @@ const closeContext: CloseTaskContext = {
 	issueNumber: 42,
 };
 
-describe("CloseTaskHandler", () => {
-	let coder: MockCoderClient;
+describe("CloseTaskAction", () => {
+	let runner: MockTaskRunner;
 	let github: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		github = createMockGitHubClient();
 		logger = new TestLogger();
 	});
 
-	// AC #7: Stop and delete workspace, then delete task
-	test("stops, waits for stop, deletes workspace and task when task exists", async () => {
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-
-		const handler = new CloseTaskHandler(
-			coder,
+	// AC #7: Happy path — runner.delete called, comment posted
+	test("calls runner.delete and posts completion comment when task exists", async () => {
+		// MockTaskRunner.delete returns { deleted: true } by default
+		const action = new CloseTaskAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(false);
-		expect(coder.stopWorkspace).toHaveBeenCalledWith("ws-1");
-		expect(coder.waitForWorkspaceStopped).toHaveBeenCalledWith(
-			"ws-1",
-			expect.any(Function),
-		);
-		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
-		expect(coder.deleteTask).toHaveBeenCalledWith(
-			mockTask.owner_id,
-			mockTask.id,
-		);
+		expect(result.taskName).toBe("gh-libxmtp-42");
+		expect(result.taskStatus).toBe("deleted");
+		expect(runner.delete).toHaveBeenCalledTimes(1);
+		const deleteCall = runner.delete.mock.calls[0] as unknown as [
+			{ taskName: string },
+		];
+		expect(String(deleteCall[0].taskName)).toBe("gh-libxmtp-42");
 		expect(github.commentOnIssue).toHaveBeenCalledWith(
 			closeContext.owner,
 			closeContext.repo,
@@ -74,149 +62,40 @@ describe("CloseTaskHandler", () => {
 		);
 	});
 
-	// AC #8: No task found
-	test("returns skipped when no task found", async () => {
-		coder.getTask.mockResolvedValue(null);
+	// AC #8: Task not found — returns skipped with "task-not-found", no comment posted
+	test("skips with task-not-found when task does not exist (no comment posted)", async () => {
+		runner.delete.mockResolvedValue({ deleted: false });
 
-		const handler = new CloseTaskHandler(
-			coder,
+		const action = new CloseTaskAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(coder.stopWorkspace).not.toHaveBeenCalled();
-		expect(coder.waitForWorkspaceStopped).not.toHaveBeenCalled();
-		expect(coder.deleteWorkspace).not.toHaveBeenCalled();
+		expect(result.skipReason).toBe("task-not-found");
+		expect(runner.delete).toHaveBeenCalledTimes(1);
+		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
 
-	// AC #9: Stop fails — skip wait, still delete workspace and task
-	test("skips wait and attempts delete even when stop fails", async () => {
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-		coder.stopWorkspace.mockRejectedValue(new Error("stop failed"));
-
-		const handler = new CloseTaskHandler(
-			coder,
+	// No workspace stop/delete calls — those are gone
+	test("does not call any workspace-level operations", async () => {
+		// runner.delete returns { deleted: true } by default — task exists
+		const action = new CloseTaskAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
 		);
-		const result = await handler.run();
+		await action.run();
 
-		expect(result.skipped).toBe(false);
-		expect(coder.waitForWorkspaceStopped).not.toHaveBeenCalled();
-		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
-		expect(coder.deleteTask).toHaveBeenCalledWith(
-			mockTask.owner_id,
-			mockTask.id,
-		);
-	});
-
-	// waitForWorkspaceStopped times out — still delete workspace and task
-	test("attempts delete even when waitForWorkspaceStopped times out", async () => {
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-		coder.waitForWorkspaceStopped.mockRejectedValue(
-			new CoderAPIError("Timeout waiting for workspace to stop", 408),
-		);
-
-		const handler = new CloseTaskHandler(
-			coder,
-			github as unknown as import("../services/github/client").GitHubClient,
-			baseInputs,
-			closeContext,
-			logger,
-		);
-		const result = await handler.run();
-
-		expect(result.skipped).toBe(false);
-		expect(coder.deleteWorkspace).toHaveBeenCalledWith("ws-1");
-		expect(coder.deleteTask).toHaveBeenCalledWith(
-			mockTask.owner_id,
-			mockTask.id,
-		);
-	});
-
-	// Edge case: deleteTask fails, still completes
-	test("completes successfully even when deleteTask fails", async () => {
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-		coder.deleteTask.mockRejectedValue(new CoderAPIError("Not found", 404));
-
-		const handler = new CloseTaskHandler(
-			coder,
-			github as unknown as import("../services/github/client").GitHubClient,
-			baseInputs,
-			closeContext,
-			logger,
-		);
-		const result = await handler.run();
-
-		expect(result.skipped).toBe(false);
-		expect(coder.deleteTask).toHaveBeenCalledWith(
-			mockTask.owner_id,
-			mockTask.id,
-		);
-	});
-
-	// Regression: coderUsername is undefined in production for close_task (issue #70)
-	test("uses task.owner_id for deleteTask even when coderUsername is undefined", async () => {
-		const inputsWithoutUsername: HandlerConfig = {
-			...baseInputs,
-			coderUsername: undefined,
-		};
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-
-		const handler = new CloseTaskHandler(
-			coder,
-			github as unknown as import("../services/github/client").GitHubClient,
-			inputsWithoutUsername,
-			closeContext,
-			logger,
-		);
-		const result = await handler.run();
-
-		expect(result.skipped).toBe(false);
-		expect(coder.deleteTask).toHaveBeenCalledWith(
-			mockTask.owner_id,
-			mockTask.id,
-		);
-	});
-
-	// Edge case: already-deleted workspace
-	test("handles 404 from Coder gracefully", async () => {
-		coder.getTask.mockResolvedValue({
-			...mockTask,
-			workspace_id: "ws-1",
-		} as never);
-		coder.stopWorkspace.mockRejectedValue(new CoderAPIError("Not found", 404));
-		coder.deleteWorkspace.mockRejectedValue(
-			new CoderAPIError("Not found", 404),
-		);
-
-		const handler = new CloseTaskHandler(
-			coder,
-			github as unknown as import("../services/github/client").GitHubClient,
-			baseInputs,
-			closeContext,
-			logger,
-		);
-		const result = await handler.run();
-
-		expect(result.skipped).toBe(false);
+		// Verify only delete was called (not startWorkspace, sendInput, etc.)
+		expect(runner.delete).toHaveBeenCalledTimes(1);
+		expect(runner.sendInput).not.toHaveBeenCalled();
+		expect(runner.create).not.toHaveBeenCalled();
 	});
 });

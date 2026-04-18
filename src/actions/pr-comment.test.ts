@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
-	MockCoderClient,
-	createMockGitHubClient,
-	mockStoppedTask,
+	MockTaskRunner,
 	mockTask,
+	mockErrorTask,
+	createMockGitHubClient,
 } from "../testing/helpers";
-import { PRCommentHandler } from "./pr-comment";
+import { PRCommentAction } from "./pr-comment";
 import type { PRCommentContext } from "./pr-comment";
 
 const baseInputs: HandlerConfig = {
@@ -33,13 +33,13 @@ const validContext: PRCommentContext = {
 	commentCreatedAt: "2026-03-17T12:00:00Z",
 };
 
-describe("PRCommentHandler", () => {
-	let coder: MockCoderClient;
+describe("PRCommentAction", () => {
+	let runner: MockTaskRunner;
 	let github: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		github = createMockGitHubClient();
 		logger = new TestLogger();
 		// Default: linked issue exists, task exists
@@ -51,39 +51,41 @@ describe("PRCommentHandler", () => {
 				url: "https://github.com/xmtp/libxmtp/issues/42",
 			},
 		]);
-		coder.getTask.mockResolvedValue(mockTask as never);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
-	// AC #10: Forward comment to task
+	// AC #10: Forward comment to task — sendInput called exactly once with correct timeout
 	test("sends formatted message to task for valid PR comment", async () => {
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(false);
-		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
-		const sentMessage = (
-			coder.sendTaskInput.mock.calls[0] as unknown as [string, unknown, string]
-		)[2];
-		expect(sentMessage).toContain("New Comment on PR:");
-		expect(sentMessage).toContain("Please fix the typo");
+		expect(runner.sendInput).toHaveBeenCalledTimes(1);
+		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
+			{ taskName: string; input: string; timeout: number },
+		];
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
+		expect(sendArgs[0].input).toContain("New Comment on PR:");
+		expect(sendArgs[0].input).toContain("Please fix the typo");
+		expect(sendArgs[0].timeout).toBe(120_000);
 	});
 
 	// Issue #23: React with 👀 when comment is forwarded to agent
 	test("adds 👀 reaction when comment is forwarded to agent", async () => {
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
 		expect(github.addReactionToComment).toHaveBeenCalledWith(
@@ -96,14 +98,14 @@ describe("PRCommentHandler", () => {
 	// Issue #23: No reaction when comment is skipped
 	test("does not add reaction when PR not by coder agent", async () => {
 		const ctx = { ...validContext, prAuthor: "other-user" };
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		expect(github.addReactionToComment).not.toHaveBeenCalled();
 	});
@@ -111,46 +113,32 @@ describe("PRCommentHandler", () => {
 	// AC #11: PR not by agent
 	test("skips when PR not authored by coder agent", async () => {
 		const ctx = { ...validContext, prAuthor: "other-user" };
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("pr-not-by-coder-agent");
-		expect(coder.sendTaskInput).not.toHaveBeenCalled();
+		expect(runner.sendInput).not.toHaveBeenCalled();
 	});
 
 	// AC #12: Self-comment
 	test("skips self-comments from coder agent", async () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
-		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toBe("self-comment");
-	});
-
-	test("skips self-comment using agentGithubUsername", async () => {
-		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
-		const handler = new PRCommentHandler(
-			coder,
-			github as unknown as import("../services/github/client").GitHubClient,
-			baseInputs,
-			ctx,
-			logger,
-		);
-		const result = await handler.run();
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("self-comment");
 	});
@@ -158,54 +146,49 @@ describe("PRCommentHandler", () => {
 	// AC #13: No linked issue
 	test("skips when no linked issue found", async () => {
 		github.findLinkedIssues.mockResolvedValue([]);
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("no-linked-issue");
+		expect(result.skipReason).toBe("no-linked-issue");
 	});
 
 	// AC #14: Task not found
-	test("skips when task not found", async () => {
-		coder.getTask.mockResolvedValue(null);
-		const handler = new PRCommentHandler(
-			coder,
+	test("skips when task not found (null)", async () => {
+		runner.getStatus.mockResolvedValue(null);
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
-	// AC #15: Restart stopped (paused) task
-	test("resumes paused task before sending", async () => {
-		coder.getTask.mockResolvedValue(mockStoppedTask as never);
-		const handler = new PRCommentHandler(
-			coder,
+	// AC #14: Task in error state — skip
+	test("skips when task is in error state", async () => {
+		runner.getStatus.mockResolvedValue(mockErrorTask);
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
-		expect(result.skipped).toBe(false);
-		expect(coder.startWorkspace).toHaveBeenCalledTimes(1);
-		expect(coder.startWorkspace).toHaveBeenCalledWith(
-			mockStoppedTask.workspace_id,
-		);
-		expect(coder.waitForTaskActive).toHaveBeenCalledTimes(1);
-		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
 	// Edge: multiple linked issues — use first
@@ -214,20 +197,19 @@ describe("PRCommentHandler", () => {
 			{ number: 42, title: "Bug 1", state: "OPEN", url: "url1" },
 			{ number: 43, title: "Bug 2", state: "OPEN", url: "url2" },
 		]);
-		const handler = new PRCommentHandler(
-			coder,
+		const action = new PRCommentAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
-		// Task name should use issue 42, not 43
-		const taskNameArg = (
-			coder.getTask.mock.calls[0] as unknown as [string, unknown]
-		)[1];
-		expect(String(taskNameArg)).toBe("gh-libxmtp-42");
+		const getStatusCall = runner.getStatus.mock.calls[0] as unknown as [
+			{ taskName: string; owner?: string },
+		];
+		expect(String(getStatusCall[0].taskName)).toBe("gh-libxmtp-42");
 	});
 
 	// Issue #58: PR review submissions (approve/request changes/comment body)
@@ -241,67 +223,65 @@ describe("PRCommentHandler", () => {
 		};
 
 		test("forwards review submission body to task", async () => {
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
 				logger,
 			);
-			const result = await handler.run();
+			const result = await action.run();
 
 			expect(result.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
-			const sentMessage = (
-				coder.sendTaskInput.mock.calls[0] as unknown as [
-					string,
-					unknown,
-					string,
-				]
-			)[2];
-			expect(sentMessage).toContain("Please address the naming conventions");
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
+			const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
+				{ taskName: string; input: string; timeout: number },
+			];
+			expect(sendArgs[0].input).toContain(
+				"Please address the naming conventions",
+			);
 		});
 
 		test("skips review submission with empty body", async () => {
 			const ctx = { ...reviewSubmissionContext, commentBody: "" };
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
 			);
-			const result = await handler.run();
+			const result = await action.run();
 
 			expect(result.skipped).toBe(true);
 			expect(result.skipReason).toBe("empty-review-body");
-			expect(coder.sendTaskInput).not.toHaveBeenCalled();
+			expect(runner.sendInput).not.toHaveBeenCalled();
 		});
 
 		test("skips review submission with whitespace-only body", async () => {
 			const ctx = { ...reviewSubmissionContext, commentBody: "   \n  " };
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
 			);
-			const result = await handler.run();
+			const result = await action.run();
 
 			expect(result.skipped).toBe(true);
 			expect(result.skipReason).toBe("empty-review-body");
 		});
 
 		test("does not add reaction for review submissions", async () => {
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
 				logger,
 			);
-			await handler.run();
+			await action.run();
 
 			expect(github.addReactionToComment).not.toHaveBeenCalled();
 			expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
@@ -317,17 +297,17 @@ describe("PRCommentHandler", () => {
 		};
 
 		test("forwards review comment to task", async () => {
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewContext,
 				logger,
 			);
-			const result = await handler.run();
+			const result = await action.run();
 
 			expect(result.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 
 		test("includes file path and line number in forwarded message", async () => {
@@ -340,34 +320,32 @@ describe("PRCommentHandler", () => {
 				filePath: "src/handlers/pr-comment.ts",
 				lineNumber: 42,
 			};
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
 			);
-			await handler.run();
+			await action.run();
 
-			const sentMessage = (
-				coder.sendTaskInput.mock.calls[0] as unknown as [
-					string,
-					unknown,
-					string,
-				]
-			)[2];
-			expect(sentMessage).toContain("File: src/handlers/pr-comment.ts:42");
+			const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
+				{ taskName: string; input: string; timeout: number },
+			];
+			expect(sendArgs[0].input).toContain(
+				"File: src/handlers/pr-comment.ts:42",
+			);
 		});
 
 		test("adds 👀 reaction via review comment endpoint", async () => {
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewContext,
 				logger,
 			);
-			await handler.run();
+			await action.run();
 
 			expect(github.addReactionToReviewComment).toHaveBeenCalledTimes(1);
 			expect(github.addReactionToReviewComment).toHaveBeenCalledWith(
@@ -379,14 +357,14 @@ describe("PRCommentHandler", () => {
 		});
 
 		test("uses issue comment endpoint for regular PR comments", async () => {
-			const handler = new PRCommentHandler(
-				coder,
+			const action = new PRCommentAction(
+				runner,
 				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				validContext,
 				logger,
 			);
-			await handler.run();
+			await action.run();
 
 			expect(github.addReactionToComment).toHaveBeenCalledTimes(1);
 			expect(github.addReactionToReviewComment).not.toHaveBeenCalled();

@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
-	MockCoderClient,
-	createMockGitHubClient,
+	MockTaskRunner,
 	mockTask,
+	mockErrorTask,
+	createMockGitHubClient,
 } from "../testing/helpers";
-import { FailedCheckHandler } from "./failed-check";
+import { FailedCheckAction } from "./failed-check";
 import type { FailedCheckContext } from "./failed-check";
 
 const baseInputs: HandlerConfig = {
@@ -31,13 +32,13 @@ const validContext: FailedCheckContext = {
 	pullRequests: [{ number: 5 }],
 };
 
-describe("FailedCheckHandler", () => {
-	let coder: MockCoderClient;
+describe("FailedCheckAction", () => {
+	let runner: MockTaskRunner;
 	let github: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		github = createMockGitHubClient();
 		logger = new TestLogger();
 		// Defaults: PR by agent, matching SHA, linked issue, task exists
@@ -60,29 +61,47 @@ describe("FailedCheckHandler", () => {
 		github.getJobLogs.mockResolvedValue(
 			"Error: test assertion failed\n  at test.ts:42",
 		);
-		coder.getTask.mockResolvedValue(mockTask as never);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
-	// AC #16: Forward failed check logs
+	// AC #16: Happy path — fetches failed job logs, sends formatted message
 	test("fetches failed job logs and sends formatted message", async () => {
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(false);
 		expect(github.getFailedJobs).toHaveBeenCalledWith("xmtp", "libxmtp", 12345);
 		expect(github.getJobLogs).toHaveBeenCalledTimes(1);
-		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
-		const sentMessage = (
-			coder.sendTaskInput.mock.calls[0] as unknown as [string, unknown, string]
-		)[2];
-		expect(sentMessage).toContain("CI Check Failed on PR:");
-		expect(sentMessage).toContain("test assertion failed");
+		expect(runner.sendInput).toHaveBeenCalledTimes(1);
+		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
+			{ taskName: string; input: string; timeout: number },
+		];
+		// linked issue #42 → task name includes issue number
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
+		expect(sendArgs[0].input).toContain("CI Check Failed on PR:");
+		expect(sendArgs[0].input).toContain("test assertion failed");
+		expect(sendArgs[0].timeout).toBe(120_000);
+	});
+
+	// No reaction calls for failed-check
+	test("does not add any reactions", async () => {
+		const action = new FailedCheckAction(
+			runner,
+			github as unknown as import("../services/github/client").GitHubClient,
+			baseInputs,
+			validContext,
+			logger,
+		);
+		await action.run();
+
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
+		expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
 	});
 
 	// AC #17: PR not by agent
@@ -93,14 +112,14 @@ describe("FailedCheckHandler", () => {
 			head: { sha: "abc123" },
 		});
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("pr-not-by-coder-agent");
@@ -114,14 +133,14 @@ describe("FailedCheckHandler", () => {
 			head: { sha: "newer-sha-456" },
 		});
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("stale-commit");
@@ -136,14 +155,14 @@ describe("FailedCheckHandler", () => {
 			head: { sha: "abc123" },
 		});
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(false);
 		expect(github.findPRByHeadSHA).toHaveBeenCalledWith(
@@ -158,14 +177,14 @@ describe("FailedCheckHandler", () => {
 		const ctx = { ...validContext, pullRequests: [] };
 		github.findPRByHeadSHA.mockResolvedValue(null);
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
 		expect(result.skipReason).toBe("no-pr-found");
@@ -175,37 +194,54 @@ describe("FailedCheckHandler", () => {
 	test("skips when no linked issue found", async () => {
 		github.findLinkedIssues.mockResolvedValue([]);
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("no-linked-issue");
+		expect(result.skipReason).toBe("no-linked-issue");
 	});
 
 	// Edge: task not found
 	test("skips when task not found", async () => {
-		coder.getTask.mockResolvedValue(null);
+		runner.getStatus.mockResolvedValue(null);
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		const result = await handler.run();
+		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
-	// Edge: caps at 5 failed jobs
+	// Edge: task in error state — skip
+	test("skips when task is in error state", async () => {
+		runner.getStatus.mockResolvedValue(mockErrorTask);
+
+		const action = new FailedCheckAction(
+			runner,
+			github as unknown as import("../services/github/client").GitHubClient,
+			baseInputs,
+			validContext,
+			logger,
+		);
+		const result = await action.run();
+
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("task-not-found");
+	});
+
+	// Edge: caps at MAX_FAILED_JOBS (5) failed jobs
 	test("caps at 5 failed jobs in message", async () => {
 		const jobs = Array.from({ length: 8 }, (_, i) => ({
 			id: i + 1,
@@ -215,14 +251,14 @@ describe("FailedCheckHandler", () => {
 		github.getFailedJobs.mockResolvedValue(jobs);
 		github.getJobLogs.mockResolvedValue("failure output");
 
-		const handler = new FailedCheckHandler(
-			coder,
+		const action = new FailedCheckAction(
+			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
 		);
-		await handler.run();
+		await action.run();
 
 		// Should only fetch logs for first 5 jobs
 		expect(github.getJobLogs).toHaveBeenCalledTimes(5);

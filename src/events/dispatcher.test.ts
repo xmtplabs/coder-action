@@ -1,21 +1,19 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { HandlerDispatcher } from "./dispatcher";
-import type { HandlerDispatcherOptions } from "./dispatcher";
+import { EventDispatcher } from "./dispatcher";
+import type { EventDispatcherOptions } from "./dispatcher";
 import {
-	MockCoderClient,
-	createMockGitHubClient,
+	MockTaskRunner,
 	mockTask,
+	createMockGitHubClient,
 } from "../testing/helpers";
 import { TestLogger } from "../infra/logger";
 import type { AppConfig } from "../config/app-config";
 import type {
-	RouteResult,
-	CreateTaskContext,
-	CloseTaskContext,
-	PRCommentContext,
-	IssueCommentContext,
-	FailedCheckContext,
-} from "../webhooks/github/router";
+	TaskRequestedEvent,
+	TaskClosedEvent,
+	CommentPostedEvent,
+	CheckFailedEvent,
+} from "./types";
 import type { GitHubClient, Octokit } from "../services/github/client";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -37,35 +35,116 @@ const mockConfig: AppConfig = {
 
 const INSTALLATION_ID = 99999;
 
-type DispatchedResult = Extract<RouteResult, { dispatched: true }>;
-
-function makeDispatchedResult(
-	handler: DispatchedResult["handler"],
-	context:
-		| CreateTaskContext
-		| CloseTaskContext
-		| PRCommentContext
-		| IssueCommentContext
-		| FailedCheckContext,
-): DispatchedResult {
+function makeTaskRequestedEvent(
+	overrides?: Partial<TaskRequestedEvent>,
+): TaskRequestedEvent {
 	return {
-		dispatched: true,
-		handler,
-		installationId: INSTALLATION_ID,
-		context,
-	} as DispatchedResult;
+		type: "task_requested",
+		source: { type: "github", installationId: INSTALLATION_ID },
+		repository: { owner: "xmtp", name: "test-repo" },
+		issue: {
+			number: 42,
+			url: "https://github.com/xmtp/test-repo/issues/42",
+		},
+		requester: {
+			login: "human-dev",
+			externalId: 67890,
+		},
+		...overrides,
+	};
 }
 
-describe("HandlerDispatcher", () => {
-	let coder: MockCoderClient;
+function makeTaskClosedEvent(
+	overrides?: Partial<TaskClosedEvent>,
+): TaskClosedEvent {
+	return {
+		type: "task_closed",
+		source: { type: "github", installationId: INSTALLATION_ID },
+		repository: { owner: "xmtp", name: "test-repo" },
+		issue: { number: 42 },
+		...overrides,
+	};
+}
+
+function makePRCommentEvent(
+	overrides?: Partial<CommentPostedEvent>,
+): CommentPostedEvent {
+	return {
+		type: "comment_posted",
+		source: { type: "github", installationId: INSTALLATION_ID },
+		repository: { owner: "xmtp", name: "test-repo" },
+		target: {
+			kind: "pull_request",
+			number: 5,
+			authorLogin: "xmtp-coder-agent",
+		},
+		comment: {
+			id: 1001,
+			body: "Please fix the naming.",
+			url: "https://github.com/xmtp/test-repo/pull/5#issuecomment-1001",
+			createdAt: "2024-01-15T10:00:00Z",
+			authorLogin: "human-reviewer",
+			isReviewComment: false,
+			isReviewSubmission: false,
+		},
+		...overrides,
+	};
+}
+
+function makeIssueCommentEvent(
+	overrides?: Partial<CommentPostedEvent>,
+): CommentPostedEvent {
+	return {
+		type: "comment_posted",
+		source: { type: "github", installationId: INSTALLATION_ID },
+		repository: { owner: "xmtp", name: "test-repo" },
+		target: {
+			kind: "issue",
+			number: 42,
+			authorLogin: "xmtp-coder-agent",
+		},
+		comment: {
+			id: 1002,
+			body: "Can you handle edge cases?",
+			url: "https://github.com/xmtp/test-repo/issues/42#issuecomment-1002",
+			createdAt: "2024-01-15T11:00:00Z",
+			authorLogin: "human-dev",
+			isReviewComment: false,
+			isReviewSubmission: false,
+		},
+		...overrides,
+	};
+}
+
+function makeCheckFailedEvent(
+	overrides?: Partial<CheckFailedEvent>,
+): CheckFailedEvent {
+	return {
+		type: "check_failed",
+		source: { type: "github", installationId: INSTALLATION_ID },
+		repository: { owner: "xmtp", name: "test-repo" },
+		run: {
+			id: 4001,
+			url: "https://github.com/xmtp/test-repo/actions/runs/4001",
+			headSha: "abc123def456",
+			workflowName: "CI",
+			workflowFile: "ci.yml",
+		},
+		pullRequestNumbers: [5],
+		...overrides,
+	};
+}
+
+describe("EventDispatcher", () => {
+	let runner: MockTaskRunner;
 	let gh: ReturnType<typeof createMockGitHubClient>;
 	let logger: TestLogger;
 	let mockOctokit: Octokit;
 	let createInstallationOctokit: ReturnType<typeof mock>;
-	let dispatcher: HandlerDispatcher;
+	let dispatcher: EventDispatcher;
 
 	beforeEach(() => {
-		coder = new MockCoderClient();
+		runner = new MockTaskRunner();
 		gh = createMockGitHubClient();
 		logger = new TestLogger();
 
@@ -74,196 +153,169 @@ describe("HandlerDispatcher", () => {
 		mockOctokit = {} as Octokit;
 		createInstallationOctokit = mock(() => mockOctokit);
 
-		const options: HandlerDispatcherOptions = {
+		const options: EventDispatcherOptions = {
 			config: mockConfig,
 			createInstallationOctokit: createInstallationOctokit as unknown as (
 				installationId: number,
 			) => Octokit,
-			coderClient: coder,
+			taskRunner: runner,
 			logger,
 			// Inject mock GitHubClient to avoid real API calls
 			createGitHubClient: () => gh as unknown as GitHubClient,
 		};
-		dispatcher = new HandlerDispatcher(options);
+		dispatcher = new EventDispatcher(options);
 	});
 
-	// ── create_task ──────────────────────────────────────────────────────────
+	// ── task_requested ──────────────────────────────────────────────────────
 
-	describe("create_task", () => {
-		const createTaskContext = {
-			issueNumber: 42,
-			issueUrl: "https://github.com/xmtp/test-repo/issues/42",
-			issueTitle: "Fix some bug",
-			issueLabels: [] as string[],
-			repoName: "test-repo",
-			repoOwner: "xmtp",
-			senderLogin: "human-dev",
-			senderId: 67890,
-		};
-
+	describe("task_requested", () => {
 		test("calls createInstallationOctokit with the correct installationId", async () => {
-			const result = makeDispatchedResult("create_task", createTaskContext);
-			await dispatcher.dispatch(result);
+			const event = makeTaskRequestedEvent();
+			await dispatcher.dispatch(event);
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
-		test("resolves coder username via getCoderUserByGitHubId with senderId", async () => {
-			const result = makeDispatchedResult("create_task", createTaskContext);
-			await dispatcher.dispatch(result);
-			expect(coder.getCoderUserByGitHubId).toHaveBeenCalledWith(67890);
+		test("resolves owner via runner.lookupUser with senderId", async () => {
+			const event = makeTaskRequestedEvent();
+			await dispatcher.dispatch(event);
+			expect(runner.lookupUser).toHaveBeenCalledWith({
+				user: {
+					type: "github",
+					id: "67890",
+					username: "human-dev",
+				},
+			});
 		});
 
 		test("creates a task and returns ActionOutputs", async () => {
-			coder.getTask.mockResolvedValue(null);
-			coder.createTask.mockResolvedValue(mockTask);
+			runner.getStatus.mockResolvedValue(null);
+			runner.create.mockResolvedValue(mockTask);
 
-			const result = makeDispatchedResult("create_task", createTaskContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makeTaskRequestedEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(false);
 			expect(outputs.taskName).toBeDefined();
 		});
+
+		test("installation caching: createInstallationOctokit called for each dispatch (factory owns caching)", async () => {
+			const event = makeTaskRequestedEvent();
+			await dispatcher.dispatch(event);
+			await dispatcher.dispatch(event);
+			// Dispatcher delegates caching to the factory; called once per dispatch
+			expect(createInstallationOctokit).toHaveBeenCalledTimes(2);
+		});
 	});
 
-	// ── close_task ───────────────────────────────────────────────────────────
+	// ── task_closed ──────────────────────────────────────────────────────────
 
-	describe("close_task", () => {
-		const closeTaskContext = {
-			issueNumber: 42,
-			repoName: "test-repo",
-			repoOwner: "xmtp",
-		};
-
+	describe("task_closed", () => {
 		test("calls createInstallationOctokit with the correct installationId", async () => {
-			const result = makeDispatchedResult("close_task", closeTaskContext);
-			await dispatcher.dispatch(result);
+			const event = makeTaskClosedEvent();
+			await dispatcher.dispatch(event);
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
-		test("skips when no task is found", async () => {
-			coder.getTask.mockResolvedValue(null);
-
-			const result = makeDispatchedResult("close_task", closeTaskContext);
-			const outputs = await dispatcher.dispatch(result);
-
-			expect(outputs.skipped).toBe(true);
-			expect(outputs.skipReason).toBe("task-not-found");
-		});
-
-		test("deletes task and returns outputs when task exists", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
-
-			const result = makeDispatchedResult("close_task", closeTaskContext);
-			const outputs = await dispatcher.dispatch(result);
+		test("deletes task and returns outputs", async () => {
+			const event = makeTaskClosedEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(false);
 			expect(outputs.taskStatus).toBe("deleted");
+			expect(runner.delete).toHaveBeenCalledTimes(1);
 		});
 	});
 
-	// ── pr_comment ───────────────────────────────────────────────────────────
+	// ── comment_posted (pull_request) ─────────────────────────────────────────
 
-	describe("pr_comment", () => {
-		const prCommentContext = {
-			issueNumber: 5,
-			commentBody: "Please fix the naming.",
-			commentUrl: "https://github.com/xmtp/test-repo/pull/5#issuecomment-1001",
-			commentId: 1001,
-			commentCreatedAt: "2024-01-15T10:00:00Z",
-			repoName: "test-repo",
-			repoOwner: "xmtp",
-			prAuthor: "xmtp-coder-agent",
-			commenterLogin: "human-reviewer",
-			isReviewComment: false,
-			isReviewSubmission: false,
-		};
-
+	describe("comment_posted (pull_request)", () => {
 		test("calls createInstallationOctokit with the correct installationId", async () => {
-			const result = makeDispatchedResult("pr_comment", prCommentContext);
-			await dispatcher.dispatch(result);
+			const event = makePRCommentEvent();
+			await dispatcher.dispatch(event);
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTask);
 
-			const result = makeDispatchedResult("pr_comment", prCommentContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makePRCommentEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 
 		test("skips when PR not authored by agent", async () => {
-			const context = { ...prCommentContext, prAuthor: "other-user" };
-			const result = makeDispatchedResult("pr_comment", context);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makePRCommentEvent({
+				target: {
+					kind: "pull_request",
+					number: 5,
+					authorLogin: "other-user",
+				},
+			});
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(true);
 			expect(outputs.skipReason).toBe("pr-not-by-coder-agent");
 		});
+
+		test("dispatches to PRCommentAction, not IssueCommentAction", async () => {
+			runner.getStatus.mockResolvedValue(mockTask);
+
+			const event = makePRCommentEvent();
+			await dispatcher.dispatch(event);
+
+			// PRCommentAction calls findLinkedIssues, IssueCommentAction does not
+			expect(gh.findLinkedIssues).toHaveBeenCalledTimes(1);
+		});
 	});
 
-	// ── issue_comment ─────────────────────────────────────────────────────────
+	// ── comment_posted (issue) ────────────────────────────────────────────────
 
-	describe("issue_comment", () => {
-		const issueCommentContext = {
-			issueNumber: 42,
-			commentBody: "Can you handle edge cases?",
-			commentUrl:
-				"https://github.com/xmtp/test-repo/issues/42#issuecomment-1002",
-			commentId: 1002,
-			commentCreatedAt: "2024-01-15T11:00:00Z",
-			repoName: "test-repo",
-			repoOwner: "xmtp",
-			commenterLogin: "human-dev",
-		};
-
+	describe("comment_posted (issue)", () => {
 		test("calls createInstallationOctokit with the correct installationId", async () => {
-			const result = makeDispatchedResult("issue_comment", issueCommentContext);
-			await dispatcher.dispatch(result);
+			const event = makeIssueCommentEvent();
+			await dispatcher.dispatch(event);
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTask);
 
-			const result = makeDispatchedResult("issue_comment", issueCommentContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makeIssueCommentEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
 		});
 
 		test("skips when task is not found", async () => {
-			coder.getTask.mockResolvedValue(null);
+			runner.getStatus.mockResolvedValue(null);
 
-			const result = makeDispatchedResult("issue_comment", issueCommentContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makeIssueCommentEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(true);
 			expect(outputs.skipReason).toBe("task-not-found");
 		});
+
+		test("dispatches to IssueCommentAction, not PRCommentAction", async () => {
+			runner.getStatus.mockResolvedValue(mockTask);
+
+			const event = makeIssueCommentEvent();
+			await dispatcher.dispatch(event);
+
+			// IssueCommentAction does NOT call findLinkedIssues
+			expect(gh.findLinkedIssues).not.toHaveBeenCalled();
+		});
 	});
 
-	// ── failed_check ─────────────────────────────────────────────────────────
+	// ── check_failed ─────────────────────────────────────────────────────────
 
-	describe("failed_check", () => {
-		const failedCheckContext = {
-			workflowRunId: 4001,
-			workflowName: "CI",
-			workflowPath: ".github/workflows/ci.yml",
-			headSha: "abc123def456",
-			workflowRunUrl: "https://github.com/xmtp/test-repo/actions/runs/4001",
-			conclusion: "failure",
-			pullRequestNumbers: [5],
-			repoName: "test-repo",
-			repoOwner: "xmtp",
-		};
-
+	describe("check_failed", () => {
 		test("calls createInstallationOctokit with the correct installationId", async () => {
-			const result = makeDispatchedResult("failed_check", failedCheckContext);
-			await dispatcher.dispatch(result);
+			const event = makeCheckFailedEvent();
+			await dispatcher.dispatch(event);
 			expect(createInstallationOctokit).toHaveBeenCalledWith(INSTALLATION_ID);
 		});
 
@@ -274,27 +326,59 @@ describe("HandlerDispatcher", () => {
 				head: { sha: "abc123def456" },
 			});
 
-			const result = makeDispatchedResult("failed_check", failedCheckContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makeCheckFailedEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(true);
 			expect(outputs.skipReason).toBe("pr-not-by-coder-agent");
 		});
 
 		test("forwards failed check details to task when all conditions met", async () => {
-			// PR sha must match headSha in context to pass the stale-commit guard
+			// PR sha must match headSha in event to pass the stale-commit guard
 			gh.getPR.mockResolvedValue({
 				number: 5,
 				user: { login: "xmtp-coder-agent" },
 				head: { sha: "abc123def456" },
 			});
-			coder.getTask.mockResolvedValue(mockTask as never);
+			runner.getStatus.mockResolvedValue(mockTask);
 
-			const result = makeDispatchedResult("failed_check", failedCheckContext);
-			const outputs = await dispatcher.dispatch(result);
+			const event = makeCheckFailedEvent();
+			const outputs = await dispatcher.dispatch(event);
 
 			expect(outputs.skipped).toBe(false);
-			expect(coder.sendTaskInput).toHaveBeenCalled();
+			expect(runner.sendInput).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	// ── installation caching (cross-event) ───────────────────────────────────
+
+	describe("installation id forwarding", () => {
+		test("two dispatches with same installationId call factory twice (caching is in factory)", async () => {
+			const event1 = makeTaskClosedEvent();
+			const event2 = makeTaskClosedEvent();
+
+			await dispatcher.dispatch(event1);
+			await dispatcher.dispatch(event2);
+
+			// Dispatcher no longer caches — it delegates to the factory each time.
+			// The factory (createInstallationOctokit in main.ts) does the caching.
+			expect(createInstallationOctokit).toHaveBeenCalledTimes(2);
+		});
+
+		test("two dispatches with different installationIds call factory with correct ids", async () => {
+			const event1 = makeTaskClosedEvent({
+				source: { type: "github", installationId: 11111 },
+			});
+			const event2 = makeTaskClosedEvent({
+				source: { type: "github", installationId: 22222 },
+			});
+
+			await dispatcher.dispatch(event1);
+			await dispatcher.dispatch(event2);
+
+			expect(createInstallationOctokit).toHaveBeenCalledTimes(2);
+			expect(createInstallationOctokit).toHaveBeenCalledWith(11111);
+			expect(createInstallationOctokit).toHaveBeenCalledWith(22222);
 		});
 	});
 });
