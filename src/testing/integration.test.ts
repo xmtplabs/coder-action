@@ -1,16 +1,16 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { createApp } from "./http/server";
+import { createApp } from "../http/server";
 import {
 	WebhookRouter,
 	type RouteResult,
 	type CreateTaskContext,
 	type IssueCommentContext,
-} from "./webhooks/github/router";
-import { TestLogger } from "./infra/logger";
+} from "../webhooks/github/router";
+import { TestLogger } from "../infra/logger";
 
-import issuesAssigned from "./testing/fixtures/issues-assigned.json";
-import issueCommentOnIssue from "./testing/fixtures/issue-comment-on-issue.json";
-import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
+import issuesAssigned from "./fixtures/issues-assigned.json";
+import issueCommentOnIssue from "./fixtures/issue-comment-on-issue.json";
+import workflowRunSuccess from "./fixtures/workflow-run-success.json";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
