@@ -3,7 +3,7 @@ import { EventDispatcher } from "./dispatcher";
 import type { EventDispatcherOptions } from "./dispatcher";
 import {
 	MockTaskRunner,
-	mockTaskNeutral,
+	mockTask,
 	createMockGitHubClient,
 } from "../testing/helpers";
 import { TestLogger } from "../infra/logger";
@@ -189,7 +189,7 @@ describe("EventDispatcher", () => {
 
 		test("creates a task and returns ActionOutputs", async () => {
 			runner.getStatus.mockResolvedValue(null);
-			runner.create.mockResolvedValue(mockTaskNeutral);
+			runner.create.mockResolvedValue(mockTask);
 
 			const event = makeTaskRequestedEvent();
 			const outputs = await dispatcher.dispatch(event);
@@ -236,7 +236,7 @@ describe("EventDispatcher", () => {
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			runner.getStatus.mockResolvedValue(mockTaskNeutral);
+			runner.getStatus.mockResolvedValue(mockTask);
 
 			const event = makePRCommentEvent();
 			const outputs = await dispatcher.dispatch(event);
@@ -260,7 +260,7 @@ describe("EventDispatcher", () => {
 		});
 
 		test("dispatches to PRCommentAction, not IssueCommentAction", async () => {
-			runner.getStatus.mockResolvedValue(mockTaskNeutral);
+			runner.getStatus.mockResolvedValue(mockTask);
 
 			const event = makePRCommentEvent();
 			await dispatcher.dispatch(event);
@@ -280,7 +280,7 @@ describe("EventDispatcher", () => {
 		});
 
 		test("forwards comment to task and returns outputs", async () => {
-			runner.getStatus.mockResolvedValue(mockTaskNeutral);
+			runner.getStatus.mockResolvedValue(mockTask);
 
 			const event = makeIssueCommentEvent();
 			const outputs = await dispatcher.dispatch(event);
@@ -300,7 +300,7 @@ describe("EventDispatcher", () => {
 		});
 
 		test("dispatches to IssueCommentAction, not PRCommentAction", async () => {
-			runner.getStatus.mockResolvedValue(mockTaskNeutral);
+			runner.getStatus.mockResolvedValue(mockTask);
 
 			const event = makeIssueCommentEvent();
 			await dispatcher.dispatch(event);
@@ -340,7 +340,7 @@ describe("EventDispatcher", () => {
 				user: { login: "xmtp-coder-agent" },
 				head: { sha: "abc123def456" },
 			});
-			runner.getStatus.mockResolvedValue(mockTaskNeutral);
+			runner.getStatus.mockResolvedValue(mockTask);
 
 			const event = makeCheckFailedEvent();
 			const outputs = await dispatcher.dispatch(event);

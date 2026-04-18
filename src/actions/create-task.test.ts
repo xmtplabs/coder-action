@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
 	MockTaskRunner,
-	mockTaskNeutral,
+	mockTask,
 	createMockGitHubClient,
 } from "../testing/helpers";
 import type { HandlerConfig } from "../config/handler-config";
@@ -45,7 +45,7 @@ describe("CreateTaskAction", () => {
 	test("creates task and comments on issue for org member", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		runner.getStatus.mockResolvedValue(null);
-		runner.create.mockResolvedValue(mockTaskNeutral);
+		runner.create.mockResolvedValue(mockTask);
 
 		const action = new CreateTaskAction(
 			runner,
@@ -70,7 +70,7 @@ describe("CreateTaskAction", () => {
 			string,
 			string,
 		];
-		expect(commentArgs[3]).toContain(mockTaskNeutral.url);
+		expect(commentArgs[3]).toContain(mockTask.url);
 	});
 
 	// AC #2: Permission denied — runner methods NOT called
@@ -95,7 +95,7 @@ describe("CreateTaskAction", () => {
 	// AC #3: Existing task path — no create call
 	test("returns existing task without creating when task already exists", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
-		runner.getStatus.mockResolvedValue(mockTaskNeutral);
+		runner.getStatus.mockResolvedValue(mockTask);
 
 		const action = new CreateTaskAction(
 			runner,
@@ -108,8 +108,8 @@ describe("CreateTaskAction", () => {
 
 		expect(result.skipped).toBe(false);
 		expect(result.taskName).toBe("gh-libxmtp-42");
-		expect(result.taskUrl).toBe(mockTaskNeutral.url);
-		expect(result.taskStatus).toBe(mockTaskNeutral.status);
+		expect(result.taskUrl).toBe(mockTask.url);
+		expect(result.taskStatus).toBe(mockTask.status);
 		expect(runner.create).not.toHaveBeenCalled();
 		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
@@ -118,7 +118,7 @@ describe("CreateTaskAction", () => {
 	test("appends issue URL to prompt", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		runner.getStatus.mockResolvedValue(null);
-		runner.create.mockResolvedValue(mockTaskNeutral);
+		runner.create.mockResolvedValue(mockTask);
 
 		const inputs = { ...baseInputs, prompt: "Fix the bug" };
 		const action = new CreateTaskAction(
@@ -144,7 +144,7 @@ describe("CreateTaskAction", () => {
 	test("uses only issue URL when no prompt provided", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		runner.getStatus.mockResolvedValue(null);
-		runner.create.mockResolvedValue(mockTaskNeutral);
+		runner.create.mockResolvedValue(mockTask);
 
 		const action = new CreateTaskAction(
 			runner,
@@ -165,7 +165,7 @@ describe("CreateTaskAction", () => {
 	test("uses deterministic task name", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		runner.getStatus.mockResolvedValue(null);
-		runner.create.mockResolvedValue(mockTaskNeutral);
+		runner.create.mockResolvedValue(mockTask);
 
 		const action = new CreateTaskAction(
 			runner,
@@ -185,7 +185,7 @@ describe("CreateTaskAction", () => {
 	test("logs task name via injected logger", async () => {
 		github.checkActorPermission.mockResolvedValue(true);
 		runner.getStatus.mockResolvedValue(null);
-		runner.create.mockResolvedValue(mockTaskNeutral);
+		runner.create.mockResolvedValue(mockTask);
 
 		const action = new CreateTaskAction(
 			runner,

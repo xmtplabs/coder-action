@@ -3,8 +3,8 @@ import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
 	MockTaskRunner,
-	mockTaskNeutral,
-	mockTaskNeutralError,
+	mockTask,
+	mockErrorTask,
 	createMockGitHubClient,
 } from "../testing/helpers";
 import { FailedCheckAction } from "./failed-check";
@@ -61,7 +61,7 @@ describe("FailedCheckAction", () => {
 		github.getJobLogs.mockResolvedValue(
 			"Error: test assertion failed\n  at test.ts:42",
 		);
-		runner.getStatus.mockResolvedValue(mockTaskNeutral);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
 	// AC #16: Happy path — fetches failed job logs, sends formatted message
@@ -224,7 +224,7 @@ describe("FailedCheckAction", () => {
 
 	// Edge: task in error state — skip
 	test("skips when task is in error state", async () => {
-		runner.getStatus.mockResolvedValue(mockTaskNeutralError);
+		runner.getStatus.mockResolvedValue(mockErrorTask);
 
 		const action = new FailedCheckAction(
 			runner,

@@ -1,101 +1,24 @@
 import { mock } from "bun:test";
-import type {
-	CoderClient,
-	ExperimentalCoderSDKTask,
-} from "../services/coder/client";
-import { TaskIdSchema, TaskNameSchema } from "../services/coder/client";
 import type { GitHubClient } from "../services/github/client";
 import type { Task, TaskName, TaskRunner } from "../services/task-runner";
 import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner";
 
-// ── Mock Task Data ──────────────────────────────────────────────────────────
+// ── Mock Task Data (TaskRunner-shape) ───────────────────────────────────────
 
-export const mockTask: ExperimentalCoderSDKTask = {
-	id: TaskIdSchema.parse("550e8400-e29b-41d4-a716-446655440000"),
-	name: TaskNameSchema.parse("gh-repo-42"),
-	owner_id: "550e8400-e29b-41d4-a716-446655440001",
-	template_id: "550e8400-e29b-41d4-a716-446655440002",
-	workspace_id: "550e8400-e29b-41d4-a716-446655440003",
-	created_at: "2026-01-01T00:00:00Z",
-	updated_at: "2026-01-01T00:00:00Z",
-	status: "active",
-	current_state: { state: "idle" },
-};
-
-export const mockStoppedTask: ExperimentalCoderSDKTask = {
-	...mockTask,
-	status: "paused",
-	current_state: null,
-};
-
-export const mockErrorTask: ExperimentalCoderSDKTask = {
-	...mockTask,
-	status: "error",
-	current_state: null,
-};
-
-export const mockTemplate = {
-	id: "550e8400-e29b-41d4-a716-446655440010",
-	name: "task-template",
-	description: "AI task template",
-	organization_id: "550e8400-e29b-41d4-a716-446655440020",
-	active_version_id: "550e8400-e29b-41d4-a716-446655440030",
-};
-
-export const mockPreset = {
-	ID: "550e8400-e29b-41d4-a716-446655440040",
-	Name: "default",
-	Default: true,
-};
-
-// ── Mock Coder Client ───────────────────────────────────────────────────────
-
-export class MockCoderClient implements CoderClient {
-	getCoderUserByGitHubId = mock(() =>
-		Promise.resolve({
-			id: "u1",
-			username: "coder-agent",
-			email: "a@b.com",
-			organization_ids: [],
-			github_com_user_id: 1,
-		}),
-	);
-	getTemplateByOrganizationAndName = mock(() => Promise.resolve(mockTemplate));
-	getTemplateVersionPresets = mock(() => Promise.resolve([mockPreset]));
-	getTask = mock(() => Promise.resolve(null));
-	getTaskById = mock(() => Promise.resolve(mockTask));
-	createTask = mock(() => Promise.resolve(mockTask));
-	sendTaskInput = mock(() => Promise.resolve());
-	waitForTaskActive = mock(() => Promise.resolve());
-	getWorkspace = mock(() =>
-		Promise.resolve({
-			id: "ws-1",
-			latest_build: { status: "running", transition: "start" },
-		}),
-	);
-	startWorkspace = mock(() => Promise.resolve());
-	stopWorkspace = mock(() => Promise.resolve());
-	waitForWorkspaceStopped = mock(() => Promise.resolve());
-	deleteWorkspace = mock(() => Promise.resolve());
-	deleteTask = mock(() => Promise.resolve());
-}
-
-// ── Neutral Task Fixtures (TaskRunner-shape) ────────────────────────────────
-
-export const mockTaskNeutral: Task = {
+export const mockTask: Task = {
 	name: TaskRunnerNameSchema.parse("gh-test-repo-42"),
 	status: "ready",
 	owner: "test-coder-user",
 	url: "https://coder.example.com/tasks/test-coder-user/550e8400-e29b-41d4-a716-446655440000",
 };
 
-export const mockTaskNeutralStopped: Task = {
-	...mockTaskNeutral,
+export const mockStoppedTask: Task = {
+	...mockTask,
 	status: "stopped",
 };
 
-export const mockTaskNeutralError: Task = {
-	...mockTaskNeutral,
+export const mockErrorTask: Task = {
+	...mockTask,
 	status: "error",
 };
 
@@ -107,8 +30,7 @@ export class MockTaskRunner implements TaskRunner {
 			"test-coder-user",
 	);
 	create = mock(
-		async (_: { taskName: TaskName; owner: string; input: string }) =>
-			mockTaskNeutral,
+		async (_: { taskName: TaskName; owner: string; input: string }) => mockTask,
 	);
 	sendInput = mock(
 		async (_: {

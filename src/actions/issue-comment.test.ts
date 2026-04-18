@@ -3,8 +3,8 @@ import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
 	MockTaskRunner,
-	mockTaskNeutral,
-	mockTaskNeutralError,
+	mockTask,
+	mockErrorTask,
 	createMockGitHubClient,
 } from "../testing/helpers";
 import { IssueCommentAction } from "./issue-comment";
@@ -41,7 +41,7 @@ describe("IssueCommentAction", () => {
 		runner = new MockTaskRunner();
 		github = createMockGitHubClient();
 		logger = new TestLogger();
-		runner.getStatus.mockResolvedValue(mockTaskNeutral);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
 	// AC #20: Happy path — sendInput called once with timeout; reaction added
@@ -149,7 +149,7 @@ describe("IssueCommentAction", () => {
 
 	// Task in error state — skip
 	test("skips when task is in error state", async () => {
-		runner.getStatus.mockResolvedValue(mockTaskNeutralError);
+		runner.getStatus.mockResolvedValue(mockErrorTask);
 		const action = new IssueCommentAction(
 			runner,
 			github as unknown as import("../services/github/client").GitHubClient,

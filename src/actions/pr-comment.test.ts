@@ -3,8 +3,8 @@ import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {
 	MockTaskRunner,
-	mockTaskNeutral,
-	mockTaskNeutralError,
+	mockTask,
+	mockErrorTask,
 	createMockGitHubClient,
 } from "../testing/helpers";
 import { PRCommentAction } from "./pr-comment";
@@ -51,7 +51,7 @@ describe("PRCommentAction", () => {
 				url: "https://github.com/xmtp/libxmtp/issues/42",
 			},
 		]);
-		runner.getStatus.mockResolvedValue(mockTaskNeutral);
+		runner.getStatus.mockResolvedValue(mockTask);
 	});
 
 	// AC #10: Forward comment to task — sendInput called exactly once with correct timeout
@@ -190,7 +190,7 @@ describe("PRCommentAction", () => {
 
 	// AC #14: Task in error state — skip
 	test("skips when task is in error state", async () => {
-		runner.getStatus.mockResolvedValue(mockTaskNeutralError);
+		runner.getStatus.mockResolvedValue(mockErrorTask);
 		const action = new PRCommentAction(
 			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
