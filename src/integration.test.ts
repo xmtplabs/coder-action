@@ -5,7 +5,7 @@ import {
 	type RouteResult,
 	type CreateTaskContext,
 	type IssueCommentContext,
-} from "./webhook-router";
+} from "./webhooks/github/router";
 import { TestLogger } from "./infra/logger";
 
 import issuesAssigned from "./testing/fixtures/issues-assigned.json";

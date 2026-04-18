@@ -1,4 +1,4 @@
-import type { Logger } from "./infra/logger";
+import type { Logger } from "../../infra/logger";
 import type {
 	IssuesAssignedPayload,
 	IssuesClosedPayload,
@@ -8,7 +8,7 @@ import type {
 	PRReviewCommentEditedPayload,
 	PRReviewSubmittedPayload,
 	WorkflowRunCompletedPayload,
-} from "./webhooks/github/payload-types";
+} from "./payload-types";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

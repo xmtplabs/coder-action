@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { WebhookRouter } from "./webhook-router";
+import { WebhookRouter } from "./router";
 import type {
 	WebhookRouterOptions,
 	CreateTaskContext,
@@ -7,18 +7,18 @@ import type {
 	PRCommentContext,
 	IssueCommentContext,
 	FailedCheckContext,
-} from "./webhook-router";
-import type { Logger } from "./infra/logger";
+} from "./router";
+import type { Logger } from "../../infra/logger";
 
-import issuesAssigned from "./testing/fixtures/issues-assigned.json";
-import issuesClosed from "./testing/fixtures/issues-closed.json";
-import issueCommentOnIssue from "./testing/fixtures/issue-comment-on-issue.json";
-import issueCommentOnPr from "./testing/fixtures/issue-comment-on-pr.json";
-import prReviewComment from "./testing/fixtures/pr-review-comment.json";
-import prReviewSubmitted from "./testing/fixtures/pr-review-submitted.json";
-import prReviewSubmittedEmpty from "./testing/fixtures/pr-review-submitted-empty.json";
-import workflowRunFailure from "./testing/fixtures/workflow-run-failure.json";
-import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
+import issuesAssigned from "../../testing/fixtures/issues-assigned.json";
+import issuesClosed from "../../testing/fixtures/issues-closed.json";
+import issueCommentOnIssue from "../../testing/fixtures/issue-comment-on-issue.json";
+import issueCommentOnPr from "../../testing/fixtures/issue-comment-on-pr.json";
+import prReviewComment from "../../testing/fixtures/pr-review-comment.json";
+import prReviewSubmitted from "../../testing/fixtures/pr-review-submitted.json";
+import prReviewSubmittedEmpty from "../../testing/fixtures/pr-review-submitted-empty.json";
+import workflowRunFailure from "../../testing/fixtures/workflow-run-failure.json";
+import workflowRunSuccess from "../../testing/fixtures/workflow-run-success.json";
 
 // These constants must match the fixture data
 const AGENT_USER_LOGIN = "xmtp-coder-agent";
