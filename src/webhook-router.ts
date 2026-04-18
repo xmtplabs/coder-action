@@ -8,7 +8,7 @@ import type {
 	PRReviewCommentEditedPayload,
 	PRReviewSubmittedPayload,
 	WorkflowRunCompletedPayload,
-} from "./webhook-schemas";
+} from "./webhooks/github/payload-types";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

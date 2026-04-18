@@ -7,17 +7,17 @@ import type {
 	PRReviewCommentCreatedPayload,
 	PRReviewSubmittedPayload,
 	WorkflowRunCompletedPayload,
-} from "./webhook-schemas";
+} from "./payload-types";
 
-import issuesAssigned from "./testing/fixtures/issues-assigned.json";
-import issuesClosed from "./testing/fixtures/issues-closed.json";
-import issueCommentOnPr from "./testing/fixtures/issue-comment-on-pr.json";
-import issueCommentOnIssue from "./testing/fixtures/issue-comment-on-issue.json";
-import prReviewComment from "./testing/fixtures/pr-review-comment.json";
-import prReviewSubmitted from "./testing/fixtures/pr-review-submitted.json";
-import prReviewSubmittedEmpty from "./testing/fixtures/pr-review-submitted-empty.json";
-import workflowRunFailure from "./testing/fixtures/workflow-run-failure.json";
-import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
+import issuesAssigned from "../../testing/fixtures/issues-assigned.json";
+import issuesClosed from "../../testing/fixtures/issues-closed.json";
+import issueCommentOnPr from "../../testing/fixtures/issue-comment-on-pr.json";
+import issueCommentOnIssue from "../../testing/fixtures/issue-comment-on-issue.json";
+import prReviewComment from "../../testing/fixtures/pr-review-comment.json";
+import prReviewSubmitted from "../../testing/fixtures/pr-review-submitted.json";
+import prReviewSubmittedEmpty from "../../testing/fixtures/pr-review-submitted-empty.json";
+import workflowRunFailure from "../../testing/fixtures/workflow-run-failure.json";
+import workflowRunSuccess from "../../testing/fixtures/workflow-run-success.json";
 
 // ── Fixture type compatibility checks ────────────────────────────────────────
 //
