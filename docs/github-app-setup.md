@@ -92,7 +92,15 @@ On the app settings page, copy the **App ID** shown near the top. You will set t
 1. Scroll to the bottom of the app settings page.
 2. Click **Generate a private key**.
 3. A `.pem` file will be downloaded automatically. Store it securely — it cannot be retrieved again.
-4. The contents of this file become the `PRIVATE_KEY` environment variable. When setting it as a single-line environment variable, replace literal newlines with `\n`.
+4. **Convert the key from PKCS#1 to PKCS#8.** GitHub issues keys in PKCS#1 format (`-----BEGIN RSA PRIVATE KEY-----`), but `universal-github-app-jwt` only accepts PKCS#8 (`-----BEGIN PRIVATE KEY-----`):
+
+   ```bash
+   openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt \
+     -in your-app.private-key.pem \
+     -out your-app.private-key-pkcs8.pem
+   ```
+
+5. The contents of the **PKCS#8** file become the `PRIVATE_KEY` environment variable. When setting it as a single-line environment variable, replace literal newlines with `\n`.
 
 ---
 
@@ -114,7 +122,7 @@ Create a `.env` file (or configure your deployment environment) with the followi
 ```
 # GitHub App credentials
 APP_ID=123456
-PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 WEBHOOK_SECRET=your-webhook-secret
 
 # GitHub User identity used by Coder workspaces
@@ -183,6 +191,7 @@ Expected response: `{"status":"ok"}`
 | Webhook deliveries show `500` and logs say "invalid signature" | Same as above, or the secret contains extra whitespace | Trim the secret value; ensure no trailing newline |
 | App posts no comment after issue assignment | `APP_ID` or `PRIVATE_KEY` is wrong | Verify `APP_ID` matches the numeric ID on the app settings page; re-paste the private key ensuring `\n` line endings |
 | `PRIVATE_KEY` parse error on startup | PEM is malformed or newlines were not escaped | Use `awk '{printf "%s\\n", $0}' your-key.pem` to produce a single-line escaped value |
+| `Private Key is in PKCS#1 format, but only PKCS#8 is supported` | Key was used as downloaded from GitHub | Convert to PKCS#8 (see Step 7): `openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in your-app.private-key.pem -out your-app.private-key-pkcs8.pem` |
 | "Resource not accessible by integration" error from GitHub API | Missing permission | Review Step 2 and Step 3; re-install the app after saving permission changes |
 | Comments from agent trigger new tasks (feedback loop) | `AGENT_GITHUB_USERNAME` is missing or misspelled | Set `AGENT_GITHUB_USERNAME` to the exact GitHub username of the user account (no `@` prefix) |
 | Workflow run events not received | `workflow_run` event not subscribed | Go to app settings → Edit → subscribe to **Workflow run** and save |
