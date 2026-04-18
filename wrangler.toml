@@ -1,5 +1,5 @@
 "$schema" = "./node_modules/wrangler/config-schema.json"
-name = "task-action"
+name = "coder-action"
 main = "src/main.ts"
 compatibility_date = "2026-04-18"
 compatibility_flags = ["nodejs_compat"]
