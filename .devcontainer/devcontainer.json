@@ -1,19 +1,14 @@
 {
 	"name": "coder-action",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:24",
 	"features": {
-		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-			"moby": false
-		},
-		"ghcr.io/shyim/devcontainers-features/bun:0": {}
+		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
-	"postCreateCommand": "bun install",
+	"postCreateCommand": "npm install",
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"biomejs.biome",
-				"oven.bun-vscode"
+				"biomejs.biome"
 			],
 			"settings": {
 				"editor.defaultFormatter": "biomejs.biome",
