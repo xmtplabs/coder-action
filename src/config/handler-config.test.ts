@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type ActionOutputs, ActionOutputsSchema } from "./schemas";
+import { type ActionOutputs, ActionOutputsSchema } from "./handler-config";
 
 describe("ActionOutputsSchema", () => {
 	test("validates complete output", () => {

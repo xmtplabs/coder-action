@@ -6,7 +6,7 @@ import { FailedCheckHandler } from "./handlers/failed-check";
 import { IssueCommentHandler } from "./handlers/issue-comment";
 import { PRCommentHandler } from "./handlers/pr-comment";
 import type { Logger } from "./infra/logger";
-import type { ActionOutputs, HandlerConfig } from "./schemas";
+import type { ActionOutputs, HandlerConfig } from "./config/handler-config";
 import type { AppConfig } from "./config/app-config";
 import type { RouteResult } from "./webhook-router";
 

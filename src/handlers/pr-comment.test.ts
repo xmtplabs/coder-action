@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { TestLogger } from "../infra/logger";
-import type { HandlerConfig } from "../schemas";
+import type { HandlerConfig } from "../config/handler-config";
 import {
 	MockCoderClient,
 	createMockGitHubClient,

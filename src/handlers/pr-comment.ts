@@ -2,7 +2,7 @@ import type { CoderClient } from "../coder-client";
 import type { GitHubClient } from "../github-client";
 import type { Logger } from "../infra/logger";
 import { formatPRCommentMessage } from "../messages";
-import type { ActionOutputs, HandlerConfig } from "../schemas";
+import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
 import {
 	generateTaskName,
 	lookupAndEnsureActiveTask,

@@ -5,7 +5,7 @@ import {
 	mockStoppedTask,
 	mockTask,
 } from "../test-helpers";
-import type { HandlerConfig } from "../schemas";
+import type { HandlerConfig } from "../config/handler-config";
 import { TestLogger } from "../infra/logger";
 import { CreateTaskHandler } from "./create-task";
 
