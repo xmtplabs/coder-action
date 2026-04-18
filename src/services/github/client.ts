@@ -1,4 +1,4 @@
-import type { Logger } from "../../infra/logger";
+import type { Logger } from "../../utils/logger";
 import type { Octokit as OctokitRest } from "@octokit/rest";
 import type { LinkedIssue, FailedJob, PRInfo } from "./types";
 

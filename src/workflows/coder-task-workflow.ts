@@ -7,7 +7,7 @@ import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "../config/app-config";
 import type { Event } from "../events/types";
-import { createLogger } from "../infra/logger";
+import { createLogger } from "../utils/logger";
 import { CoderService } from "../services/coder/service";
 import { GitHubClient } from "../services/github/client";
 import { runCloseTask } from "./steps/close-task";

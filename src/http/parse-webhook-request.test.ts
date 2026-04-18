@@ -80,7 +80,7 @@ describe("parseWebhookRequest — typed errors", () => {
 		const req = await signedReq({
 			body,
 			eventName: "issues",
-			signature: "sha256=" + "0".repeat(64),
+			signature: `sha256=${"0".repeat(64)}`,
 		});
 		let thrown: unknown;
 		try {

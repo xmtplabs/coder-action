@@ -1,4 +1,4 @@
-import type { Logger } from "../../infra/logger";
+import type { Logger } from "../../utils/logger";
 import type {
 	IssuesAssignedPayload,
 	IssuesClosedPayload,

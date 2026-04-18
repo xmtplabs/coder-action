@@ -1,6 +1,6 @@
 import { describe, expect, vi, test } from "vitest";
 import { GitHubClient } from "./client";
-import { TestLogger } from "../../infra/logger";
+import { TestLogger } from "../../utils/logger";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {

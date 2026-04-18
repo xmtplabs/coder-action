@@ -1,4 +1,4 @@
-import type { Logger } from "../../infra/logger";
+import type { Logger } from "../../utils/logger";
 import type { GithubUser, Task, TaskRunner, TaskStatus } from "../task-runner";
 import type { TaskId, TaskName } from "../task-runner";
 import { CoderAPIError } from "./errors";
