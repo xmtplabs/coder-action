@@ -11,6 +11,7 @@ import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner"
 // ── Mock Task Data (TaskRunner-shape) ───────────────────────────────────────
 
 export const mockTask: Task = {
+	id: "550e8400-e29b-41d4-a716-446655440000",
 	name: TaskRunnerNameSchema.parse("gh-test-repo-42"),
 	status: "ready",
 	owner: "test-coder-user",

@@ -389,7 +389,13 @@ describe("ensureTaskReady — step return serialization", () => {
 			(c: unknown[]) => c[0] === "check-status-1",
 		);
 		const result = await step.do.mock.results[callIdx]?.value;
-		expect(result).toEqual({ status: "active", state: "working" });
+		// Spec §4 serialization table: { status, state, workspaceId }. Deep-equal
+		// guards against raw-SDK-field leakage (EARS-REQ-16a).
+		expect(result).toEqual({
+			status: "active",
+			state: "working",
+			workspaceId: "ws-1",
+		});
 	});
 });
 

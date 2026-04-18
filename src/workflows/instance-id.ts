@@ -22,9 +22,12 @@ export function buildInstanceId(event: Event, deliveryId: string): string {
 				return `${event.type}-${event.repository.name}-${event.target.number}-${deliveryId}`;
 			case "check_failed": {
 				const n = event.pullRequestNumbers[0];
+				// Always use `event.type` as the prefix so log/grep patterns are
+				// uniform across the event taxonomy. The trailing segment is either
+				// the linked PR number (preferred) or the run id fallback.
 				return n != null
 					? `${event.type}-${event.repository.name}-${n}-${deliveryId}`
-					: `check-failed-${event.run.id}-${deliveryId}`;
+					: `${event.type}-${event.run.id}-${deliveryId}`;
 			}
 		}
 	})();

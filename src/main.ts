@@ -30,16 +30,12 @@ export function __setAppBotLoginForTests(login: string | undefined): void {
 }
 
 async function resolveAppBotLogin(
-	env: CoderTaskWorkflowEnv,
+	_env: CoderTaskWorkflowEnv,
 	config: ReturnType<typeof loadConfig>,
 ): Promise<string> {
 	if (appBotLoginCache) return appBotLoginCache;
-	// Allow env override (used by tests and also a useful escape hatch for
-	// installations with a non-standard bot login).
-	if (env.AGENT_GITHUB_USERNAME) {
-		// The env var configures the human-user identity that the agent posts as,
-		// NOT the bot login — don't conflate. Fall through to the API call.
-	}
+	// `AGENT_GITHUB_USERNAME` env var is the human-user identity the agent
+	// posts as — distinct from the bot login. We only resolve the latter here.
 	const appOctokit = new Octokit({
 		authStrategy: createAppAuth,
 		auth: { appId: config.appId, privateKey: config.privateKey },

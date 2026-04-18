@@ -276,6 +276,7 @@ export class CoderService implements TaskRunner {
 	 */
 	private toTask(raw: ExperimentalCoderSDKTask, ownerUsername: string): Task {
 		return {
+			id: raw.id,
 			name: raw.name,
 			status: normalizeStatus(raw.status, raw.current_state),
 			owner: ownerUsername,
@@ -417,41 +418,10 @@ export class CoderService implements TaskRunner {
 	}
 
 	/**
-	 * Send input to an existing task, resolving the task name → id + owner.
-	 *
-	 * Polling is now handled by the workflow caller via `ensureTaskReady`;
-	 * this method assumes the task is already in a ready state when invoked.
-	 * The send call itself is NOT retried on failure (EARS-REQ-9).
-	 */
-	async sendInput(params: {
-		taskName: TaskName;
-		owner?: string;
-		input: string;
-	}): Promise<void> {
-		const { taskName, owner, input } = params;
-
-		const raw = await this.findTask(taskName, owner);
-		if (!raw) {
-			throw new Error(`Task not found: ${taskName}`);
-		}
-
-		const taskId = raw.id as TaskId;
-		const resolvedOwner =
-			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
-
-		// Single send call — no retry (EARS-REQ-9)
-		const sendEndpoint = `/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(taskId)}/send`;
-		await this.request(sendEndpoint, {
-			method: "POST",
-			body: JSON.stringify({ input }),
-		});
-	}
-
-	/**
-	 * Return the current status of a task, or null if it does not exist.
-	 *
-	 * When `owner` is omitted, scans all tasks by name and warns if multiple
-	 * matches are found (EARS-REQ-12, EARS-REQ-19).
+	 * Return the current (normalized) status of a task, or null if not found.
+	 * Thin wrapper over `findTask` + `toTask` — exercises status normalization
+	 * and URL composition for callers that need the provider-agnostic `Task`
+	 * shape rather than the raw SDK object.
 	 */
 	async getStatus(params: {
 		taskName: TaskName;

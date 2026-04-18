@@ -248,49 +248,9 @@ describe("CoderService.create", () => {
 
 // ── sendInput (post-polling-removal) ────────────────────────────────────────
 
-describe("CoderService.sendInput (no polling)", () => {
-	test("single send — resolves task by name + owner then POSTs to send endpoint", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-			// Resolve task by name
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
-			}
-			// Send endpoint
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const service = makeService(fetchFn as unknown as typeof fetch);
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) => init?.method === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	test("throws when task not found", async () => {
-		const fetchFn = vi.fn(() =>
-			Promise.resolve(createMockResponse({ tasks: [] })),
-		);
-		const service = makeService(fetchFn as unknown as typeof fetch);
-		await expect(
-			service.sendInput({
-				taskName: TASK_NAME,
-				owner: OWNER,
-				input: "hello",
-			}),
-		).rejects.toThrow(/Task not found/);
-	});
-});
+// Note: `sendInput` (polling-then-send) was removed — the workflow driver now
+// calls `sendTaskInput` primitive directly after `ensureTaskReady`. Tests for
+// the primitive live in the "CoderService primitives" block above.
 
 // ── Test 8 & 9: delete ────────────────────────────────────────────────────────
 

@@ -18,11 +18,24 @@ export interface RunCreateTaskContext {
  * wrapped in a `step.do` so Workflows can retry individual steps, persist
  * their results, and resume from partial progress on replay.
  *
- * Step callbacks return only plain scalar objects — never class instances or
- * raw SDK responses (EARS-REQ-16a).
+ * Order: permission check FIRST so unauthorized actors don't trigger a Coder
+ * user lookup. Step callbacks return only plain scalar objects — never class
+ * instances or raw SDK responses (EARS-REQ-16a).
  */
 export async function runCreateTask(ctx: RunCreateTaskContext): Promise<void> {
 	const { step, coder, github, config, event } = ctx;
+
+	const hasPermission = await step.do("check-github-permission", async () =>
+		github.checkActorPermission(
+			event.repository.owner,
+			event.repository.name,
+			event.requester.login,
+		),
+	);
+
+	if (!hasPermission) {
+		return;
+	}
 
 	const taskName = generateTaskName(
 		config.coderTaskNamePrefix,
@@ -40,24 +53,16 @@ export async function runCreateTask(ctx: RunCreateTaskContext): Promise<void> {
 		}),
 	);
 
-	const hasPermission = await step.do("check-github-permission", async () =>
-		github.checkActorPermission(
-			event.repository.owner,
-			event.repository.name,
-			event.requester.login,
-		),
-	);
-
-	if (!hasPermission) {
-		return;
-	}
-
 	const prompt = event.issue.url; // Default prompt = issue URL
 	const created = await step.do("create-coder-task", async () => {
 		const task = await coder.create({ taskName, owner, input: prompt });
+		// Scalar projection per spec §4 serialization table. `taskId` keeps the
+		// cached step output self-sufficient for any follow-up step that needs
+		// to operate on the task by id without re-querying Coder.
 		return {
 			taskName: task.name,
 			owner: task.owner,
+			taskId: task.id,
 			url: task.url,
 			status: task.status,
 		};

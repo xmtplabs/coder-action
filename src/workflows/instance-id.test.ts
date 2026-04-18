@@ -46,7 +46,7 @@ describe("buildInstanceId", () => {
 		expect(id).toBe("comment_posted-repo-99-d");
 	});
 
-	test("check_failed with no PR → 'check-failed-{runId}-{delivery}'", () => {
+	test("check_failed with no PR → 'check_failed-{runId}-{delivery}' (sanitized)", () => {
 		const event: Event = {
 			type: "check_failed",
 			source: { type: "github", installationId: 1 },
@@ -61,7 +61,8 @@ describe("buildInstanceId", () => {
 			pullRequestNumbers: [],
 		};
 		const id = buildInstanceId(event, "delivery-xyz");
-		expect(id).toBe("check-failed-999-delivery-xyz");
+		// `_` in event.type is sanitized to `-` by the charset regex.
+		expect(id).toBe("check_failed-999-delivery-xyz");
 	});
 
 	test("check_failed WITH PR → 'check_failed-repo-{prNumber}-{delivery}'", () => {

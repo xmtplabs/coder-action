@@ -106,10 +106,12 @@ export async function runFailedCheck(
 		}));
 	});
 
-	// 5. Fetch logs per job (each as its own step, returning plain strings)
+	// 5. Fetch logs per job (each as its own step, returning plain strings).
+	// Step names MUST be unique per workflow instance — interpolate the job id
+	// so multi-job PRs don't collide on the replay cache.
 	const jobsWithLogs: Array<{ name: string; logs: string }> = [];
 	for (const job of failedJobs) {
-		const logs = await step.do(`fetch-job-logs`, async () =>
+		const logs = await step.do(`fetch-job-logs-${job.id}`, async () =>
 			github.getJobLogs(
 				event.repository.owner,
 				event.repository.name,

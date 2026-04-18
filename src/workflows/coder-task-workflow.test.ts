@@ -281,7 +281,7 @@ describe("CoderTaskWorkflow dispatch — check_failed", () => {
 				{ id: 7, name: "test", conclusion: "failure" },
 			]);
 			await m.mockStepResult(
-				{ name: "fetch-job-logs" },
+				{ name: "fetch-job-logs-7" },
 				"Error: test failed\n",
 			);
 			await m.mockStepResult(

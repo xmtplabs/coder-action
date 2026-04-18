@@ -29,11 +29,12 @@ const config = {
 } as unknown as AppConfig;
 
 describe("runCreateTask", () => {
-	test("emits steps in order: lookup-coder-user, check-github-permission, create-coder-task, comment-on-issue", async () => {
+	test("emits steps in order: check-github-permission (first), lookup-coder-user, create-coder-task, comment-on-issue", async () => {
 		const step = makeStep();
 		const coder = {
 			lookupUser: vi.fn(async () => "coder-user"),
 			create: vi.fn(async () => ({
+				id: "task-uuid-1",
 				name: "gh-repo-42",
 				status: "ready",
 				owner: "coder-user",
@@ -53,16 +54,25 @@ describe("runCreateTask", () => {
 			event,
 		});
 		expect(step.calls).toEqual([
-			"lookup-coder-user",
 			"check-github-permission",
+			"lookup-coder-user",
 			"create-coder-task",
 			"comment-on-issue",
 		]);
 	});
 
-	test("skips create + comment if actor lacks write permission", async () => {
+	test("skips lookup + create + comment if actor lacks write permission", async () => {
 		const step = makeStep();
-		const coder = { lookupUser: vi.fn(async () => "coder-user") };
+		const coder = {
+			lookupUser: vi.fn(async () => "coder-user"),
+			create: vi.fn(async () => ({
+				id: "unused",
+				name: "x",
+				status: "ready",
+				owner: "x",
+				url: "u",
+			})),
+		};
 		const github = {
 			checkActorPermission: vi.fn(async () => false),
 			commentOnIssue: vi.fn(async () => {}),
@@ -74,18 +84,20 @@ describe("runCreateTask", () => {
 			config,
 			event,
 		});
-		expect(step.calls).toEqual([
-			"lookup-coder-user",
-			"check-github-permission",
-		]);
+		// Only the permission check ran.
+		expect(step.calls).toEqual(["check-github-permission"]);
+		// Neither Coder nor GitHub comment-on-issue hit.
+		expect(coder.lookupUser).not.toHaveBeenCalled();
+		expect(coder.create).not.toHaveBeenCalled();
 		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
 
-	test("create-coder-task step returns only plain scalar fields (no raw SDK)", async () => {
+	test("create-coder-task step returns exactly the spec §4 scalar projection", async () => {
 		const step = makeStep();
 		const coder = {
 			lookupUser: vi.fn(async () => "coder-user"),
 			create: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
 				name: "gh-repo-42",
 				status: "ready",
 				owner: "coder-user",
@@ -106,12 +118,15 @@ describe("runCreateTask", () => {
 		const createIdx = step.do.mock.calls.findIndex(
 			(c: unknown[]) => c[0] === "create-coder-task",
 		);
-		const result = (await step.do.mock.results[createIdx]?.value) as Record<
-			string,
-			unknown
-		>;
-		expect(result).toHaveProperty("taskName");
-		expect(result).toHaveProperty("owner");
-		expect(result).toHaveProperty("url");
+		const result = await step.do.mock.results[createIdx]?.value;
+		// Exact deep equality — guards against raw-SDK-field leakage (EARS-REQ-16a)
+		// AND missing-field regressions.
+		expect(result).toEqual({
+			taskName: "gh-repo-42",
+			owner: "coder-user",
+			taskId: "11111111-1111-1111-1111-111111111111",
+			url: "https://coder/t",
+			status: "ready",
+		});
 	});
 });

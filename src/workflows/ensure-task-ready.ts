@@ -96,9 +96,14 @@ export async function ensureTaskReady(
 			STATUS_RETRY,
 			async () => {
 				const raw = await coder.getTaskById(taskId, owner);
+				// Return the full scalar projection per spec §4 table:
+				// { status, state, workspaceId }. `workspaceId` isn't consumed in the
+				// loop today but surfacing it keeps the cached step output
+				// self-sufficient for any future mid-loop workspace action.
 				return {
 					status: raw.status,
 					state: raw.current_state?.state ?? null,
+					workspaceId: raw.workspace_id,
 				};
 			},
 		);

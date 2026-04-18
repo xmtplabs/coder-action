@@ -9,6 +9,7 @@ export type TaskId = z.infer<typeof TaskIdSchema>;
 export type TaskStatus = "initializing" | "ready" | "stopped" | "error";
 
 export interface Task {
+	id: string; // task-provider-internal task identifier (e.g. Coder task UUID)
 	name: TaskName;
 	status: TaskStatus;
 	owner: string; // task-provider-internal owner identifier

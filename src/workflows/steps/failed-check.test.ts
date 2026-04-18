@@ -116,8 +116,60 @@ describe("runFailedCheck", () => {
 		expect(step.calls).toContain("find-linked-issues");
 		expect(step.calls).toContain("locate-task");
 		expect(step.calls).toContain("fetch-failed-jobs");
-		expect(step.calls).toContain("fetch-job-logs");
+		// Step name includes the job id so multi-job PRs don't collide on the
+		// replay cache (one name per instance — Workflows contract).
+		expect(step.calls).toContain("fetch-job-logs-1");
 		expect(step.calls).toContain("send-task-input");
+	});
+
+	test("fetch-job-logs step name is unique per job id (avoids replay-cache collision)", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				owner_id: "owner-uuid",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			getTaskById: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			getPR: vi.fn(async () => ({
+				number: 5,
+				user: { login: "xmtp-coder-agent" },
+				head: { sha: "abc123" },
+			})),
+			findPRByHeadSHA: vi.fn(async () => null),
+			findLinkedIssues: vi.fn(async () => [
+				{ number: 7, title: "Bug", state: "OPEN", url: "u" },
+			]),
+			getFailedJobs: vi.fn(async () => [
+				{ id: 101, name: "unit-test", conclusion: "failure" },
+				{ id: 202, name: "e2e-test", conclusion: "failure" },
+			]),
+			getJobLogs: vi.fn(async () => "log"),
+		};
+		await runFailedCheck({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: event(),
+		});
+		const logsCalls = step.calls.filter((c: string) =>
+			c.startsWith("fetch-job-logs-"),
+		);
+		expect(logsCalls).toEqual(["fetch-job-logs-101", "fetch-job-logs-202"]);
+		// All step names are unique within the instance.
+		expect(new Set(step.calls).size).toBe(step.calls.length);
 	});
 
 	test("fetch-failed-jobs returns plain array", async () => {
