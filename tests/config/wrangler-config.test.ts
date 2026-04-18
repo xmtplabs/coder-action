@@ -5,7 +5,7 @@ import content from "../../wrangler.toml?raw";
 
 describe("wrangler.toml", () => {
 	test("declares the worker name and main entry", () => {
-		expect(content).toMatch(/^name\s*=\s*"coder-action"/m);
+		expect(content).toMatch(/^name\s*=\s*"task-action"/m);
 		expect(content).toMatch(/^main\s*=\s*"src\/main\.ts"/m);
 	});
 
