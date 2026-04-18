@@ -139,11 +139,11 @@ describe("CoderService.create", () => {
 				return Promise.resolve(createMockResponse(makePresets(true)));
 			}
 			// GET existing tasks (returns empty — no pre-existing task)
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			// POST create
-			if (method === "POST" && url.includes("/api/experimental/tasks/")) {
+			if (method === "POST" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(
 					createMockResponse(
 						makeTask({ status: "initializing", current_state: null }),
@@ -162,13 +162,13 @@ describe("CoderService.create", () => {
 
 		// Must have: GET tasks (existing check), GET template, GET presets, POST create
 		const getTaskCall = calls.find((c) =>
-			c.includes("/api/experimental/tasks/"),
+			c.includes("/api/experimental/tasks"),
 		);
 		const getTemplateCall = calls.find((c) =>
 			c.includes(`/api/v2/organizations/${ORG}/templates/${TEMPLATE_NAME}`),
 		);
 		const postCreateCalls = calls.filter(
-			(c) => c.startsWith("POST") && c.includes("/api/experimental/tasks/"),
+			(c) => c.startsWith("POST") && c.includes("/api/experimental/tasks"),
 		);
 
 		expect(getTaskCall).toBeDefined();
@@ -189,7 +189,7 @@ describe("CoderService.create", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// pre-create lookup returns a match
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -214,7 +214,7 @@ describe("CoderService.create", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			if (method === "GET" && url.includes("/api/v2/organizations/")) {
@@ -223,7 +223,7 @@ describe("CoderService.create", () => {
 			if (method === "GET" && url.includes("/presets")) {
 				return Promise.resolve(createMockResponse(makePresets(true)));
 			}
-			if (method === "POST" && url.includes("/api/experimental/tasks/")) {
+			if (method === "POST" && url.includes("/api/experimental/tasks")) {
 				postBodies.push(
 					init?.body ? JSON.parse(init.body as string) : undefined,
 				);
@@ -260,11 +260,11 @@ describe("CoderService.delete", () => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task by name
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			// DELETE
-			if (method === "DELETE" && url.includes("/api/experimental/tasks/")) {
+			if (method === "DELETE" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -310,7 +310,7 @@ describe("CoderService.delete", () => {
 					}),
 				);
 			}
-			if (method === "DELETE" && url.includes("/api/experimental/tasks/")) {
+			if (method === "DELETE" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -332,7 +332,7 @@ describe("CoderService.delete", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
