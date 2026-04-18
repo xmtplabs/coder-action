@@ -3,7 +3,6 @@ import type { TaskStatus } from "../task-runner";
 import { TaskNameSchema, TaskIdSchema } from "../task-runner";
 import { TestLogger } from "../../infra/logger";
 import { CoderService } from "./service";
-import type { CoderServiceOptions } from "./service";
 import { CoderAPIError } from "./errors";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -98,14 +97,11 @@ function createMockResponse(
 	} as unknown as Response;
 }
 
-type WaitFnType = CoderServiceOptions["waitForTaskIdleFn"];
-
-/** Build a CoderService with a fake fetchFn and optional waitForTaskIdleFn */
+/** Build a CoderService with a fake fetchFn */
 function makeService(
 	fetchFn: typeof fetch,
 	opts: {
 		templatePreset?: string;
-		waitForTaskIdleFn?: WaitFnType;
 		logger?: TestLogger;
 	} = {},
 ) {
@@ -119,9 +115,6 @@ function makeService(
 		},
 		fetchFn,
 		logger: opts.logger,
-		...(opts.waitForTaskIdleFn
-			? { waitForTaskIdleFn: opts.waitForTaskIdleFn }
-			: {}),
 	});
 }
 
@@ -253,21 +246,16 @@ describe("CoderService.create", () => {
 	});
 });
 
-// ── Test 3: sendInput on ready task (active+idle) — sends directly ────────────
+// ── sendInput (post-polling-removal) ────────────────────────────────────────
 
-describe("CoderService.sendInput", () => {
-	test("active+idle task — no wait, single send POST (EARS-REQ-14 direct path)", async () => {
+describe("CoderService.sendInput (no polling)", () => {
+	test("single send — resolves task by name + owner then POSTs to send endpoint", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
-
 			// Resolve task by name
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
 				return Promise.resolve(
-					createMockResponse({
-						tasks: [
-							makeTask({ status: "active", current_state: { state: "idle" } }),
-						],
-					}),
+					createMockResponse({ tasks: [makeTask()] }),
 				);
 			}
 			// Send endpoint
@@ -277,272 +265,32 @@ describe("CoderService.sendInput", () => {
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
 
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
+		const service = makeService(fetchFn as unknown as typeof fetch);
 		await service.sendInput({
 			taskName: TASK_NAME,
 			owner: OWNER,
 			input: "hello",
 		});
 
-		// waitForTaskIdle NOT called
-		expect(waitFn).not.toHaveBeenCalled();
-
-		// exactly one send POST
 		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
 		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
+			([url, init]) => init?.method === "POST" && url.includes("/send"),
 		);
 		expect(sendCalls).toHaveLength(1);
 	});
 
-	// ── Test 4: paused task — resume then wait then send ──────────────────────
-
-	test("paused task — resume POST, then waitForTaskIdle, then send (EARS-REQ-14)", async () => {
-		const fetchOrder: string[] = [];
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-			fetchOrder.push(`${method} ${url}`);
-
-			// Resolve task by name — returns paused task
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({ tasks: [makeTask({ status: "paused" })] }),
-				);
-			}
-			// Resume workspace
-			if (
-				method === "POST" &&
-				url.includes(`/api/v2/workspaces/${WORKSPACE_ID}/builds`)
-			) {
-				return Promise.resolve(createMockResponse({}, { status: 200 }));
-			}
-			// Send
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		// resume build posted
-		const resumeCalls = fetchOrder.filter((c) =>
-			c.includes(`/api/v2/workspaces/${WORKSPACE_ID}/builds`),
+	test("throws when task not found", async () => {
+		const fetchFn = vi.fn(() =>
+			Promise.resolve(createMockResponse({ tasks: [] })),
 		);
-		expect(resumeCalls).toHaveLength(1);
-
-		// waitForTaskIdle called exactly once after resume
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		// send call happened
-		const sendCalls = fetchOrder.filter((c) => c.includes("/send"));
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 5: initializing task — waits then sends ───────────────────────────
-
-	test("initializing task — waitForTaskIdle then single send (EARS-REQ-15)", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			// Resolve task — initializing
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "fix",
-		});
-
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 5b: active+working task — waits before sending ───────────────────
-
-	test("active+working task — waitForTaskIdle called once before send", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			// Resolve task — active+working
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [
-							makeTask({
-								status: "active",
-								current_state: { state: "working" },
-							}),
-						],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({ taskName: TASK_NAME, owner: OWNER, input: "hi" });
-
-		// waitForTaskIdle must be called once (task is not directly ready)
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		// exactly one send POST
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 6: no retry on send failure ──────────────────────────────────────
-
-	test("does NOT retry on send failure — rejects after first failed send (EARS-REQ-9)", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(
-					createMockResponse(
-						{ message: "server error" },
-						{ status: 500, statusText: "Internal Server Error" },
-					),
-				);
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
+		const service = makeService(fetchFn as unknown as typeof fetch);
 		await expect(
-			service.sendInput({ taskName: TASK_NAME, owner: OWNER, input: "hello" }),
-		).rejects.toThrow();
-
-		// Exactly one send attempt — no retry
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 7: default timeout 120000ms ──────────────────────────────────────
-
-	test("passes 120_000 ms default timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		expect(waitFn).toHaveBeenCalledTimes(1);
-		// The waitFn receives a params object; check timeoutMs defaults to 120_000
-		const callArgs = (waitFn.mock.calls[0] as [{ timeoutMs?: number }])[0];
-		expect(callArgs.timeoutMs).toBe(120_000);
-	});
-
-	test("passes explicit timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = vi.fn((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-			timeout: 60_000,
-		});
-
-		const callArgs = (waitFn.mock.calls[0] as [{ timeoutMs?: number }])[0];
-		expect(callArgs.timeoutMs).toBe(60_000);
+			service.sendInput({
+				taskName: TASK_NAME,
+				owner: OWNER,
+				input: "hello",
+			}),
+		).rejects.toThrow(/Task not found/);
 	});
 });
 

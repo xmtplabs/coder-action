@@ -2,7 +2,6 @@ import type { Logger } from "../../infra/logger";
 import type { GithubUser, Task, TaskRunner, TaskStatus } from "../task-runner";
 import type { TaskId, TaskName } from "../task-runner";
 import { CoderAPIError } from "./errors";
-import { waitForTaskIdle } from "./polling";
 import {
 	CoderSDKGetUsersResponseSchema,
 	CoderSDKUserSchema,
@@ -34,13 +33,6 @@ export interface CoderServiceOptions {
 	fetchFn?: typeof fetch;
 	/** Defaults to a no-op logger. Injectable for testing. */
 	logger?: Logger;
-	/**
-	 * Defaults to `waitForTaskIdle` from `./polling`.
-	 * Injectable to allow timeout assertions without real timers.
-	 */
-	waitForTaskIdleFn?: (
-		params: Parameters<typeof waitForTaskIdle>[0],
-	) => Promise<void>;
 }
 
 // ── No-op logger ──────────────────────────────────────────────────────────────
@@ -134,9 +126,6 @@ export class CoderService implements TaskRunner {
 	private readonly fetchFn: typeof fetch;
 	private readonly config: CoderServiceConfig;
 	private readonly logger: Logger;
-	private readonly waitForTaskIdleFn: (
-		params: Parameters<typeof waitForTaskIdle>[0],
-	) => Promise<void>;
 
 	constructor(options: CoderServiceOptions) {
 		this.serverURL = options.serverURL;
@@ -147,7 +136,6 @@ export class CoderService implements TaskRunner {
 		this.fetchFn = options.fetchFn ?? globalThis.fetch;
 		this.config = options.config;
 		this.logger = options.logger ?? noopLogger;
-		this.waitForTaskIdleFn = options.waitForTaskIdleFn ?? waitForTaskIdle;
 	}
 
 	// ── HTTP plumbing ───────────────────────────────────────────────────────────
@@ -295,29 +283,6 @@ export class CoderService implements TaskRunner {
 		};
 	}
 
-	/**
-	 * A minimal client adapter compatible with `waitForTaskIdle`'s `client`
-	 * parameter, whose `getTaskById` signature is `(id, owner?)`.
-	 */
-	private makePollingClient() {
-		const self = this;
-		return {
-			async getTaskById(
-				taskId: string,
-				owner?: string,
-			): Promise<ExperimentalCoderSDKTask> {
-				let endpoint: string;
-				if (owner) {
-					endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`;
-				} else {
-					endpoint = `/api/experimental/tasks/${encodeURIComponent(taskId)}`;
-				}
-				const raw = await self.request<unknown>(endpoint);
-				return ExperimentalCoderSDKTaskSchema.parse(raw);
-			},
-		};
-	}
-
 	// ── Owner resolution ────────────────────────────────────────────────────────
 
 	/**
@@ -452,24 +417,18 @@ export class CoderService implements TaskRunner {
 	}
 
 	/**
-	 * Send input to an existing task, preparing it as needed:
+	 * Send input to an existing task, resolving the task name → id + owner.
 	 *
-	 * - `active` + terminal `current_state`: send directly (no wait).
-	 * - `active` + `working` | `null`, or `initializing`/`pending`: wait-for-idle first.
-	 * - `paused`: resume (POST workspace start), then wait-for-idle.
-	 * - `error`: wait-for-idle (5-min grace inside polling.ts).
-	 * - `unknown`: reject immediately.
-	 *
+	 * Polling is now handled by the workflow caller via `ensureTaskReady`;
+	 * this method assumes the task is already in a ready state when invoked.
 	 * The send call itself is NOT retried on failure (EARS-REQ-9).
-	 * Default timeout is 120 000 ms (EARS-REQ-10).
 	 */
 	async sendInput(params: {
 		taskName: TaskName;
 		owner?: string;
 		input: string;
-		timeout?: number;
 	}): Promise<void> {
-		const { taskName, owner, input, timeout = 120_000 } = params;
+		const { taskName, owner, input } = params;
 
 		const raw = await this.findTask(taskName, owner);
 		if (!raw) {
@@ -479,41 +438,6 @@ export class CoderService implements TaskRunner {
 		const taskId = raw.id as TaskId;
 		const resolvedOwner =
 			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
-
-		const pollingClient = this.makePollingClient();
-
-		const state = raw.current_state?.state ?? null;
-
-		// Determine whether to skip the wait-for-idle
-		const isDirectlyReady =
-			raw.status === "active" &&
-			(state === "idle" || state === "complete" || state === "failed");
-
-		if (raw.status === "unknown") {
-			throw new Error(`Task ${taskId} has unknown status; cannot send input`);
-		}
-
-		if (!isDirectlyReady) {
-			// Resume paused task first
-			if (raw.status === "paused") {
-				await this.request(
-					`/api/v2/workspaces/${encodeURIComponent(raw.workspace_id)}/builds`,
-					{
-						method: "POST",
-						body: JSON.stringify({ transition: "start" }),
-					},
-				);
-			}
-
-			// Wait for task to become idle
-			await this.waitForTaskIdleFn({
-				client: pollingClient,
-				taskId,
-				owner: resolvedOwner,
-				log: (msg) => this.logger.debug(msg),
-				timeoutMs: timeout,
-			});
-		}
 
 		// Single send call — no retry (EARS-REQ-9)
 		const sendEndpoint = `/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(taskId)}/send`;
