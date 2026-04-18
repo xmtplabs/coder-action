@@ -3,7 +3,7 @@ import { TaskNameSchema } from "../services/coder/client";
 import type { GitHubClient } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import { generateTaskName } from "../task-utils";
+import { generateTaskName } from "./task-utils";
 
 export interface IssueContext {
 	owner: string;

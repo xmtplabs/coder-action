@@ -1,13 +1,13 @@
 import type { CoderClient } from "../services/coder/client";
 import type { GitHubClient } from "../services/github/client";
 import type { Logger } from "../infra/logger";
-import { formatIssueCommentMessage } from "../messages";
+import { formatIssueCommentMessage } from "./messages";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
 import {
 	generateTaskName,
 	lookupAndEnsureActiveTask,
 	sendInputWithRetry,
-} from "../task-utils";
+} from "./task-utils";
 
 export interface IssueCommentContext {
 	owner: string;
