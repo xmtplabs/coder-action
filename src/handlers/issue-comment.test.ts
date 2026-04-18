@@ -6,7 +6,7 @@ import {
 	createMockGitHubClient,
 	mockStoppedTask,
 	mockTask,
-} from "../test-helpers";
+} from "../testing/helpers";
 import { IssueCommentHandler } from "./issue-comment";
 import type { IssueCommentContext } from "./issue-comment";
 

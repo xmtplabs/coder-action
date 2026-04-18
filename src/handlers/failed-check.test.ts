@@ -5,7 +5,7 @@ import {
 	MockCoderClient,
 	createMockGitHubClient,
 	mockTask,
-} from "../test-helpers";
+} from "../testing/helpers";
 import { FailedCheckHandler } from "./failed-check";
 import type { FailedCheckContext } from "./failed-check";
 

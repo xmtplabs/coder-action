@@ -4,7 +4,7 @@ import {
 	createMockGitHubClient,
 	mockStoppedTask,
 	mockTask,
-} from "../test-helpers";
+} from "../testing/helpers";
 import type { HandlerConfig } from "../config/handler-config";
 import { TestLogger } from "../infra/logger";
 import { CreateTaskHandler } from "./create-task";

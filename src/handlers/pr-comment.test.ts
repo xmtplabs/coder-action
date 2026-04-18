@@ -6,7 +6,7 @@ import {
 	createMockGitHubClient,
 	mockStoppedTask,
 	mockTask,
-} from "../test-helpers";
+} from "../testing/helpers";
 import { PRCommentHandler } from "./pr-comment";
 import type { PRCommentContext } from "./pr-comment";
 

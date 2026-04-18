@@ -10,15 +10,15 @@ import type {
 } from "./webhook-router";
 import type { Logger } from "./infra/logger";
 
-import issuesAssigned from "./__fixtures__/issues-assigned.json";
-import issuesClosed from "./__fixtures__/issues-closed.json";
-import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
-import issueCommentOnPr from "./__fixtures__/issue-comment-on-pr.json";
-import prReviewComment from "./__fixtures__/pr-review-comment.json";
-import prReviewSubmitted from "./__fixtures__/pr-review-submitted.json";
-import prReviewSubmittedEmpty from "./__fixtures__/pr-review-submitted-empty.json";
-import workflowRunFailure from "./__fixtures__/workflow-run-failure.json";
-import workflowRunSuccess from "./__fixtures__/workflow-run-success.json";
+import issuesAssigned from "./testing/fixtures/issues-assigned.json";
+import issuesClosed from "./testing/fixtures/issues-closed.json";
+import issueCommentOnIssue from "./testing/fixtures/issue-comment-on-issue.json";
+import issueCommentOnPr from "./testing/fixtures/issue-comment-on-pr.json";
+import prReviewComment from "./testing/fixtures/pr-review-comment.json";
+import prReviewSubmitted from "./testing/fixtures/pr-review-submitted.json";
+import prReviewSubmittedEmpty from "./testing/fixtures/pr-review-submitted-empty.json";
+import workflowRunFailure from "./testing/fixtures/workflow-run-failure.json";
+import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 
 // These constants must match the fixture data
 const AGENT_USER_LOGIN = "xmtp-coder-agent";

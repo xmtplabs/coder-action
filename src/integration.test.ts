@@ -8,9 +8,9 @@ import {
 } from "./webhook-router";
 import { TestLogger } from "./infra/logger";
 
-import issuesAssigned from "./__fixtures__/issues-assigned.json";
-import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";
-import workflowRunSuccess from "./__fixtures__/workflow-run-success.json";
+import issuesAssigned from "./testing/fixtures/issues-assigned.json";
+import issueCommentOnIssue from "./testing/fixtures/issue-comment-on-issue.json";
+import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

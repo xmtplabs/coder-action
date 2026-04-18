@@ -6,7 +6,7 @@ import {
 	MockCoderClient,
 	createMockGitHubClient,
 	mockTask,
-} from "../test-helpers";
+} from "../testing/helpers";
 import { CloseTaskHandler } from "./close-task";
 import type { CloseTaskContext } from "./close-task";
 

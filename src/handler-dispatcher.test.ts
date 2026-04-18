@@ -5,7 +5,7 @@ import {
 	MockCoderClient,
 	createMockGitHubClient,
 	mockTask,
-} from "./test-helpers";
+} from "./testing/helpers";
 import { TestLogger } from "./infra/logger";
 import type { AppConfig } from "./config/app-config";
 import type {
