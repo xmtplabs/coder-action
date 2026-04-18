@@ -6,7 +6,7 @@ import {
 	type CreateTaskContext,
 	type IssueCommentContext,
 } from "./webhook-router";
-import { TestLogger } from "./logger";
+import { TestLogger } from "./infra/logger";
 
 import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issueCommentOnIssue from "./__fixtures__/issue-comment-on-issue.json";

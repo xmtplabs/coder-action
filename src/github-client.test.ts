@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { GitHubClient } from "./github-client";
-import { TestLogger } from "./logger";
+import { TestLogger } from "./infra/logger";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {

@@ -1,4 +1,4 @@
-import type { Logger } from "./logger";
+import type { Logger } from "./infra/logger";
 import type { Octokit as OctokitRest } from "@octokit/rest";
 
 export type Octokit = OctokitRest;

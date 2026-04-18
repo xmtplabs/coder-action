@@ -6,7 +6,7 @@ import {
 	createMockGitHubClient,
 	mockTask,
 } from "./test-helpers";
-import { TestLogger } from "./logger";
+import { TestLogger } from "./infra/logger";
 import type { AppConfig } from "./config";
 import type {
 	RouteResult,

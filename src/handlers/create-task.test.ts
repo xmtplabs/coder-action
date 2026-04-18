@@ -6,7 +6,7 @@ import {
 	mockTask,
 } from "../test-helpers";
 import type { HandlerConfig } from "../schemas";
-import { TestLogger } from "../logger";
+import { TestLogger } from "../infra/logger";
 import { CreateTaskHandler } from "./create-task";
 
 const baseInputs: HandlerConfig = {

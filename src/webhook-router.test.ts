@@ -8,7 +8,7 @@ import type {
 	IssueCommentContext,
 	FailedCheckContext,
 } from "./webhook-router";
-import type { Logger } from "./logger";
+import type { Logger } from "./infra/logger";
 
 import issuesAssigned from "./__fixtures__/issues-assigned.json";
 import issuesClosed from "./__fixtures__/issues-closed.json";

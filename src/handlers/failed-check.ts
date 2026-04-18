@@ -1,6 +1,6 @@
 import type { CoderClient } from "../coder-client";
 import type { GitHubClient, PRInfo } from "../github-client";
-import type { Logger } from "../logger";
+import type { Logger } from "../infra/logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../messages";
 import type { ActionOutputs, HandlerConfig } from "../schemas";
 import {

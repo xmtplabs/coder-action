@@ -5,7 +5,7 @@ import { CreateTaskHandler } from "./handlers/create-task";
 import { FailedCheckHandler } from "./handlers/failed-check";
 import { IssueCommentHandler } from "./handlers/issue-comment";
 import { PRCommentHandler } from "./handlers/pr-comment";
-import type { Logger } from "./logger";
+import type { Logger } from "./infra/logger";
 import type { ActionOutputs, HandlerConfig } from "./schemas";
 import type { AppConfig } from "./config";
 import type { RouteResult } from "./webhook-router";

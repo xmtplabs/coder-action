@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { verify } from "@octokit/webhooks-methods";
-import type { Logger } from "./logger";
+import type { Logger } from "./infra/logger";
 
 const ERR_MISSING_SIGNATURE = "Unauthorized: missing signature";
 const ERR_INVALID_SIGNATURE = "Unauthorized: invalid signature";

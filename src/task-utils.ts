@@ -1,6 +1,6 @@
 import type { CoderClient, ExperimentalCoderSDKTask } from "./coder-client";
 import { CoderAPIError, TaskNameSchema } from "./coder-client";
-import type { Logger } from "./logger";
+import type { Logger } from "./infra/logger";
 
 const DEFAULT_MAX_RETRIES = 5;
 
