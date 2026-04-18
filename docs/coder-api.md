@@ -4,7 +4,7 @@
 
 | Method | Endpoint | Notes |
 |---|---|---|
-| `GET` | `/api/experimental/tasks?q=owner:{username}` | List tasks; no dedicated single-lookup endpoint |
+| `GET` | `/api/experimental/tasks?q=owner:{username}` | List tasks. Only `owner:` is a valid filter — `name:` returns 400. Filter by name client-side. |
 | `POST` | `/api/experimental/tasks/{owner}` | Create task |
 | `GET` | `/api/experimental/tasks/{owner}/{taskId}` | Get task by ID |
 | `POST` | `/api/experimental/tasks/{owner}/{taskId}/send` | Send input to task |

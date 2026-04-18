@@ -240,10 +240,9 @@ export class CoderService implements TaskRunner {
 		owner?: string,
 	): Promise<ExperimentalCoderSDKTask | null> {
 		try {
-			const query = owner
-				? `owner:${owner} name:${taskName}`
-				: `name:${taskName}`;
-			const endpoint = `/api/experimental/tasks?q=${encodeURIComponent(query)}`;
+			const endpoint = owner
+				? `/api/experimental/tasks?q=${encodeURIComponent(`owner:${owner}`)}`
+				: `/api/experimental/tasks`;
 
 			const raw = await this.request<unknown>(endpoint);
 			const parsed = ExperimentalCoderSDKTaskListResponseSchema.parse(raw);
