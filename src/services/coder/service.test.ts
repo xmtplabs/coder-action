@@ -4,6 +4,7 @@ import { TaskNameSchema, TaskIdSchema } from "../task-runner";
 import { TestLogger } from "../../infra/logger";
 import { CoderService } from "./service";
 import type { CoderServiceOptions } from "./service";
+import { CoderAPIError } from "./errors";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -852,5 +853,105 @@ describe("CoderService.lookupUser", () => {
 				user: { type: "github", id: "99999", username: "nobody" },
 			}),
 		).rejects.toThrow();
+	});
+});
+
+// ── Primitive methods (Phase 4 Task 12) ──────────────────────────────────────
+
+describe("CoderService primitives", () => {
+	function makeMinimalService(fetchFn: typeof fetch): CoderService {
+		return new CoderService({
+			serverURL: "https://c",
+			apiToken: "t",
+			config: { organization: "default", templateName: "x" },
+			fetchFn,
+		});
+	}
+
+	test("findTaskByName returns null on 404", async () => {
+		const fetchFn = vi.fn(async () => new Response("", { status: 404 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const result = await svc.findTaskByName(
+			TaskNameSchema.parse("tname"),
+			"owner",
+		);
+		expect(result).toBeNull();
+	});
+
+	test("findTaskByName returns the matching task when found", async () => {
+		const matching = makeTask({ name: "tname" });
+		const fetchFn = vi.fn(async () =>
+			new Response(JSON.stringify({ tasks: [matching], count: 1 }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const result = await svc.findTaskByName(
+			TaskNameSchema.parse("tname"),
+			"owner",
+		);
+		expect(result).not.toBeNull();
+		expect(result?.name).toBe("tname");
+	});
+
+	test("getTaskById throws CoderAPIError on non-2xx", async () => {
+		const fetchFn = vi.fn(async () => new Response("boom", { status: 500 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await expect(
+			svc.getTaskById(TaskIdSchema.parse(TASK_ID), "owner"),
+		).rejects.toThrow(CoderAPIError);
+	});
+
+	test("getTaskById returns the parsed task on 200", async () => {
+		const raw = makeTask();
+		const fetchFn = vi.fn(async () =>
+			new Response(JSON.stringify(raw), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const parsed = await svc.getTaskById(
+			TaskIdSchema.parse(TASK_ID),
+			"owner",
+		);
+		expect(parsed.id).toBe(TASK_ID);
+	});
+
+	test("resumeWorkspace POSTs to /api/v2/workspaces/<id>/builds with transition start", async () => {
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(null, { status: 204 }),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await svc.resumeWorkspace("ws-123");
+		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+			.calls[0] as [string, RequestInit];
+		expect(call[0]).toContain("/api/v2/workspaces/ws-123/builds");
+		expect(call[1].method).toBe("POST");
+		expect(JSON.parse(call[1].body as string)).toEqual({
+			transition: "start",
+		});
+	});
+
+	test("sendTaskInput POSTs to /api/experimental/tasks/<owner>/<id>/send", async () => {
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(null, { status: 204 }),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await svc.sendTaskInput(
+			TaskIdSchema.parse(TASK_ID),
+			"owner",
+			"hello",
+		);
+		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+			.calls[0] as [string, RequestInit];
+		expect(call[0]).toContain(
+			`/api/experimental/tasks/owner/${encodeURIComponent(TASK_ID)}/send`,
+		);
+		expect(call[1].method).toBe("POST");
+		expect(JSON.parse(call[1].body as string)).toEqual({ input: "hello" });
 	});
 });

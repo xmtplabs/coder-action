@@ -183,6 +183,63 @@ export class CoderService implements TaskRunner {
 		return response.json() as Promise<T>;
 	}
 
+	// ── Primitive methods (consumed by the Workflow) ──────────────────────────
+
+	/**
+	 * Public look-up by task name. Returns the raw Coder SDK task or null.
+	 * When owner is omitted, scans all tasks by name; warns if multiple matches.
+	 */
+	async findTaskByName(
+		taskName: TaskName,
+		owner?: string,
+	): Promise<ExperimentalCoderSDKTask | null> {
+		return this.findTask(taskName, owner);
+	}
+
+	/**
+	 * Fetch a single task by its (owner, id). Throws CoderAPIError on non-2xx.
+	 * Returns the raw Coder SDK task, parsed via Zod.
+	 */
+	async getTaskById(
+		taskId: TaskId,
+		owner: string,
+	): Promise<ExperimentalCoderSDKTask> {
+		const endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`;
+		const raw = await this.request<unknown>(endpoint);
+		return ExperimentalCoderSDKTaskSchema.parse(raw);
+	}
+
+	/**
+	 * Issue a workspace start build transition (resumes a paused workspace).
+	 */
+	async resumeWorkspace(workspaceId: string): Promise<void> {
+		await this.request(
+			`/api/v2/workspaces/${encodeURIComponent(workspaceId)}/builds`,
+			{
+				method: "POST",
+				body: JSON.stringify({ transition: "start" }),
+			},
+		);
+	}
+
+	/**
+	 * Send input to an already-ready task. No polling — the workflow caller is
+	 * expected to have ensured the task is in a ready state via ensureTaskReady.
+	 */
+	async sendTaskInput(
+		taskId: TaskId,
+		owner: string,
+		input: string,
+	): Promise<void> {
+		await this.request(
+			`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`,
+			{
+				method: "POST",
+				body: JSON.stringify({ input }),
+			},
+		);
+	}
+
 	// ── Internal helpers ────────────────────────────────────────────────────────
 
 	/**
