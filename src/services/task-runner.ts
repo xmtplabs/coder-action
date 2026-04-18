@@ -72,6 +72,12 @@ export interface TaskRunner {
 	 * Delete the task. Idempotent — resolves without error if the task does
 	 * not exist. `owner` is optional; when omitted, the service resolves the
 	 * task by name alone.
+	 *
+	 * Returns `{ deleted: true }` when a task was found and removed, or
+	 * `{ deleted: false }` when no task was found (no-op).
 	 */
-	delete(params: { taskName: TaskName; owner?: string }): Promise<void>;
+	delete(params: {
+		taskName: TaskName;
+		owner?: string;
+	}): Promise<{ deleted: boolean }>;
 }

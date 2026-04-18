@@ -44,7 +44,10 @@ export class MockTaskRunner implements TaskRunner {
 		async (_: { taskName: TaskName; owner?: string }): Promise<Task | null> =>
 			null,
 	);
-	delete = mock(async (_: { taskName: TaskName; owner?: string }) => {});
+	delete = mock(
+		async (_: { taskName: TaskName; owner?: string }) =>
+			({ deleted: true }) as { deleted: boolean },
+	);
 }
 
 // ── Mock GitHub Client ──────────────────────────────────────────────────────

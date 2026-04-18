@@ -517,7 +517,8 @@ describe("CoderService.delete", () => {
 		});
 
 		const service = makeService(fetchFn as unknown as typeof fetch);
-		await service.delete({ taskName: TASK_NAME, owner: OWNER });
+		const result = await service.delete({ taskName: TASK_NAME, owner: OWNER });
+		expect(result).toEqual({ deleted: true });
 
 		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
 		const deleteCalls = allCalls.filter(
@@ -532,7 +533,7 @@ describe("CoderService.delete", () => {
 		expect(workspaceCalls).toHaveLength(0);
 	});
 
-	test("no-op when task missing — no DELETE call (EARS-REQ-11)", async () => {
+	test("no-op when task missing — no DELETE call, returns { deleted: false } (EARS-REQ-11)", async () => {
 		const fetchFn = mock((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
@@ -543,10 +544,8 @@ describe("CoderService.delete", () => {
 		});
 
 		const service = makeService(fetchFn as unknown as typeof fetch);
-		// Should not throw
-		await expect(
-			service.delete({ taskName: TASK_NAME, owner: OWNER }),
-		).resolves.toBeUndefined();
+		const result = await service.delete({ taskName: TASK_NAME, owner: OWNER });
+		expect(result).toEqual({ deleted: false });
 
 		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
 		const deleteCalls = allCalls.filter(
@@ -579,11 +578,23 @@ describe("CoderService.getStatus", () => {
 	test("warns on multiple matches when no owner given (EARS-REQ-19)", async () => {
 		const task1 = makeTask({ id: TASK_ID });
 		const task2 = makeTask({ id: "550e8400-e29b-41d4-a716-446655440099" });
+		// task owner_id is a UUID — resolveOwnerUsername will call /api/v2/users/<uuid>
+		const OWNER_UUID = task1.owner_id;
 
 		const fetchFn = mock((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [task1, task2] }));
+			}
+			if (method === "GET" && url.includes(`/api/v2/users/${OWNER_UUID}`)) {
+				return Promise.resolve(
+					createMockResponse({
+						id: OWNER_UUID,
+						username: OWNER,
+						email: `${OWNER}@test.com`,
+						organization_ids: [],
+					}),
+				);
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
 		});
@@ -684,6 +695,43 @@ describe("CoderService Task.url", () => {
 			owner: OWNER,
 		});
 		expect(result?.url).toBe(`${CODER_URL}/tasks/${OWNER}/${TASK_ID}`);
+	});
+
+	test("getStatus without owner resolves UUID owner_id to username for Task.url (spec §4)", async () => {
+		// The task's owner_id is a UUID; getStatus must resolve it to a username
+		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // matches makeTask() owner_id
+		const RESOLVED_USERNAME = "resolved-username";
+
+		const fetchFn = mock((url: string, init?: RequestInit) => {
+			const method = init?.method ?? "GET";
+			// findTask (no owner) returns the task
+			if (
+				method === "GET" &&
+				url.includes("/api/experimental/tasks") &&
+				!url.includes(`/api/v2/users/`)
+			) {
+				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
+			}
+			// resolveOwnerUsername fetches user by UUID
+			if (method === "GET" && url.includes(`/api/v2/users/${OWNER_UUID}`)) {
+				return Promise.resolve(
+					createMockResponse({
+						id: OWNER_UUID,
+						username: RESOLVED_USERNAME,
+						email: `${RESOLVED_USERNAME}@test.com`,
+						organization_ids: [],
+					}),
+				);
+			}
+			throw new Error(`Unexpected fetch: ${method} ${url}`);
+		});
+
+		const service = makeService(fetchFn as unknown as typeof fetch);
+		const result = await service.getStatus({ taskName: TASK_NAME });
+		// URL must contain the resolved username, NOT the UUID
+		expect(result?.url).toContain(`/tasks/${RESOLVED_USERNAME}/`);
+		expect(result?.url).not.toContain(OWNER_UUID);
+		expect(result?.owner).toBe(RESOLVED_USERNAME);
 	});
 });
 

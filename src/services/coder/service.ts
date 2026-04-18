@@ -5,6 +5,7 @@ import { CoderAPIError } from "./errors";
 import { waitForTaskIdle } from "./polling";
 import {
 	CoderSDKGetUsersResponseSchema,
+	CoderSDKUserSchema,
 	CoderSDKTemplateSchema,
 	CoderSDKTemplateVersionPresetsResponseSchema,
 	ExperimentalCoderSDKTaskListResponseSchema,
@@ -260,6 +261,31 @@ export class CoderService implements TaskRunner {
 		};
 	}
 
+	// ── Owner resolution ────────────────────────────────────────────────────────
+
+	/**
+	 * If `userIdOrUsername` looks like a UUID, fetch the Coder user via
+	 * `GET /api/v2/users/<id>` and return their username. Otherwise return the
+	 * value unchanged (already a username).
+	 *
+	 * This ensures `Task.owner` and `Task.url` always carry a human-readable
+	 * username rather than an internal UUID (spec §4 URL composition).
+	 */
+	private async resolveOwnerUsername(
+		userIdOrUsername: string,
+	): Promise<string> {
+		const uuidPattern =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		if (!uuidPattern.test(userIdOrUsername)) {
+			return userIdOrUsername;
+		}
+		const raw = await this.request<unknown>(
+			`/api/v2/users/${encodeURIComponent(userIdOrUsername)}`,
+		);
+		const parsed = CoderSDKUserSchema.parse(raw);
+		return parsed.username;
+	}
+
 	// ── TaskRunner interface ────────────────────────────────────────────────────
 
 	/**
@@ -394,7 +420,8 @@ export class CoderService implements TaskRunner {
 		}
 
 		const taskId = raw.id as TaskId;
-		const resolvedOwner = owner ?? raw.owner_id;
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
 
 		const pollingClient = this.makePollingClient();
 
@@ -452,7 +479,9 @@ export class CoderService implements TaskRunner {
 		const { taskName, owner } = params;
 		const raw = await this.findTask(taskName, owner);
 		if (!raw) return null;
-		return this.toTask(raw, owner ?? raw.owner_id);
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
+		return this.toTask(raw, resolvedOwner);
 	}
 
 	/**
@@ -460,16 +489,23 @@ export class CoderService implements TaskRunner {
 	 *
 	 * Idempotent — resolves without error when the task does not exist
 	 * (EARS-REQ-11). No workspace stop, wait, or delete (EARS-REQ-18).
+	 *
+	 * Returns `{ deleted: true }` when a task was found and removed, or
+	 * `{ deleted: false }` when no task was found (no-op).
 	 */
-	async delete(params: { taskName: TaskName; owner?: string }): Promise<void> {
+	async delete(params: {
+		taskName: TaskName;
+		owner?: string;
+	}): Promise<{ deleted: boolean }> {
 		const { taskName, owner } = params;
 		const raw = await this.findTask(taskName, owner);
-		if (!raw) return;
+		if (!raw) return { deleted: false };
 
 		const resolvedOwner = owner ?? raw.owner_id;
 		await this.request(
 			`/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(raw.id)}`,
 			{ method: "DELETE" },
 		);
+		return { deleted: true };
 	}
 }

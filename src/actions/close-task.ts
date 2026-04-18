@@ -29,9 +29,15 @@ export class CloseTaskAction {
 		this.logger.info(`Deleting task: ${taskName}`);
 
 		// 2. Delete task (idempotent — no-op if missing)
-		await this.runner.delete({ taskName });
+		const result = await this.runner.delete({ taskName });
 
-		// 3. Comment on issue
+		// 3. Skip without comment if no task existed
+		if (!result.deleted) {
+			this.logger.info(`Task not found (no-op): ${taskName}`);
+			return { skipped: true, skipReason: "task-not-found" };
+		}
+
+		// 4. Comment on issue
 		await this.github.commentOnIssue(
 			this.context.owner,
 			this.context.repo,
@@ -40,7 +46,7 @@ export class CloseTaskAction {
 			"Task created:",
 		);
 
-		// 4. Return
+		// 5. Return
 		return { taskName, taskStatus: "deleted" as const, skipped: false };
 	}
 }

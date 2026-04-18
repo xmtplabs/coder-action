@@ -113,6 +113,8 @@ export class EventDispatcher {
 							commentCreatedAt: event.comment.createdAt,
 							isReviewComment: event.comment.isReviewComment,
 							isReviewSubmission: event.comment.isReviewSubmission,
+							filePath: event.comment.filePath,
+							lineNumber: event.comment.lineNumber,
 						},
 						logger,
 					);

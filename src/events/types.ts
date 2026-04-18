@@ -32,6 +32,8 @@ export type CommentPostedEvent = {
 		authorLogin: string;
 		isReviewComment: boolean;
 		isReviewSubmission: boolean;
+		filePath?: string;
+		lineNumber?: number;
 	};
 };
 

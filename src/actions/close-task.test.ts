@@ -35,6 +35,7 @@ describe("CloseTaskAction", () => {
 
 	// AC #7: Happy path — runner.delete called, comment posted
 	test("calls runner.delete and posts completion comment when task exists", async () => {
+		// MockTaskRunner.delete returns { deleted: true } by default
 		const action = new CloseTaskAction(
 			runner,
 			github as unknown as import("../services/github/client").GitHubClient,
@@ -61,9 +62,9 @@ describe("CloseTaskAction", () => {
 		);
 	});
 
-	// AC #8: Task not found — delete still called (no-op), returns deleted status
-	test("calls runner.delete even when task not found (no-op) and returns deleted", async () => {
-		// runner.delete is a no-op by default in MockTaskRunner
+	// AC #8: Task not found — returns skipped with "task-not-found", no comment posted
+	test("skips with task-not-found when task does not exist (no comment posted)", async () => {
+		runner.delete.mockResolvedValue({ deleted: false });
 
 		const action = new CloseTaskAction(
 			runner,
@@ -74,13 +75,15 @@ describe("CloseTaskAction", () => {
 		);
 		const result = await action.run();
 
-		expect(result.skipped).toBe(false);
-		expect(result.taskStatus).toBe("deleted");
+		expect(result.skipped).toBe(true);
+		expect(result.skipReason).toBe("task-not-found");
 		expect(runner.delete).toHaveBeenCalledTimes(1);
+		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
 
 	// No workspace stop/delete calls — those are gone
 	test("does not call any workspace-level operations", async () => {
+		// runner.delete returns { deleted: true } by default — task exists
 		const action = new CloseTaskAction(
 			runner,
 			github as unknown as import("../services/github/client").GitHubClient,

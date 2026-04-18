@@ -313,6 +313,22 @@ describe("WebhookRouter", () => {
 		expect(event.comment.isReviewSubmission).toBe(false);
 	});
 
+	test("pull_request_review_comment.created populates comment.filePath and comment.lineNumber from payload", async () => {
+		const result = await router.handleWebhook(
+			"pull_request_review_comment",
+			"delivery-008b",
+			prReviewComment,
+		);
+
+		expect(isEvent(result)).toBe(true);
+		if (!isEvent(result)) throw new Error("expected event");
+
+		const event = result as CommentPostedEvent;
+		// Fixture has path="dist/server.js", line=1, position=1
+		expect(event.comment.filePath).toBe("dist/server.js");
+		expect(event.comment.lineNumber).toBe(1);
+	});
+
 	test("pull_request_review_comment.edited, PR by agent, comment by human → comment_posted event", async () => {
 		const payload = { ...prReviewComment, action: "edited" };
 		const result = await router.handleWebhook(

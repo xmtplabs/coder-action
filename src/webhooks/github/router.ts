@@ -315,6 +315,13 @@ export class WebhookRouter {
 				authorLogin: commentUserLogin,
 				isReviewComment: true,
 				isReviewSubmission: false,
+				filePath: payload.comment.path ?? undefined,
+				lineNumber:
+					payload.comment.line != null
+						? payload.comment.line
+						: payload.comment.position != null
+							? payload.comment.position
+							: undefined,
 			},
 		};
 		return event;
