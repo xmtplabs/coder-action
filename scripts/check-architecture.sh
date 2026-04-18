@@ -7,16 +7,41 @@ report() {
   fail=1
 }
 
-# EARS-REQ-3: actions do not import Coder specifics
-out=$(grep -rnE 'from "(\.\./)*services/coder/|ExperimentalCoderSDK|CoderSDK|CoderAPIError' src/actions/ --include='*.ts' || true)
-[ -n "$out" ] && report "actions import Coder internals" "$out"
+# src/actions/* is mostly deleted post-migration; keep this check for the
+# pure modules that remain (messages.ts, task-naming.ts).
+if [ -d src/actions ]; then
+  out=$(grep -rnE 'from "(\.\./)*services/coder/|ExperimentalCoderSDK|CoderSDK|CoderAPIError' src/actions/ --include='*.ts' || true)
+  [ -n "$out" ] && report "actions import Coder internals" "$out"
+fi
 
-# EARS-REQ-4: framework isolation (hono / @octokit/webhooks-methods only under src/http/)
-out=$(grep -rnE 'from "(hono|@octokit/webhooks-methods)' src/ --include='*.ts' | grep -v '^src/http/' || true)
-[ -n "$out" ] && report "Hono/webhooks-methods import outside src/http/" "$out"
+# @octokit/webhooks-methods: only used by the Worker fetch handler now.
+out=$(grep -rnE 'from "@octokit/webhooks-methods' src/ --include='*.ts' | grep -v '^src/main.ts:' || true)
+[ -n "$out" ] && report "@octokit/webhooks-methods import outside src/main.ts" "$out"
 
-# EARS-REQ-13: TaskName/TaskId brand declarations only in services/task-runner.ts
+# TaskName/TaskId brand declarations only in services/task-runner.ts
 out=$(grep -rnE '\.brand\("(TaskName|TaskId)"' src/ --include='*.ts' | grep -v '^src/services/task-runner.ts:' || true)
 [ -n "$out" ] && report "TaskName/TaskId brand defined outside services/task-runner.ts" "$out"
+
+# Fail if any non-test file imports from bun:test
+out=$(grep -RInE "from ['\"]bun:test['\"]" src/ || true)
+[ -n "$out" ] && report "bun:test import found in src/" "$out"
+
+# Fail if pino remains in imports
+out=$(grep -RInE "from ['\"]pino(-pretty)?['\"]" src/ || true)
+[ -n "$out" ] && report "pino import found in src/" "$out"
+
+# Fail if hono remains in imports (bare fetch handler only)
+out=$(grep -RInE "from ['\"]hono" src/ || true)
+[ -n "$out" ] && report "hono import found in src/" "$out"
+
+# Fail if Dockerfile or .dockerignore exists
+[ -e Dockerfile ] && report "Dockerfile must not exist" ""
+[ -e .dockerignore ] && report ".dockerignore must not exist" ""
+
+# Fail if wrangler.toml is absent
+[ ! -f wrangler.toml ] && report "wrangler.toml must exist" ""
+
+# Fail if src/services/coder/polling.ts still exists
+[ -e src/services/coder/polling.ts ] && report "polling.ts must not exist" ""
 
 exit $fail
