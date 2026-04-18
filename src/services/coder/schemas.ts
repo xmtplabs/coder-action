@@ -1,11 +1,13 @@
 import { z } from "zod";
+import {
+	TaskIdSchema,
+	TaskNameSchema,
+	type TaskId,
+	type TaskName,
+} from "../task-runner";
 
-// Branded types for task identifiers to prevent mixing UUIDs and names
-export const TaskIdSchema = z.string().uuid().brand("TaskId");
-export type TaskId = z.infer<typeof TaskIdSchema>;
-
-export const TaskNameSchema = z.string().min(1).brand("TaskName");
-export type TaskName = z.infer<typeof TaskNameSchema>;
+export { TaskIdSchema, TaskNameSchema };
+export type { TaskId, TaskName };
 
 // CoderSDKUserSchema is the schema for codersdk.User.
 export const CoderSDKUserSchema = z.object({
