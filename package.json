@@ -30,6 +30,7 @@
 		"@biomejs/biome": "2.4.7",
 		"@cloudflare/vitest-pool-workers": "latest",
 		"@cloudflare/workers-types": "latest",
+		"@types/node": "^25.6.0",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.0",
 		"wrangler": "^4.79.0"
