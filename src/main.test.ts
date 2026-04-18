@@ -1,33 +1,29 @@
-import { describe, expect, test, vi } from "vitest";
-import { createStartupContext } from "./main";
-import type { StartupContextOptions } from "./main";
+import { describe, expect, test } from "vitest";
+import worker from "./main";
 
-describe("createStartupContext", () => {
-	test("calls GET /app to discover bot identity", async () => {
-		const mockGetApp: StartupContextOptions["getAppInfo"] = vi.fn(() =>
-			Promise.resolve({
-				data: { slug: "xmtp-coder-app", id: 12345 },
-			}),
-		);
-
-		const ctx = await createStartupContext({
-			getAppInfo: mockGetApp,
-		});
-
-		expect(mockGetApp).toHaveBeenCalledTimes(1);
-		expect(ctx.appSlug).toBe("xmtp-coder-app");
-		expect(ctx.appBotLogin).toBe("xmtp-coder-app[bot]");
+describe("Worker default export", () => {
+	test("has a fetch handler", () => {
+		expect(typeof worker.fetch).toBe("function");
 	});
 
-	test("throws if GET /app fails", async () => {
-		const mockGetApp: StartupContextOptions["getAppInfo"] = vi.fn(() =>
-			Promise.reject(new Error("auth failed")),
+	test("GET /healthz returns 200 'ok'", async () => {
+		const req = new Request("https://example.com/healthz", { method: "GET" });
+		const res = await worker.fetch(
+			req,
+			{} as never,
+			{} as ExecutionContext,
 		);
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe("ok");
+	});
 
-		await expect(
-			createStartupContext({
-				getAppInfo: mockGetApp,
-			}),
-		).rejects.toThrow("auth failed");
+	test("unknown route returns 404", async () => {
+		const req = new Request("https://example.com/unknown", { method: "GET" });
+		const res = await worker.fetch(
+			req,
+			{} as never,
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(404);
 	});
 });
