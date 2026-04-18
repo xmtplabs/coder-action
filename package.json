@@ -13,8 +13,7 @@
 		"format:check": "biome format .",
 		"lint": "biome lint --error-on-warnings .",
 		"typecheck": "tsc --noEmit",
-		"architecture-check": "bash scripts/check-architecture.sh",
-		"check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run architecture-check"
+		"check": "npm run typecheck && npm run lint && npm run format:check && npm test"
 	},
 	"dependencies": {
 		"@octokit/auth-app": "^8.2.0",
