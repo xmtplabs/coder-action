@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { CoderAPIError } from "../coder-client";
+import { CoderAPIError } from "../services/coder/client";
 import { TestLogger } from "../infra/logger";
 import type { HandlerConfig } from "../config/handler-config";
 import {

@@ -4,7 +4,7 @@ import {
 	CoderAPIError,
 	TaskNameSchema,
 	TaskIdSchema,
-} from "./coder-client";
+} from "./client";
 
 function createMockResponse(
 	body: unknown,

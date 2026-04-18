@@ -1,4 +1,4 @@
-import type { CoderClient } from "../coder-client";
+import type { CoderClient } from "../services/coder/client";
 import type { GitHubClient } from "../github-client";
 import type { Logger } from "../infra/logger";
 import { formatPRCommentMessage } from "../messages";

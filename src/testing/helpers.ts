@@ -1,6 +1,9 @@
 import { mock } from "bun:test";
-import type { CoderClient, ExperimentalCoderSDKTask } from "../coder-client";
-import { TaskIdSchema, TaskNameSchema } from "../coder-client";
+import type {
+	CoderClient,
+	ExperimentalCoderSDKTask,
+} from "../services/coder/client";
+import { TaskIdSchema, TaskNameSchema } from "../services/coder/client";
 import type { GitHubClient } from "../github-client";
 
 // ── Mock Task Data ──────────────────────────────────────────────────────────

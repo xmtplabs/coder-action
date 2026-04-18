@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { CoderClient } from "./coder-client";
-import { CoderAPIError } from "./coder-client";
+import type { CoderClient } from "./services/coder/client";
+import { CoderAPIError } from "./services/coder/client";
 import { TestLogger } from "./infra/logger";
 import { MockCoderClient, mockTask } from "./testing/helpers";
 import {

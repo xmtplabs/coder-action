@@ -2,7 +2,7 @@ import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "./config/app-config";
 import { createLogger } from "./infra/logger";
-import { RealCoderClient } from "./coder-client";
+import { RealCoderClient } from "./services/coder/client";
 import { WebhookRouter } from "./webhook-router";
 import { HandlerDispatcher } from "./handler-dispatcher";
 import { createApp } from "./server";

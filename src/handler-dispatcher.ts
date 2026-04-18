@@ -1,4 +1,4 @@
-import type { CoderClient } from "./coder-client";
+import type { CoderClient } from "./services/coder/client";
 import { GitHubClient, type Octokit } from "./github-client";
 import { CloseTaskHandler } from "./handlers/close-task";
 import { CreateTaskHandler } from "./handlers/create-task";
