@@ -1,6 +1,11 @@
 import { vi } from "vitest";
 import type { GitHubClient } from "../services/github/client";
-import type { Task, TaskName, TaskRunner } from "../services/task-runner";
+import type {
+	Task,
+	TaskId,
+	TaskName,
+	TaskRunner,
+} from "../services/task-runner";
 import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner";
 
 // ── Mock Task Data (TaskRunner-shape) ───────────────────────────────────────
@@ -29,20 +34,23 @@ export class MockTaskRunner implements TaskRunner {
 		async (_: { user: { type: "github"; id: string; username: string } }) =>
 			"test-coder-user",
 	);
+	findTaskByName = vi.fn(
+		async (_: TaskName, __?: string): Promise<unknown | null> => null,
+	);
+	getTaskById = vi.fn(
+		async (_: TaskId, __: string): Promise<unknown> => ({
+			id: "00000000-0000-0000-0000-000000000000",
+			status: "active",
+			current_state: { state: "idle" },
+			workspace_id: "00000000-0000-0000-0000-000000000099",
+		}),
+	);
 	create = vi.fn(
 		async (_: { taskName: TaskName; owner: string; input: string }) => mockTask,
 	);
-	sendInput = vi.fn(
-		async (_: {
-			taskName: TaskName;
-			owner?: string;
-			input: string;
-			timeout?: number;
-		}) => {},
-	);
-	getStatus = vi.fn(
-		async (_: { taskName: TaskName; owner?: string }): Promise<Task | null> =>
-			null,
+	resumeWorkspace = vi.fn(async (_: string): Promise<void> => {});
+	sendTaskInput = vi.fn(
+		async (_: TaskId, __: string, ___: string): Promise<void> => {},
 	);
 	delete = vi.fn(
 		async (_: { taskName: TaskName; owner?: string }) =>
