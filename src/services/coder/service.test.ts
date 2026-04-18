@@ -1,9 +1,9 @@
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import type { TaskStatus } from "../task-runner";
 import { TaskNameSchema, TaskIdSchema } from "../task-runner";
 import { TestLogger } from "../../infra/logger";
 import { CoderService } from "./service";
-import type { CoderServiceOptions } from "./service";
+import { CoderAPIError } from "./errors";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,14 +97,11 @@ function createMockResponse(
 	} as unknown as Response;
 }
 
-type WaitFnType = CoderServiceOptions["waitForTaskIdleFn"];
-
-/** Build a CoderService with a fake fetchFn and optional waitForTaskIdleFn */
+/** Build a CoderService with a fake fetchFn */
 function makeService(
 	fetchFn: typeof fetch,
 	opts: {
 		templatePreset?: string;
-		waitForTaskIdleFn?: WaitFnType;
 		logger?: TestLogger;
 	} = {},
 ) {
@@ -118,18 +115,15 @@ function makeService(
 		},
 		fetchFn,
 		logger: opts.logger,
-		...(opts.waitForTaskIdleFn
-			? { waitForTaskIdleFn: opts.waitForTaskIdleFn }
-			: {}),
 	});
 }
 
 // ── Test 1: create — single call, no polling ─────────────────────────────────
 
 describe("CoderService.create", () => {
-	test("single call, no polling — returns new task (EARS-REQ-7)", async () => {
+	test("single call, no polling — returns new task", async () => {
 		const calls: string[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			calls.push(`${method} ${url}`);
 
@@ -191,8 +185,8 @@ describe("CoderService.create", () => {
 		expect(calls.length).toBe(4);
 	});
 
-	test("returns existing task when same name+owner exists — no POST (EARS-REQ-7 idempotent)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+	test("returns existing task when same name+owner exists — no POST (idempotent)", async () => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// pre-create lookup returns a match
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -217,7 +211,7 @@ describe("CoderService.create", () => {
 
 	test("fetches default preset when no templatePreset configured and uses it in POST body", async () => {
 		const postBodies: unknown[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -252,304 +246,17 @@ describe("CoderService.create", () => {
 	});
 });
 
-// ── Test 3: sendInput on ready task (active+idle) — sends directly ────────────
+// ── sendInput (post-polling-removal) ────────────────────────────────────────
 
-describe("CoderService.sendInput", () => {
-	test("active+idle task — no wait, single send POST (EARS-REQ-14 direct path)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			// Resolve task by name
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [
-							makeTask({ status: "active", current_state: { state: "idle" } }),
-						],
-					}),
-				);
-			}
-			// Send endpoint
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		// waitForTaskIdle NOT called
-		expect(waitFn).not.toHaveBeenCalled();
-
-		// exactly one send POST
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 4: paused task — resume then wait then send ──────────────────────
-
-	test("paused task — resume POST, then waitForTaskIdle, then send (EARS-REQ-14)", async () => {
-		const fetchOrder: string[] = [];
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-			fetchOrder.push(`${method} ${url}`);
-
-			// Resolve task by name — returns paused task
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({ tasks: [makeTask({ status: "paused" })] }),
-				);
-			}
-			// Resume workspace
-			if (
-				method === "POST" &&
-				url.includes(`/api/v2/workspaces/${WORKSPACE_ID}/builds`)
-			) {
-				return Promise.resolve(createMockResponse({}, { status: 200 }));
-			}
-			// Send
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		// resume build posted
-		const resumeCalls = fetchOrder.filter((c) =>
-			c.includes(`/api/v2/workspaces/${WORKSPACE_ID}/builds`),
-		);
-		expect(resumeCalls).toHaveLength(1);
-
-		// waitForTaskIdle called exactly once after resume
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		// send call happened
-		const sendCalls = fetchOrder.filter((c) => c.includes("/send"));
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 5: initializing task — waits then sends ───────────────────────────
-
-	test("initializing task — waitForTaskIdle then single send (EARS-REQ-15)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			// Resolve task — initializing
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "fix",
-		});
-
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 5b: active+working task — waits before sending ───────────────────
-
-	test("active+working task — waitForTaskIdle called once before send", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			// Resolve task — active+working
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [
-							makeTask({
-								status: "active",
-								current_state: { state: "working" },
-							}),
-						],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({ taskName: TASK_NAME, owner: OWNER, input: "hi" });
-
-		// waitForTaskIdle must be called once (task is not directly ready)
-		expect(waitFn).toHaveBeenCalledTimes(1);
-
-		// exactly one send POST
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 6: no retry on send failure ──────────────────────────────────────
-
-	test("does NOT retry on send failure — rejects after first failed send (EARS-REQ-9)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(
-					createMockResponse(
-						{ message: "server error" },
-						{ status: 500, statusText: "Internal Server Error" },
-					),
-				);
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await expect(
-			service.sendInput({ taskName: TASK_NAME, owner: OWNER, input: "hello" }),
-		).rejects.toThrow();
-
-		// Exactly one send attempt — no retry
-		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
-		const sendCalls = allCalls.filter(
-			([url, init]) =>
-				(init?.method ?? "GET") === "POST" && url.includes("/send"),
-		);
-		expect(sendCalls).toHaveLength(1);
-	});
-
-	// ── Test 7: default timeout 120000ms ──────────────────────────────────────
-
-	test("passes 120_000 ms default timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-		});
-
-		expect(waitFn).toHaveBeenCalledTimes(1);
-		// The waitFn receives a params object; check timeoutMs defaults to 120_000
-		const callArgs = (waitFn.mock.calls[0] as [{ timeoutMs?: number }])[0];
-		expect(callArgs.timeoutMs).toBe(120_000);
-	});
-
-	test("passes explicit timeout to waitForTaskIdleFn (EARS-REQ-10)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
-			const method = init?.method ?? "GET";
-
-			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({
-						tasks: [makeTask({ status: "initializing", current_state: null })],
-					}),
-				);
-			}
-			if (method === "POST" && url.includes("/send")) {
-				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
-			}
-			throw new Error(`Unexpected fetch: ${method} ${url}`);
-		});
-
-		const waitFn = mock((_params: unknown) => Promise.resolve());
-		const service = makeService(fetchFn as unknown as typeof fetch, {
-			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
-		});
-
-		await service.sendInput({
-			taskName: TASK_NAME,
-			owner: OWNER,
-			input: "hello",
-			timeout: 60_000,
-		});
-
-		const callArgs = (waitFn.mock.calls[0] as [{ timeoutMs?: number }])[0];
-		expect(callArgs.timeoutMs).toBe(60_000);
-	});
-});
+// Note: `sendInput` (polling-then-send) was removed — the workflow driver now
+// calls `sendTaskInput` primitive directly after `ensureTaskReady`. Tests for
+// the primitive live in the "CoderService primitives" block above.
 
 // ── Test 8 & 9: delete ────────────────────────────────────────────────────────
 
 describe("CoderService.delete", () => {
-	test("single DELETE API call — no workspace stop/delete (EARS-REQ-18)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+	test("single DELETE API call — no workspace stop/delete", async () => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task by name
@@ -584,7 +291,7 @@ describe("CoderService.delete", () => {
 		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // makeTask() owner_id
 		const RESOLVED_USERNAME = "resolved-username";
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (
 				method === "GET" &&
@@ -621,8 +328,8 @@ describe("CoderService.delete", () => {
 		expect(deleteCall?.[0]).not.toContain(OWNER_UUID);
 	});
 
-	test("no-op when task missing — no DELETE call, returns { deleted: false } (EARS-REQ-11)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+	test("no-op when task missing — no DELETE call, returns { deleted: false }", async () => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
@@ -646,8 +353,8 @@ describe("CoderService.delete", () => {
 // ── Test 10 & 11: getStatus ───────────────────────────────────────────────────
 
 describe("CoderService.getStatus", () => {
-	test("resolves to null when task missing (EARS-REQ-12)", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+	test("resolves to null when task missing", async () => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
@@ -663,13 +370,13 @@ describe("CoderService.getStatus", () => {
 		expect(result).toBeNull();
 	});
 
-	test("warns on multiple matches when no owner given (EARS-REQ-19)", async () => {
+	test("warns on multiple matches when no owner given", async () => {
 		const task1 = makeTask({ id: TASK_ID });
 		const task2 = makeTask({ id: "550e8400-e29b-41d4-a716-446655440099" });
 		// task owner_id is a UUID — resolveOwnerUsername will call /api/v2/users/<uuid>
 		const OWNER_UUID = task1.owner_id;
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [task1, task2] }));
@@ -702,7 +409,7 @@ describe("CoderService.getStatus", () => {
 
 // ── Test 12: status normalization ─────────────────────────────────────────────
 
-describe("CoderService status normalization (EARS-REQ-20)", () => {
+describe("CoderService status normalization", () => {
 	const cases: Array<{
 		status: string;
 		current_state: { state: string } | null;
@@ -743,7 +450,7 @@ describe("CoderService status normalization (EARS-REQ-20)", () => {
 
 	for (const { status, current_state, expected } of cases) {
 		test(`Coder status="${status}" current_state=${current_state?.state ?? "null"} → TaskStatus="${expected}"`, async () => {
-			const fetchFn = mock((url: string, init?: RequestInit) => {
+			const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 				const method = init?.method ?? "GET";
 				if (method === "GET" && url.includes("/api/experimental/tasks")) {
 					return Promise.resolve(
@@ -769,7 +476,7 @@ describe("CoderService status normalization (EARS-REQ-20)", () => {
 
 describe("CoderService Task.url", () => {
 	test("url is composed as coderURL/tasks/owner/taskId", async () => {
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
@@ -790,7 +497,7 @@ describe("CoderService Task.url", () => {
 		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // matches makeTask() owner_id
 		const RESOLVED_USERNAME = "resolved-username";
 
-		const fetchFn = mock((url: string, init?: RequestInit) => {
+		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// findTask (no owner) returns the task
 			if (
@@ -827,7 +534,7 @@ describe("CoderService Task.url", () => {
 
 describe("CoderService.lookupUser", () => {
 	test("resolves github user to coder username", async () => {
-		const fetchFn = mock((url: string) => {
+		const fetchFn = vi.fn((url: string) => {
 			if (url.includes("/api/v2/users")) {
 				return Promise.resolve(createMockResponse(makeUserList("coderuser")));
 			}
@@ -842,7 +549,7 @@ describe("CoderService.lookupUser", () => {
 	});
 
 	test("throws when user not found", async () => {
-		const fetchFn = mock(() => {
+		const fetchFn = vi.fn(() => {
 			return Promise.resolve(createMockResponse({ users: [] }));
 		});
 
@@ -852,5 +559,94 @@ describe("CoderService.lookupUser", () => {
 				user: { type: "github", id: "99999", username: "nobody" },
 			}),
 		).rejects.toThrow();
+	});
+});
+
+// ── Primitive methods (Phase 4 Task 12) ──────────────────────────────────────
+
+describe("CoderService primitives", () => {
+	function makeMinimalService(fetchFn: typeof fetch): CoderService {
+		return new CoderService({
+			serverURL: "https://c",
+			apiToken: "t",
+			config: { organization: "default", templateName: "x" },
+			fetchFn,
+		});
+	}
+
+	test("findTaskByName returns null on 404", async () => {
+		const fetchFn = vi.fn(async () => new Response("", { status: 404 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const result = await svc.findTaskByName(
+			TaskNameSchema.parse("tname"),
+			"owner",
+		);
+		expect(result).toBeNull();
+	});
+
+	test("findTaskByName returns the matching task when found", async () => {
+		const matching = makeTask({ name: "tname" });
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ tasks: [matching], count: 1 }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const result = await svc.findTaskByName(
+			TaskNameSchema.parse("tname"),
+			"owner",
+		);
+		expect(result).not.toBeNull();
+		expect(result?.name).toBe("tname");
+	});
+
+	test("getTaskById throws CoderAPIError on non-2xx", async () => {
+		const fetchFn = vi.fn(async () => new Response("boom", { status: 500 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await expect(
+			svc.getTaskById(TaskIdSchema.parse(TASK_ID), "owner"),
+		).rejects.toThrow(CoderAPIError);
+	});
+
+	test("getTaskById returns the parsed task on 200", async () => {
+		const raw = makeTask();
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify(raw), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		const parsed = await svc.getTaskById(TaskIdSchema.parse(TASK_ID), "owner");
+		expect(parsed.id).toBe(TASK_ID);
+	});
+
+	test("resumeWorkspace POSTs to /api/v2/workspaces/<id>/builds with transition start", async () => {
+		const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await svc.resumeWorkspace("ws-123");
+		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+			.calls[0] as [string, RequestInit];
+		expect(call[0]).toContain("/api/v2/workspaces/ws-123/builds");
+		expect(call[1].method).toBe("POST");
+		expect(JSON.parse(call[1].body as string)).toEqual({
+			transition: "start",
+		});
+	});
+
+	test("sendTaskInput POSTs to /api/experimental/tasks/<owner>/<id>/send", async () => {
+		const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
+		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
+		await svc.sendTaskInput(TaskIdSchema.parse(TASK_ID), "owner", "hello");
+		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+			.calls[0] as [string, RequestInit];
+		expect(call[0]).toContain(
+			`/api/experimental/tasks/owner/${encodeURIComponent(TASK_ID)}/send`,
+		);
+		expect(call[1].method).toBe("POST");
+		expect(JSON.parse(call[1].body as string)).toEqual({ input: "hello" });
 	});
 });

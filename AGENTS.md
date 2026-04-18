@@ -1,113 +1,113 @@
 # AGENTS.md — coder-action
 
-GitHub App webhook server that manages the full lifecycle of Coder AI tasks driven by GitHub events. The app receives webhook payloads from GitHub, routes them to the appropriate handler, and interacts with the Coder API to create, resume, or stop task workspaces.
+Cloudflare Worker + single Cloudflare Workflow that drives Coder AI task lifecycle from GitHub webhooks. The Worker signature-verifies and classifies each webhook, then enqueues a `CoderTaskWorkflow` instance that talks to the Coder and GitHub APIs durably (step-level retries, replay across isolate evictions).
 
-## Modes
+**Tech stack:** Cloudflare Workers · Cloudflare Workflows · TypeScript (strict) · Zod · Biome · `@octokit/rest` · `@octokit/auth-app` · `@octokit/webhooks-methods` · `@cloudflare/vitest-pool-workers`
 
-| Mode | Trigger | What it does |
-|---|---|---|
-| `create_task` | `issues.assigned` — assignee is the coder agent | Creates a Coder task workspace with the issue URL as input |
-| `close_task` | `issues.closed` | Stops and deletes the task workspace |
-| `pr_comment` | `issue_comment`, `pull_request_review_comment`, or `pull_request_review` on a PR authored by the agent | Forwards the comment as task input |
-| `issue_comment` | `issue_comment` on a plain issue | Forwards the comment as task input |
-| `failed_check` | `workflow_run` completed with failure | Finds the linked PR/issue and forwards failure details |
+## Development loop
 
-**Tech stack**: Bun · TypeScript (strict) · Zod · Biome · Hono · `@octokit/auth-app` · `@octokit/webhooks`
+```bash
+npm install
+npm run dev          # wrangler dev on :8787 (Miniflare + Workflow emulation)
+npm run deploy       # wrangler deploy
+npm test             # vitest inside workerd (pool-workers)
+npm run check        # typecheck + lint + format:check + test
+```
+
+After changing `wrangler.toml`, regenerate binding types: `npx wrangler types`.
 
 ## Architecture
 
 ```
-GitHub Webhook (POST /api/webhooks)
-    ↓
-src/server.ts — Hono HTTP server, signature verification
-    ↓
-src/webhook-router.ts — event routing, guard evaluation, payload extraction
-    ↓
-src/handlers/{create-task,close-task,pr-comment,issue-comment,failed-check}.ts
-    ↓
-CoderClient (coder-client.ts)   GitHubClient (github-client.ts)
-    ↓                               ↓
-Coder REST API                  GitHub REST + GraphQL APIs
+GitHub  ───POST /api/webhooks───▶  Worker (src/main.ts)
+                                      │ parseWebhookRequest → verify sig + parse
+                                      │   (401 bad sig · 400 missing header/JSON)
+                                      │ WebhookRouter → classify + guards
+                                      │   (200 skip for self-comments, workflow_run success, …)
+                                      ▼
+                           env.CODER_TASK_WORKFLOW.create({ id, params })
+                                      │  202 Accepted
+                                      ▼
+                       CoderTaskWorkflow (src/workflows/coder-task-workflow.ts)
+                                      │  dispatch on event.type
+                                      ▼
+                         src/workflows/steps/{create-task, close-task,
+                                              comment, failed-check}.ts
+                                      │  step.do / step.sleep
+                                      ▼
+                     CoderService · GitHubClient (subrequests)
 ```
 
-Every handler receives injected `CoderClient` and `GitHubClient` instances — no globals.
+Worker does no long-running work in the request path; durable processing — retries, waits on Coder task readiness, multi-step flows — all happens inside the Workflow.
 
-## Key Files
+## Event → workflow-step mapping
+
+| Trigger | Workflow steps |
+|---|---|
+| `issues.assigned` | `check-github-permission` → `lookup-coder-user` → `create-coder-task` → `comment-on-issue` |
+| `issues.closed` | `delete-coder-task` → `comment-on-issue` |
+| `issue_comment` on an issue | `locate-task` → `ensureTaskReady` → `send-task-input` → `react-to-comment` |
+| `issue_comment` / `pull_request_review_comment` / `pull_request_review` on an agent PR | `find-linked-issues` → `locate-task` → `ensureTaskReady` → `send-task-input` → `react-to-comment` |
+| `workflow_run.completed` (failure) | `fetch-pr-info` → `find-linked-issues` → `locate-task` → `fetch-failed-jobs` → `fetch-job-logs-<id>` × N → `ensureTaskReady` → `send-task-input` |
+
+## Key files
 
 ```
 src/
-  main.ts               Entry point: loads config, authenticates GitHub App, starts Hono server
-  server.ts             Hono app with webhook endpoint and health check
-  webhook-router.ts     Maps webhook events to handler types with guard evaluation
-  webhook-schemas.ts    Zod schemas for all webhook payload types
-  config.ts             AppConfig Zod schema, loaded from env vars
-  logger.ts             Logger interface with Console and Test implementations
-  schemas.ts            HandlerConfig and ActionOutputs types
-  coder-client.ts       CoderClient interface + RealCoderClient impl + Zod API schemas
-  github-client.ts      GitHubClient wrapping Octokit REST + GraphQL
-  task-utils.ts         generateTaskName(), parseIssueURL(), lookupAndEnsureActiveTask()
-  messages.ts           Pure functions that build comment/prompt message strings
-  test-helpers.ts       MockCoderClient, createMockGitHubClient(), fixtures
-  __fixtures__/         Webhook payload JSON fixtures for testing
-  handlers/             One handler per event type + one test file per handler
+  main.ts                             Worker fetch handler — route + dispatch only
+  http/
+    parse-webhook-request.ts          Sig verify + header/JSON parse, typed errors
+    app-bot-login.ts                  App bot login cache + GET /app resolver
+  config/app-config.ts                loadConfig(env) — Zod-validated, no secret leakage
+  events/types.ts                     Event discriminated union
+  infra/logger.ts                     console.log({...}) JSON logger + TestLogger
+  services/
+    task-runner.ts                    TaskRunner interface + branded Task types
+    coder/service.ts                  HTTP primitives (no polling — workflow orchestrates)
+    github/client.ts                  Octokit REST + GraphQL wrappers
+  webhooks/github/
+    router.ts                         Event classification + guards → Event | SkipResult
+    guards.ts                         Self-comment suppression, author checks, …
+  workflows/
+    coder-task-workflow.ts            WorkflowEntrypoint — dispatches on event.type
+    instance-id.ts                    buildInstanceId + isDuplicateInstanceError
+    ensure-task-ready.ts              step.sleep-based wait-for-idle loop
+    steps/{create-task,close-task,comment,failed-check}.ts
+  actions/                            Pure helpers (task naming, message formatting)
+  testing/                            MockTaskRunner, integration.test.ts, e2e.test.ts
 ```
 
-## Development Commands
+## Identity model
 
-```bash
-bun install          # install deps
-bun test             # run tests
-bun run typecheck    # tsc --noEmit
-bun run lint         # Biome lint (fails on warnings)
-bun run format       # Biome format (auto-fix)
-bun run build        # bundle to dist/server.js
-bun run dev          # run with watch mode
-bun run start        # run production server
-bun run check        # typecheck + lint + format:check + test
-```
+Two GitHub identities:
 
-## Key Conventions
+- **`@xmtp-coder-agent`** (configurable via `AGENT_GITHUB_USERNAME`) — regular GitHub User with a PAT; forks repos, pushes code, opens PRs.
+- **App bot `@<app-slug>[bot]`** — GitHub App installation identity; posts status comments, reacts. Resolved via `resolveAppBotLogin()` on first request per isolate.
 
-- **Deterministic task naming**: Tasks are named `{prefix}-{repo}-{issueNumber}` (e.g. `gh-myrepo-42`). Use `generateTaskName()` in `task-utils.ts` — never construct names manually.
-- **Branded types**: `TaskId` and `TaskName` are Zod-branded. Always produce them via `TaskNameSchema.parse(str)` / `TaskIdSchema.parse(uuid)` — never cast with `as`.
-- **Dependency injection**: Every handler takes `(coder, github, config, context)`. Tests swap in mocks without patching globals.
-- **Dual identity model**: Two GitHub identities are in play — the agent user and the app bot. Both are suppressed in self-comment detection (see Identity Model below).
-- **Webhook signature verification**: All incoming webhook requests are verified using the GitHub App webhook secret before any payload is processed.
-- **Per-installation GitHub API tokens**: The app authenticates as the GitHub App installation to obtain short-lived tokens scoped to the target repository.
+Both identities are suppressed in self-comment detection (`src/webhooks/github/guards.ts#isIgnoredLogin`) — a comment from either never gets forwarded back to the Coder task.
 
-## Identity Model
+## Conventions and patterns (required reading)
 
-Two GitHub identities operate in this system:
+Folder-local rules are colocated with the code they govern. Read the relevant
+one before modifying a folder:
 
-- **`@xmtp-coder-agent`** — A regular GitHub User with a Personal Access Token. This identity forks repositories, creates branches, opens pull requests, and pushes code. It is the "agent" that does the actual work.
-- **App bot (e.g. `@your-app[bot]`)** — The GitHub App installation identity. This identity posts status comments (task created, task closed, errors), reacts to comments, and performs API operations on behalf of the app.
+- **[src/workflows/AGENTS.md](src/workflows/AGENTS.md)** — step-callback serialization, closure-state rule in `run()`, step-name uniqueness, task keying (PR vs issue), paused resume semantics, `ensureTaskReady` thresholds.
+- **[src/services/coder/AGENTS.md](src/services/coder/AGENTS.md)** — primitives-only discipline, idempotency of `create`/`delete`, raw-SDK vs normalized shape, UUID → username resolution, status normalization.
+- **[src/http/AGENTS.md](src/http/AGENTS.md)** — signature-first stage ordering, typed errors, app-bot login cache.
+- **[src/webhooks/github/AGENTS.md](src/webhooks/github/AGENTS.md)** — Event vs SkipResult, guard evaluation, self-comment suppression.
+- **[src/testing/AGENTS.md](src/testing/AGENTS.md)** — introspector disposal, void-return mocking, integration vs e2e, `Env` type gap, bot-login pre-seeding.
 
-Both identities are suppressed in self-comment detection: a comment from either `@xmtp-coder-agent` or the app bot will not be forwarded back to the Coder task.
+Cross-cutting:
 
-## Testing
+- **[docs/conventions.md](docs/conventions.md)** — repo-wide patterns: task naming, branded types, DI, logger, secrets, step-name uniqueness, instance IDs.
+- **[docs/gotchas.md](docs/gotchas.md)** — collected foot-guns with context. Read before non-trivial changes.
+- **[docs/testing.md](docs/testing.md)** — test layers, `introspectWorkflow` patterns, fetch-mocking options.
 
-```typescript
-describe("CreateTaskHandler", () => {
-  let coder: MockCoderClient;
-  let gh: ReturnType<typeof createMockGitHubClient>;
-  const logger = new TestLogger();
+## How to extend
 
-  beforeEach(() => {
-    coder = new MockCoderClient();
-    gh = createMockGitHubClient();
-  });
-
-  test("creates task and comments on issue", async () => {
-    const handler = new CreateTaskHandler(coder, gh, config, context, logger);
-    const result = await handler.run();
-    expect(result.skipped).toBe(false);
-  });
-});
-```
-
-Use `mockTask`, `mockTemplate`, `mockPreset`, `mockStoppedTask`, `mockErrorTask` from `test-helpers.ts` rather than constructing objects inline.
+- **[docs/adding-an-event-type.md](docs/adding-an-event-type.md)** — checklist for wiring a new GitHub event into the router + a new step factory + tests.
 
 ## Reference
 
-- [GitHub App setup](docs/github-app-setup.md)
-- [Coder API endpoints](docs/coder-api.md)
+- [GitHub App setup](docs/github-app-setup.md) — registration, installation, secrets
+- [Coder API endpoints](docs/coder-api.md) — experimental tasks + stable endpoints we consume

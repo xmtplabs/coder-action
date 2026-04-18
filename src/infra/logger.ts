@@ -1,6 +1,3 @@
-import pino from "pino";
-import pinoPretty from "pino-pretty";
-
 export interface Logger {
 	info(message: string, fields?: Record<string, unknown>): void;
 	debug(message: string, fields?: Record<string, unknown>): void;
@@ -9,63 +6,55 @@ export interface Logger {
 	child(bindings: Record<string, unknown>): Logger;
 }
 
-/**
- * Wraps a Pino instance to conform to the Logger interface.
- * Pino's native API is `logger.info(mergingObject, message)` — this wrapper
- * adapts it to `logger.info(message, fields?)` used throughout the codebase.
- */
-function wrapPino(pinoLogger: pino.Logger): Logger {
-	return {
-		info(message: string, fields?: Record<string, unknown>): void {
-			if (fields) {
-				pinoLogger.info(fields, message);
-			} else {
-				pinoLogger.info(message);
-			}
-		},
-		debug(message: string, fields?: Record<string, unknown>): void {
-			if (fields) {
-				pinoLogger.debug(fields, message);
-			} else {
-				pinoLogger.debug(message);
-			}
-		},
-		warn(message: string, fields?: Record<string, unknown>): void {
-			if (fields) {
-				pinoLogger.warn(fields, message);
-			} else {
-				pinoLogger.warn(message);
-			}
-		},
-		error(message: string, fields?: Record<string, unknown>): void {
-			if (fields) {
-				pinoLogger.error(fields, message);
-			} else {
-				pinoLogger.error(message);
-			}
-		},
-		child(bindings: Record<string, unknown>): Logger {
-			return wrapPino(pinoLogger.child(bindings));
-		},
-	};
-}
-
 export interface CreateLoggerOptions {
 	logFormat?: string;
 }
 
 /**
- * Creates a Pino-backed Logger.
+ * Creates a lightweight structured logger for Cloudflare Workers.
  *
- * - `logFormat: "json"` → structured JSON output (default for production)
- * - Any other value or omitted → human-readable output via pino-pretty (local dev)
+ * In JSON mode (`logFormat: "json"`, default in production), each call emits a
+ * single `console.log(JSON.stringify({level, msg, ...bindings, ...fields}))` —
+ * this matches Cloudflare's Workers Logs recommendation: log plain objects to
+ * `console.*` and Workers Logs auto-indexes every field as a queryable dimension.
+ * Without any third-party library the bundle stays lean and everything runs
+ * natively in workerd (no Node.js TTY/filesystem dependencies).
+ *
+ * In any other mode (local dev), a readable `[level] msg { fields }` line is
+ * printed via the matching `console.*` method (info/warn/error).
  */
 export function createLogger(options?: CreateLoggerOptions): Logger {
-	const useJson = options?.logFormat === "json";
+	const json = options?.logFormat === "json";
+	return makeLogger({}, json);
+}
 
-	const pinoLogger = useJson ? pino() : pino(pinoPretty({ colorize: true }));
-
-	return wrapPino(pinoLogger);
+function makeLogger(bindings: Record<string, unknown>, json: boolean): Logger {
+	const emit = (
+		level: "debug" | "info" | "warn" | "error",
+		msg: string,
+		fields?: Record<string, unknown>,
+	) => {
+		const record = { level, msg, ...bindings, ...(fields ?? {}) };
+		if (json) {
+			console.log(JSON.stringify(record));
+			return;
+		}
+		// Pretty local-dev line: "[level] msg <json-fields-if-any>"
+		const merged = { ...bindings, ...(fields ?? {}) };
+		const fieldStr =
+			Object.keys(merged).length > 0 ? ` ${JSON.stringify(merged)}` : "";
+		const prefix = `[${level}] ${msg}${fieldStr}`;
+		if (level === "error") console.error(prefix);
+		else if (level === "warn") console.warn(prefix);
+		else console.log(prefix);
+	};
+	return {
+		info: (m, f) => emit("info", m, f),
+		debug: (m, f) => emit("debug", m, f),
+		warn: (m, f) => emit("warn", m, f),
+		error: (m, f) => emit("error", m, f),
+		child: (b) => makeLogger({ ...bindings, ...b }, json),
+	};
 }
 
 // ── Test logger ─────────────────────────────────────────────────────────────

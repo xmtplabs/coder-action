@@ -1,136 +1,109 @@
-import { createAppAuth } from "@octokit/auth-app";
-import { Octokit } from "@octokit/rest";
 import { loadConfig } from "./config/app-config";
+import {
+	__setAppBotLoginForTests,
+	resolveAppBotLogin,
+} from "./http/app-bot-login";
+import {
+	parseWebhookRequest,
+	WebhookRequestError,
+} from "./http/parse-webhook-request";
 import { createLogger } from "./infra/logger";
-import { CoderService } from "./services/coder/service";
-import { WebhookRouter, type SkipResult } from "./webhooks/github/router";
-import { EventDispatcher } from "./events/dispatcher";
-import { createApp } from "./http/server";
+import { WebhookRouter } from "./webhooks/github/router";
+import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
+import {
+	buildInstanceId,
+	isDuplicateInstanceError,
+} from "./workflows/instance-id";
 
-// ── Startup context ───────────────────────────────────────────────────────────
+export { CoderTaskWorkflow } from "./workflows/coder-task-workflow";
+export { __setAppBotLoginForTests };
 
-export interface StartupContextOptions {
-	getAppInfo: () => Promise<{ data: { slug: string; id: number } }>;
-}
+// ── Worker entrypoint ────────────────────────────────────────────────────────
 
-export interface StartupContext {
-	appSlug: string;
-	appBotLogin: string;
-}
+export default {
+	async fetch(
+		request: Request,
+		env: CoderTaskWorkflowEnv,
+		_ctx: ExecutionContext,
+	): Promise<Response> {
+		const url = new URL(request.url);
 
-/**
- * Discovers the GitHub App identity by calling GET /app.
- * Extracted as a pure, testable function that takes injected dependencies.
- */
-export async function createStartupContext(
-	options: StartupContextOptions,
-): Promise<StartupContext> {
-	const { data: app } = await options.getAppInfo();
-	return {
-		appSlug: app.slug,
-		appBotLogin: `${app.slug}[bot]`,
-	};
-}
+		if (request.method === "POST" && url.pathname === "/api/webhooks") {
+			return handleWebhook(request, env);
+		}
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+		return new Response("Not Found", { status: 404 });
+	},
+} satisfies ExportedHandler<CoderTaskWorkflowEnv>;
 
-async function main(): Promise<void> {
-	const config = loadConfig(process.env);
-	const logger = createLogger({ logFormat: config.logFormat });
+async function handleWebhook(
+	request: Request,
+	env: CoderTaskWorkflowEnv,
+): Promise<Response> {
+	const config = loadConfig(
+		env as unknown as Record<string, string | undefined>,
+	);
+	const logger = createLogger({ logFormat: env.LOG_FORMAT });
+	const started = Date.now();
 
-	// Create app-level Octokit authenticated as the GitHub App via JWT
-	const appOctokit = new Octokit({
-		authStrategy: createAppAuth,
-		auth: { appId: config.appId, privateKey: config.privateKey },
-	});
+	// Stage 1: verify signature + decode headers + parse JSON.
+	let parsed: Awaited<ReturnType<typeof parseWebhookRequest>>;
+	try {
+		parsed = await parseWebhookRequest(request, config.webhookSecret);
+	} catch (err) {
+		if (err instanceof WebhookRequestError) {
+			logger.info(`Webhook rejected: ${err.message}`, { status: err.status });
+			return new Response(err.body, { status: err.status });
+		}
+		throw err;
+	}
 
-	// Discover bot identity from the GitHub App API
-	const { appSlug, appBotLogin } = await createStartupContext({
-		getAppInfo: () =>
-			appOctokit.rest.apps.getAuthenticated().then((res) => {
-				const data = res.data;
-				if (!data) throw new Error("GitHub App returned no data");
-				return { data: { slug: data.slug ?? "", id: data.id } };
-			}),
-	});
-	logger.info(`Discovered app identity: ${appSlug} (bot: ${appBotLogin})`);
+	const { eventName, deliveryId, payload } = parsed;
+	const reqLogger = logger.child({ deliveryId, eventName });
+	reqLogger.info("Webhook received");
 
-	// Wire up dependencies
-	const taskRunner = new CoderService({
-		serverURL: config.coderURL,
-		apiToken: config.coderToken,
-		config: {
-			organization: config.coderOrganization,
-			templateName: config.coderTemplateName,
-			templatePreset: config.coderTemplatePreset,
-		},
-		logger,
-	});
+	// Stage 2: route via WebhookRouter.
+	const appBotLogin = await resolveAppBotLogin(config);
 	const router = new WebhookRouter({
 		agentGithubUsername: config.agentGithubUsername,
 		appBotLogin,
-		logger,
+		logger: reqLogger,
 	});
+	const result = await router.handleWebhook(eventName, deliveryId, payload);
+	if ("dispatched" in result) {
+		const status = result.validationError === true ? 400 : 200;
+		reqLogger.info("Webhook skipped", {
+			status,
+			reason: result.reason,
+			duration_ms: Date.now() - started,
+		});
+		return new Response("ok", { status });
+	}
 
-	// Factory that creates (and caches) an installation-scoped Octokit per installationId.
-	// Reusing the same Octokit instance allows @octokit/auth-app to cache the
-	// short-lived installation access token internally, avoiding redundant token requests.
-	const octokitCache = new Map<number, Octokit>();
-	const createInstallationOctokit = (installationId: number): Octokit => {
-		let octokit = octokitCache.get(installationId);
-		if (!octokit) {
-			octokit = new Octokit({
-				authStrategy: createAppAuth,
-				auth: {
-					appId: config.appId,
-					privateKey: config.privateKey,
-					installationId,
-				},
+	// Stage 3: dispatch to Workflow (fire-and-return-202).
+	const instanceId = buildInstanceId(result, deliveryId);
+	try {
+		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params: result });
+		reqLogger.info("Webhook processed", {
+			handler: result.type,
+			instanceId,
+			status: 202,
+			duration_ms: Date.now() - started,
+		});
+		return new Response("accepted", { status: 202 });
+	} catch (err) {
+		if (isDuplicateInstanceError(err)) {
+			reqLogger.info("Webhook duplicate (instance exists)", {
+				handler: result.type,
+				instanceId,
+				status: 200,
 			});
-			octokitCache.set(installationId, octokit);
+			return new Response("ok", { status: 200 });
 		}
-		return octokit;
-	};
-
-	const dispatcher = new EventDispatcher({
-		config,
-		createInstallationOctokit,
-		taskRunner,
-		logger,
-	});
-
-	// Create Hono app
-	const app = createApp({
-		webhookSecret: config.webhookSecret,
-		handleWebhook: async (eventName, deliveryId, payload, reqLogger) => {
-			const result = await router.handleWebhook(eventName, deliveryId, payload);
-			// SkipResult has `dispatched: false`; Events have a `type` field instead.
-			const isSkip = (r: typeof result): r is SkipResult =>
-				"dispatched" in r && (r as SkipResult).dispatched === false;
-			if (isSkip(result)) {
-				// If the failure was due to a Zod schema validation error, signal 400.
-				const status = result.validationError === true ? 400 : 200;
-				return { dispatched: false, status };
-			}
-			// result is an Event
-			await dispatcher.dispatch(result, reqLogger);
-			return { dispatched: true, handler: result.type };
-		},
-		logger,
-	});
-
-	// Start Bun server
-	const server = Bun.serve({
-		fetch: app.fetch,
-		port: config.port,
-	});
-
-	logger.info(`XMTP Coder Agent listening on :${server.port}`);
-}
-
-if (import.meta.main) {
-	main().catch((err) => {
-		console.error("Fatal:", err);
-		process.exit(1);
-	});
+		reqLogger.error("Webhook workflow.create failed", {
+			error: err instanceof Error ? err.message : "unknown error",
+			status: 500,
+		});
+		return new Response("Internal Server Error", { status: 500 });
+	}
 }

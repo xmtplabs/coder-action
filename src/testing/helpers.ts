@@ -1,11 +1,17 @@
-import { mock } from "bun:test";
+import { vi } from "vitest";
 import type { GitHubClient } from "../services/github/client";
-import type { Task, TaskName, TaskRunner } from "../services/task-runner";
+import type {
+	Task,
+	TaskId,
+	TaskName,
+	TaskRunner,
+} from "../services/task-runner";
 import { TaskNameSchema as TaskRunnerNameSchema } from "../services/task-runner";
 
 // ── Mock Task Data (TaskRunner-shape) ───────────────────────────────────────
 
 export const mockTask: Task = {
+	id: "550e8400-e29b-41d4-a716-446655440000",
 	name: TaskRunnerNameSchema.parse("gh-test-repo-42"),
 	status: "ready",
 	owner: "test-coder-user",
@@ -25,26 +31,29 @@ export const mockErrorTask: Task = {
 // ── Mock Task Runner ────────────────────────────────────────────────────────
 
 export class MockTaskRunner implements TaskRunner {
-	lookupUser = mock(
+	lookupUser = vi.fn(
 		async (_: { user: { type: "github"; id: string; username: string } }) =>
 			"test-coder-user",
 	);
-	create = mock(
+	findTaskByName = vi.fn(
+		async (_: TaskName, __?: string): Promise<unknown | null> => null,
+	);
+	getTaskById = vi.fn(
+		async (_: TaskId, __: string): Promise<unknown> => ({
+			id: "00000000-0000-0000-0000-000000000000",
+			status: "active",
+			current_state: { state: "idle" },
+			workspace_id: "99999999-9999-4999-8999-999999999999",
+		}),
+	);
+	create = vi.fn(
 		async (_: { taskName: TaskName; owner: string; input: string }) => mockTask,
 	);
-	sendInput = mock(
-		async (_: {
-			taskName: TaskName;
-			owner?: string;
-			input: string;
-			timeout?: number;
-		}) => {},
+	resumeWorkspace = vi.fn(async (_: string): Promise<void> => {});
+	sendTaskInput = vi.fn(
+		async (_: TaskId, __: string, ___: string): Promise<void> => {},
 	);
-	getStatus = mock(
-		async (_: { taskName: TaskName; owner?: string }): Promise<Task | null> =>
-			null,
-	);
-	delete = mock(
+	delete = vi.fn(
 		async (_: { taskName: TaskName; owner?: string }) =>
 			({ deleted: true }) as { deleted: boolean },
 	);
@@ -53,11 +62,11 @@ export class MockTaskRunner implements TaskRunner {
 // ── Mock GitHub Client ──────────────────────────────────────────────────────
 
 export function createMockGitHubClient(): {
-	[K in keyof GitHubClient]: ReturnType<typeof mock>;
+	[K in keyof GitHubClient]: ReturnType<typeof vi.fn>;
 } {
 	return {
-		checkActorPermission: mock(() => Promise.resolve(true)),
-		findLinkedIssues: mock(() =>
+		checkActorPermission: vi.fn(() => Promise.resolve(true)),
+		findLinkedIssues: vi.fn(() =>
 			Promise.resolve([
 				{
 					number: 42,
@@ -67,20 +76,20 @@ export function createMockGitHubClient(): {
 				},
 			]),
 		),
-		commentOnIssue: mock(() => Promise.resolve()),
-		findPRByHeadSHA: mock(() => Promise.resolve(null)),
-		getPR: mock(() =>
+		commentOnIssue: vi.fn(() => Promise.resolve()),
+		findPRByHeadSHA: vi.fn(() => Promise.resolve(null)),
+		getPR: vi.fn(() =>
 			Promise.resolve({
 				number: 1,
 				user: { login: "xmtp-coder-agent" },
 				head: { sha: "abc123" },
 			}),
 		),
-		getFailedJobs: mock(() =>
+		getFailedJobs: vi.fn(() =>
 			Promise.resolve([{ id: 1, name: "test", conclusion: "failure" }]),
 		),
-		getJobLogs: mock(() => Promise.resolve("Error: test failed")),
-		addReactionToComment: mock(() => Promise.resolve()),
-		addReactionToReviewComment: mock(() => Promise.resolve()),
-	} as unknown as { [K in keyof GitHubClient]: ReturnType<typeof mock> };
+		getJobLogs: vi.fn(() => Promise.resolve("Error: test failed")),
+		addReactionToComment: vi.fn(() => Promise.resolve()),
+		addReactionToReviewComment: vi.fn(() => Promise.resolve()),
+	} as unknown as { [K in keyof GitHubClient]: ReturnType<typeof vi.fn> };
 }

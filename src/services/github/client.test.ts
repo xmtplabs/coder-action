@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, vi, test } from "vitest";
 import { GitHubClient } from "./client";
 import { TestLogger } from "../../infra/logger";
 
@@ -6,20 +6,20 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {
 		rest: {
 			repos: {
-				getCollaboratorPermissionLevel: mock(() =>
+				getCollaboratorPermissionLevel: vi.fn(() =>
 					Promise.resolve({ data: { permission: "write" } }),
 				),
 				...(overrides.repos as Record<string, unknown>),
 			},
 			issues: {
-				listComments: mock(() => Promise.resolve({ data: [] })),
-				createComment: mock(() => Promise.resolve({ data: { id: 1 } })),
-				updateComment: mock(() => Promise.resolve({ data: { id: 1 } })),
+				listComments: vi.fn(() => Promise.resolve({ data: [] })),
+				createComment: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
+				updateComment: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
 				...(overrides.issues as Record<string, unknown>),
 			},
 			pulls: {
-				list: mock(() => Promise.resolve({ data: [] })),
-				get: mock(() =>
+				list: vi.fn(() => Promise.resolve({ data: [] })),
+				get: vi.fn(() =>
 					Promise.resolve({
 						data: {
 							user: { login: "agent" },
@@ -30,20 +30,22 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 				...(overrides.pulls as Record<string, unknown>),
 			},
 			actions: {
-				listJobsForWorkflowRun: mock(() =>
+				listJobsForWorkflowRun: vi.fn(() =>
 					Promise.resolve({ data: { jobs: [] } }),
 				),
-				downloadJobLogsForWorkflowRun: mock(() =>
+				downloadJobLogsForWorkflowRun: vi.fn(() =>
 					Promise.resolve({ data: "log output" }),
 				),
 				...(overrides.actions as Record<string, unknown>),
 			},
 			reactions: {
-				createForIssueComment: mock(() => Promise.resolve({ data: { id: 1 } })),
+				createForIssueComment: vi.fn(() =>
+					Promise.resolve({ data: { id: 1 } }),
+				),
 				...(overrides.reactions as Record<string, unknown>),
 			},
 		},
-		graphql: mock(() => Promise.resolve({})),
+		graphql: vi.fn(() => Promise.resolve({})),
 		...overrides,
 	} as unknown as import("./client").Octokit;
 }
@@ -60,7 +62,7 @@ describe("GitHubClient", () => {
 		test("returns true for admins", async () => {
 			const octokit = createMockOctokit({
 				repos: {
-					getCollaboratorPermissionLevel: mock(() =>
+					getCollaboratorPermissionLevel: vi.fn(() =>
 						Promise.resolve({ data: { permission: "admin" } }),
 					),
 				},
@@ -77,7 +79,7 @@ describe("GitHubClient", () => {
 		test("returns false for read-only users", async () => {
 			const octokit = createMockOctokit({
 				repos: {
-					getCollaboratorPermissionLevel: mock(() =>
+					getCollaboratorPermissionLevel: vi.fn(() =>
 						Promise.resolve({ data: { permission: "read" } }),
 					),
 				},
@@ -90,7 +92,7 @@ describe("GitHubClient", () => {
 		test("returns false when user not found (404)", async () => {
 			const octokit = createMockOctokit({
 				repos: {
-					getCollaboratorPermissionLevel: mock(() =>
+					getCollaboratorPermissionLevel: vi.fn(() =>
 						Promise.reject({ status: 404 }),
 					),
 				},
@@ -108,7 +110,7 @@ describe("GitHubClient", () => {
 	describe("findLinkedIssues", () => {
 		test("returns linked issues from PR", async () => {
 			const octokit = createMockOctokit({
-				graphql: mock(() =>
+				graphql: vi.fn(() =>
 					Promise.resolve({
 						repository: {
 							pullRequest: {
@@ -135,7 +137,7 @@ describe("GitHubClient", () => {
 
 		test("returns empty array when no linked issues", async () => {
 			const octokit = createMockOctokit({
-				graphql: mock(() =>
+				graphql: vi.fn(() =>
 					Promise.resolve({
 						repository: {
 							pullRequest: {
@@ -168,13 +170,13 @@ describe("GitHubClient", () => {
 		test("updates existing comment with matching prefix", async () => {
 			const octokit = createMockOctokit({
 				issues: {
-					listComments: mock(() =>
+					listComments: vi.fn(() =>
 						Promise.resolve({
 							data: [{ id: 99, body: "Task created: old-url" }],
 						}),
 					),
-					updateComment: mock(() => Promise.resolve({ data: { id: 99 } })),
-					createComment: mock(() => Promise.resolve({ data: { id: 1 } })),
+					updateComment: vi.fn(() => Promise.resolve({ data: { id: 99 } })),
+					createComment: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
 				},
 			});
 			const client = new GitHubClient(octokit, new TestLogger());
@@ -193,7 +195,7 @@ describe("GitHubClient", () => {
 		test("returns PR when found", async () => {
 			const octokit = createMockOctokit({
 				pulls: {
-					list: mock(() =>
+					list: vi.fn(() =>
 						Promise.resolve({
 							data: [
 								{
@@ -224,7 +226,7 @@ describe("GitHubClient", () => {
 		test("returns only failed jobs", async () => {
 			const octokit = createMockOctokit({
 				actions: {
-					listJobsForWorkflowRun: mock(() =>
+					listJobsForWorkflowRun: vi.fn(() =>
 						Promise.resolve({
 							data: {
 								jobs: [
@@ -235,7 +237,7 @@ describe("GitHubClient", () => {
 							},
 						}),
 					),
-					downloadJobLogsForWorkflowRun: mock(() =>
+					downloadJobLogsForWorkflowRun: vi.fn(() =>
 						Promise.resolve({ data: "line1\nline2\nline3" }),
 					),
 				},
@@ -266,7 +268,7 @@ describe("GitHubClient", () => {
 		test("does not throw when reaction API fails", async () => {
 			const octokit = createMockOctokit({
 				reactions: {
-					createForIssueComment: mock(() =>
+					createForIssueComment: vi.fn(() =>
 						Promise.reject(new Error("Resource not accessible by integration")),
 					),
 				},
@@ -286,7 +288,7 @@ describe("GitHubClient", () => {
 			).join("\n");
 			const octokit = createMockOctokit({
 				actions: {
-					downloadJobLogsForWorkflowRun: mock(() =>
+					downloadJobLogsForWorkflowRun: vi.fn(() =>
 						Promise.resolve({ data: longLog }),
 					),
 				},

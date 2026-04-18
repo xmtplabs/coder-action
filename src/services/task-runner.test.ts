@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { TaskRunner, TaskStatus } from "./task-runner";
 import { TaskNameSchema, TaskIdSchema } from "./task-runner";
 
@@ -29,5 +29,20 @@ describe("TaskRunner types", () => {
 	test("TaskRunner interface shape compiles", () => {
 		const _placeholder: TaskRunner | null = null;
 		expect(_placeholder).toBeNull();
+	});
+
+	test("TaskRunner declares primitive methods", () => {
+		// Structural compile-time assertion that the interface has the expected keys.
+		const keys: Partial<Record<keyof TaskRunner, 1>> = {
+			lookupUser: 1,
+			findTaskByName: 1,
+			getTaskById: 1,
+			create: 1,
+			resumeWorkspace: 1,
+			sendTaskInput: 1,
+			delete: 1,
+		};
+		expect(keys).toBeDefined();
+		expect(Object.keys(keys)).toContain("sendTaskInput");
 	});
 });
