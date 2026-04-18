@@ -17,7 +17,7 @@ enabled = true
 
 [vars]
 AGENT_GITHUB_USERNAME = "xmtp-coder-agent"
-CODER_URL = "https://coder.example.com"
+CODER_URL = "https://sandbox.xmtp.team"
 CODER_TASK_NAME_PREFIX = "gh"
 CODER_TEMPLATE_NAME = "task-template"
 CODER_TEMPLATE_NAME_CODEX = "task-template-codex"
