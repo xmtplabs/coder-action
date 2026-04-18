@@ -161,9 +161,7 @@ describe("CoderService.create", () => {
 		});
 
 		// Must have: GET tasks (existing check), GET template, GET presets, POST create
-		const getTaskCall = calls.find((c) =>
-			c.includes("/api/v2/tasks"),
-		);
+		const getTaskCall = calls.find((c) => c.includes("/api/v2/tasks"));
 		const getTemplateCall = calls.find((c) =>
 			c.includes(`/api/v2/organizations/${ORG}/templates/${TEMPLATE_NAME}`),
 		);
