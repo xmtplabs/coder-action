@@ -119,7 +119,7 @@ describe("runCreateTask", () => {
 			(c: unknown[]) => c[0] === "create-coder-task",
 		);
 		const result = await step.do.mock.results[createIdx]?.value;
-		// Exact deep equality — guards against raw-SDK-field leakage (EARS-REQ-16a)
+		// Exact deep equality — guards against raw-SDK-field leakage
 		// AND missing-field regressions.
 		expect(result).toEqual({
 			taskName: "gh-repo-42",

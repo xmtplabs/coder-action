@@ -24,12 +24,12 @@ describe("CoderTaskWorkflow", () => {
 	});
 });
 
-// ── Introspection-driven per-event tests (EARS-REQ-21, 21a, 22b) ─────────────
+// ── Introspection-driven per-event tests ─────────────────────────────────────
 //
 // Each test:
 //   1. Registers an introspector BEFORE creating the instance so every step.do
 //      result and step.sleep call is mocked (no live Coder / GitHub fetches).
-//   2. Uses `await using` for automatic disposal — guards EARS-REQ-21a.
+//   2. Uses `await using` for automatic disposal (see src/testing/AGENTS.md).
 //   3. Creates the workflow instance with a representative `Event` payload.
 //   4. Asserts the instance reaches the `complete` status.
 

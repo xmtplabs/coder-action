@@ -20,7 +20,7 @@ export interface RunCreateTaskContext {
  *
  * Order: permission check FIRST so unauthorized actors don't trigger a Coder
  * user lookup. Step callbacks return only plain scalar objects — never class
- * instances or raw SDK responses (EARS-REQ-16a).
+ * instances or raw SDK responses. See src/workflows/AGENTS.md.
  */
 export async function runCreateTask(ctx: RunCreateTaskContext): Promise<void> {
 	const { step, coder, github, config, event } = ctx;

@@ -35,8 +35,9 @@ type WorkerEnv = Parameters<typeof worker.fetch>[1];
  *   • Introspection-driven step-result mocks
  *   • `waitForStatus("complete")` confirming the instance ran to completion
  *
- * Guards EARS-REQ-1 (valid signature → 202 in <1s) and EARS-REQ-21/21a/22b
- * (introspectWorkflow with `await using` disposal; no live GitHub/Coder fetches).
+ * Verifies: valid signature → 202 in <1s, and end-to-end dispatch through an
+ * introspected workflow instance with `await using` disposal (no live
+ * GitHub/Coder fetches). See src/testing/AGENTS.md for the pattern.
  */
 describe("e2e: signed webhook → worker → workflow completion", () => {
 	test("task_requested webhook runs the full pipeline to instance completion", async () => {
@@ -74,7 +75,7 @@ describe("e2e: signed webhook → worker → workflow completion", () => {
 		const elapsed = Date.now() - started;
 
 		expect(res.status).toBe(202);
-		expect(elapsed).toBeLessThan(1000); // EARS-REQ-1: 202 within 1 second
+		expect(elapsed).toBeLessThan(1000); // 202 within 1 second
 
 		const instances = introspector.get();
 		expect(instances.length).toBeGreaterThanOrEqual(1);

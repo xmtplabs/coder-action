@@ -46,7 +46,7 @@ export interface CoderTaskWorkflowEnv {
  * Clients (Octokit, GitHubClient, CoderService) are constructed at the top
  * of `run()` once per replay. They must NOT be returned from any `step.do`
  * callback — class instances are not structured-cloneable and the workflow
- * engine throws on attempted persistence (EARS-REQ-16a).
+ * engine throws on attempted persistence. See src/workflows/AGENTS.md.
  */
 export class CoderTaskWorkflow extends WorkflowEntrypoint<
 	CoderTaskWorkflowEnv,

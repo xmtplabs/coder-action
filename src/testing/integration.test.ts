@@ -182,16 +182,14 @@ describe("Worker fetch handler — HTTP status surface", () => {
 		expect(created).toBe(false);
 	});
 
-	// EARS-REQ-3 reserves the 400 branch in `main.ts:129`
-	// (`result.validationError === true ? 400 : 200`) for router-side Zod
-	// validation failures. The router's `SkipResult.validationError` flag
-	// is declared (`router.ts:33`) but never set — router.ts uses unsafe
-	// structural `as` casts plus null-checks rather than schema validation.
-	// Payloads that the router can't classify therefore flow to the default
-	// "Unhandled event" arm and yield 200. This test pins the current
-	// behavior so any future router refactor that introduces real Zod
-	// validation (and thus a reachable 400 path) explicitly updates it.
-	test("payload the router can't classify → 200 with SkipResult (EARS-REQ-3 400-branch is unreachable today)", async () => {
+	// The router's `SkipResult.validationError` flag is declared but never
+	// set — router.ts uses structural `as` casts with null-checks rather
+	// than schema validation. Payloads that the router can't classify flow
+	// to the default "Unhandled event" arm and yield 200. This test pins
+	// current behavior so any future router refactor that introduces real
+	// Zod validation (and a reachable 400 path) has to explicitly update it.
+	// See docs/gotchas.md § "Zod 400-branch is unreachable today."
+	test("payload the router can't classify → 200 with SkipResult (400-branch is unreachable today)", async () => {
 		let created = false;
 		const env = makeEnv(() => {
 			created = true;

@@ -88,9 +88,20 @@ Both identities are suppressed in self-comment detection (`src/webhooks/github/g
 
 ## Conventions and patterns (required reading)
 
-- **[docs/conventions.md](docs/conventions.md)** — mandatory patterns: task naming, branded types, step-callback serialization rule, closure-state rule in `run()`, DI model, logger usage. Break these and things silently corrupt on replay.
-- **[docs/gotchas.md](docs/gotchas.md)** — collected foot-guns with context. Read before making non-trivial changes. Examples: PR number vs. issue number in task keys, `mockStepResult` + falsy values, `failed` is terminal-ready in Coder semantics, step-name uniqueness per instance.
-- **[docs/testing.md](docs/testing.md)** — test layers, `introspectWorkflow` patterns, fetch-mocking options, miniflare quirks.
+Folder-local rules are colocated with the code they govern. Read the relevant
+one before modifying a folder:
+
+- **[src/workflows/AGENTS.md](src/workflows/AGENTS.md)** — step-callback serialization, closure-state rule in `run()`, step-name uniqueness, task keying (PR vs issue), paused resume semantics, `ensureTaskReady` thresholds.
+- **[src/services/coder/AGENTS.md](src/services/coder/AGENTS.md)** — primitives-only discipline, idempotency of `create`/`delete`, raw-SDK vs normalized shape, UUID → username resolution, status normalization.
+- **[src/http/AGENTS.md](src/http/AGENTS.md)** — signature-first stage ordering, typed errors, app-bot login cache.
+- **[src/webhooks/github/AGENTS.md](src/webhooks/github/AGENTS.md)** — Event vs SkipResult, guard evaluation, self-comment suppression.
+- **[src/testing/AGENTS.md](src/testing/AGENTS.md)** — introspector disposal, void-return mocking, integration vs e2e, `Env` type gap, bot-login pre-seeding.
+
+Cross-cutting:
+
+- **[docs/conventions.md](docs/conventions.md)** — repo-wide patterns: task naming, branded types, DI, logger, secrets, step-name uniqueness, instance IDs.
+- **[docs/gotchas.md](docs/gotchas.md)** — collected foot-guns with context. Read before non-trivial changes.
+- **[docs/testing.md](docs/testing.md)** — test layers, `introspectWorkflow` patterns, fetch-mocking options.
 
 ## How to extend
 

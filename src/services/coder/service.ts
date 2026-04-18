@@ -233,7 +233,7 @@ export class CoderService implements TaskRunner {
 	/**
 	 * Look up a task by owner+name. Returns the raw Coder task or null.
 	 * When owner is omitted, scans all tasks by name (may log a warning on
-	 * multiple matches — EARS-REQ-19).
+	 * multiple matches).
 	 */
 	private async findTask(
 		taskName: TaskName,
@@ -355,7 +355,7 @@ export class CoderService implements TaskRunner {
 	 * Create a new Coder task (single POST — no post-create wait).
 	 *
 	 * If a task with the same `(owner, taskName)` already exists, the existing
-	 * task is returned without modification (EARS-REQ-7).
+	 * task is returned without modification.
 	 */
 	async create(params: {
 		taskName: TaskName;
@@ -413,7 +413,7 @@ export class CoderService implements TaskRunner {
 		});
 		const created = ExperimentalCoderSDKTaskSchema.parse(rawCreated);
 
-		// 5. Return — no wait (EARS-REQ-7)
+		// 5. Return — no wait
 		return this.toTask(created, owner);
 	}
 
@@ -439,7 +439,7 @@ export class CoderService implements TaskRunner {
 	 * Delete a task by issuing a single DELETE API call.
 	 *
 	 * Idempotent — resolves without error when the task does not exist
-	 * (EARS-REQ-11). No workspace stop, wait, or delete (EARS-REQ-18).
+	 *. No workspace stop, wait, or delete.
 	 *
 	 * Returns `{ deleted: true }` when a task was found and removed, or
 	 * `{ deleted: false }` when no task was found (no-op).

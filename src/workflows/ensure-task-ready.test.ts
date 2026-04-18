@@ -372,7 +372,7 @@ describe("ensureTaskReady — total timeout", () => {
 	});
 });
 
-// ── Serialization rule (EARS-REQ-16a) ────────────────────────────────────
+// ── Serialization rule ────────────────────────────────────
 
 describe("ensureTaskReady — step return serialization", () => {
 	test("lookup-task step returns only plain scalar fields (no raw SDK task)", async () => {
@@ -407,7 +407,7 @@ describe("ensureTaskReady — step return serialization", () => {
 		);
 		const result = await step.do.mock.results[callIdx]?.value;
 		// Spec §4 serialization table: { status, state, workspaceId }. Deep-equal
-		// guards against raw-SDK-field leakage (EARS-REQ-16a).
+		// guards against raw-SDK-field leakage.
 		expect(result).toEqual({
 			status: "active",
 			state: "working",

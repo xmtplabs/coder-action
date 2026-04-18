@@ -43,15 +43,15 @@ export interface EnsureTaskReadyOptions {
  * `step.sleep("wait-<n>", "30 seconds")`. The `nilStateStartAttempt` closure
  * variable tracks consecutive `active+null` observations across iterations.
  *
- * **Replay safety (EARS-REQ-16b)**: the workflow engine replays run() from
- * the top on every resume. Completed step.do calls return cached outputs, so
- * the closure-state mutations (which live OUTSIDE step callbacks and depend
- * only on those cached outputs) reconstruct identically on replay. We never
- * mutate closure state inside a step.do callback and never read Date.now(),
- * Math.random(), or cross-request globals here.
+ * **Replay safety**: the workflow engine replays run() from the top on every
+ * resume. Completed step.do calls return cached outputs, so the closure-state
+ * mutations (which live OUTSIDE step callbacks and depend only on those cached
+ * outputs) reconstruct identically on replay. We never mutate closure state
+ * inside a step.do callback and never read Date.now(), Math.random(), or
+ * cross-request globals here. See src/workflows/AGENTS.md.
  *
- * **Serialization (EARS-REQ-16a)**: step callbacks return only plain scalar
- * objects — never the raw Coder SDK task, never class instances.
+ * **Serialization**: step callbacks return only plain scalar objects — never
+ * the raw Coder SDK task, never class instances. See src/workflows/AGENTS.md.
  */
 export async function ensureTaskReady(
 	opts: EnsureTaskReadyOptions,
@@ -87,7 +87,7 @@ export async function ensureTaskReady(
 
 	// ── Phase 2: hand-rolled poll loop ──────────────────────────────────────
 	// Closure state — mutated only OUTSIDE step.do callbacks. Pure function of
-	// the sequence of cached step outputs; replay-safe (EARS-REQ-16b).
+	// the sequence of cached step outputs; replay-safe.
 	let nilStateStartAttempt: number | null = null;
 
 	for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

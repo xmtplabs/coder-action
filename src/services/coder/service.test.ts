@@ -121,7 +121,7 @@ function makeService(
 // ── Test 1: create — single call, no polling ─────────────────────────────────
 
 describe("CoderService.create", () => {
-	test("single call, no polling — returns new task (EARS-REQ-7)", async () => {
+	test("single call, no polling — returns new task", async () => {
 		const calls: string[] = [];
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
@@ -185,7 +185,7 @@ describe("CoderService.create", () => {
 		expect(calls.length).toBe(4);
 	});
 
-	test("returns existing task when same name+owner exists — no POST (EARS-REQ-7 idempotent)", async () => {
+	test("returns existing task when same name+owner exists — no POST (idempotent)", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// pre-create lookup returns a match
@@ -255,7 +255,7 @@ describe("CoderService.create", () => {
 // ── Test 8 & 9: delete ────────────────────────────────────────────────────────
 
 describe("CoderService.delete", () => {
-	test("single DELETE API call — no workspace stop/delete (EARS-REQ-18)", async () => {
+	test("single DELETE API call — no workspace stop/delete", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
@@ -328,7 +328,7 @@ describe("CoderService.delete", () => {
 		expect(deleteCall?.[0]).not.toContain(OWNER_UUID);
 	});
 
-	test("no-op when task missing — no DELETE call, returns { deleted: false } (EARS-REQ-11)", async () => {
+	test("no-op when task missing — no DELETE call, returns { deleted: false }", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
@@ -353,7 +353,7 @@ describe("CoderService.delete", () => {
 // ── Test 10 & 11: getStatus ───────────────────────────────────────────────────
 
 describe("CoderService.getStatus", () => {
-	test("resolves to null when task missing (EARS-REQ-12)", async () => {
+	test("resolves to null when task missing", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			if (method === "GET" && url.includes("/api/experimental/tasks")) {
@@ -370,7 +370,7 @@ describe("CoderService.getStatus", () => {
 		expect(result).toBeNull();
 	});
 
-	test("warns on multiple matches when no owner given (EARS-REQ-19)", async () => {
+	test("warns on multiple matches when no owner given", async () => {
 		const task1 = makeTask({ id: TASK_ID });
 		const task2 = makeTask({ id: "550e8400-e29b-41d4-a716-446655440099" });
 		// task owner_id is a UUID — resolveOwnerUsername will call /api/v2/users/<uuid>
@@ -409,7 +409,7 @@ describe("CoderService.getStatus", () => {
 
 // ── Test 12: status normalization ─────────────────────────────────────────────
 
-describe("CoderService status normalization (EARS-REQ-20)", () => {
+describe("CoderService status normalization", () => {
 	const cases: Array<{
 		status: string;
 		current_state: { state: string } | null;

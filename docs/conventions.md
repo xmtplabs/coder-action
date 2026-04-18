@@ -19,7 +19,7 @@ const taskId   = TaskIdSchema.parse(raw);  // UUID
 
 Never cast with `as TaskName` / `as TaskId` — the brand has no runtime representation, and a bad cast will produce a corrupt value that passes all type checks.
 
-## Step callback serialization (EARS-REQ-16a)
+## Step callback serialization
 
 Every `step.do` callback must return **plain JSON-serializable data** — primitives, plain objects, or arrays of serializables. Never return:
 
@@ -45,7 +45,7 @@ const pr = await step.do("fetch-pr-info", async () => {
 const pr = await step.do("fetch-pr-info", async () => github.getPR(owner, repo, number));
 ```
 
-## Closure state in run() (EARS-REQ-16b)
+## Closure state in run()
 
 The Workflow engine replays `run()` from the top on every resume. Completed `step.do` calls return their cached outputs; the function body between them re-executes. This implies two rules:
 
