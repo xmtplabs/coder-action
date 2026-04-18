@@ -16,7 +16,7 @@ import type {
 	IssueCommentContext,
 	FailedCheckContext,
 } from "./webhook-router";
-import type { GitHubClient, Octokit } from "./github-client";
+import type { GitHubClient, Octokit } from "./services/github/client";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

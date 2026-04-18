@@ -47,7 +47,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
@@ -80,7 +80,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
@@ -103,7 +103,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
@@ -131,7 +131,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
@@ -156,7 +156,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,
@@ -183,7 +183,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			inputsWithoutUsername,
 			closeContext,
 			logger,
@@ -210,7 +210,7 @@ describe("CloseTaskHandler", () => {
 
 		const handler = new CloseTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			closeContext,
 			logger,

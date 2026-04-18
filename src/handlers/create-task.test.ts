@@ -49,7 +49,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -68,7 +68,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -89,7 +89,7 @@ describe("CreateTaskHandler", () => {
 		const inputs = { ...baseInputs, prompt: "Fix the bug" };
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			inputs,
 			issueContext,
 			logger,
@@ -115,7 +115,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -136,7 +136,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -155,7 +155,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -175,7 +175,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -199,7 +199,7 @@ describe("CreateTaskHandler", () => {
 		};
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -222,7 +222,7 @@ describe("CreateTaskHandler", () => {
 		};
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -241,7 +241,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,
@@ -264,7 +264,7 @@ describe("CreateTaskHandler", () => {
 		};
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -283,7 +283,7 @@ describe("CreateTaskHandler", () => {
 
 		const handler = new CreateTaskHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			issueContext,
 			logger,

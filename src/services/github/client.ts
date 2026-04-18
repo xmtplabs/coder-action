@@ -1,26 +1,10 @@
-import type { Logger } from "./infra/logger";
+import type { Logger } from "../../infra/logger";
 import type { Octokit as OctokitRest } from "@octokit/rest";
 
 export type Octokit = OctokitRest;
 
-export interface LinkedIssue {
-	number: number;
-	title: string;
-	state: string;
-	url: string;
-}
-
-export interface FailedJob {
-	id: number;
-	name: string;
-	conclusion: string;
-}
-
-export interface PRInfo {
-	number: number;
-	user: { login: string };
-	head: { sha: string };
-}
+export type { LinkedIssue, FailedJob, PRInfo } from "./types";
+import type { LinkedIssue, FailedJob, PRInfo } from "./types";
 
 export class GitHubClient {
 	constructor(

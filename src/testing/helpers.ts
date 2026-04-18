@@ -4,7 +4,7 @@ import type {
 	ExperimentalCoderSDKTask,
 } from "../services/coder/client";
 import { TaskIdSchema, TaskNameSchema } from "../services/coder/client";
-import type { GitHubClient } from "../github-client";
+import type { GitHubClient } from "../services/github/client";
 
 // ── Mock Task Data ──────────────────────────────────────────────────────────
 

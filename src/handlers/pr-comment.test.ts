@@ -58,7 +58,7 @@ describe("PRCommentHandler", () => {
 	test("sends formatted message to task for valid PR comment", async () => {
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -78,7 +78,7 @@ describe("PRCommentHandler", () => {
 	test("adds 👀 reaction when comment is forwarded to agent", async () => {
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -98,7 +98,7 @@ describe("PRCommentHandler", () => {
 		const ctx = { ...validContext, prAuthor: "other-user" };
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -113,7 +113,7 @@ describe("PRCommentHandler", () => {
 		const ctx = { ...validContext, prAuthor: "other-user" };
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -130,7 +130,7 @@ describe("PRCommentHandler", () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -145,7 +145,7 @@ describe("PRCommentHandler", () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -160,7 +160,7 @@ describe("PRCommentHandler", () => {
 		github.findLinkedIssues.mockResolvedValue([]);
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -176,7 +176,7 @@ describe("PRCommentHandler", () => {
 		coder.getTask.mockResolvedValue(null);
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -192,7 +192,7 @@ describe("PRCommentHandler", () => {
 		coder.getTask.mockResolvedValue(mockStoppedTask as never);
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -216,7 +216,7 @@ describe("PRCommentHandler", () => {
 		]);
 		const handler = new PRCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -243,7 +243,7 @@ describe("PRCommentHandler", () => {
 		test("forwards review submission body to task", async () => {
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
 				logger,
@@ -266,7 +266,7 @@ describe("PRCommentHandler", () => {
 			const ctx = { ...reviewSubmissionContext, commentBody: "" };
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
@@ -282,7 +282,7 @@ describe("PRCommentHandler", () => {
 			const ctx = { ...reviewSubmissionContext, commentBody: "   \n  " };
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
@@ -296,7 +296,7 @@ describe("PRCommentHandler", () => {
 		test("does not add reaction for review submissions", async () => {
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewSubmissionContext,
 				logger,
@@ -319,7 +319,7 @@ describe("PRCommentHandler", () => {
 		test("forwards review comment to task", async () => {
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewContext,
 				logger,
@@ -342,7 +342,7 @@ describe("PRCommentHandler", () => {
 			};
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				ctx,
 				logger,
@@ -362,7 +362,7 @@ describe("PRCommentHandler", () => {
 		test("adds 👀 reaction via review comment endpoint", async () => {
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				reviewContext,
 				logger,
@@ -381,7 +381,7 @@ describe("PRCommentHandler", () => {
 		test("uses issue comment endpoint for regular PR comments", async () => {
 			const handler = new PRCommentHandler(
 				coder,
-				github as unknown as import("../github-client").GitHubClient,
+				github as unknown as import("../services/github/client").GitHubClient,
 				baseInputs,
 				validContext,
 				logger,

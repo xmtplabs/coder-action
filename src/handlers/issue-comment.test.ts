@@ -48,7 +48,7 @@ describe("IssueCommentHandler", () => {
 	test("sends formatted message to task for valid issue comment", async () => {
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -68,7 +68,7 @@ describe("IssueCommentHandler", () => {
 	test("adds 👀 reaction when comment is forwarded to agent", async () => {
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -88,7 +88,7 @@ describe("IssueCommentHandler", () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -103,7 +103,7 @@ describe("IssueCommentHandler", () => {
 		coder.getTask.mockResolvedValue(null);
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -118,7 +118,7 @@ describe("IssueCommentHandler", () => {
 		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -135,7 +135,7 @@ describe("IssueCommentHandler", () => {
 		coder.getTask.mockResolvedValue(null);
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -151,7 +151,7 @@ describe("IssueCommentHandler", () => {
 		coder.getTask.mockResolvedValue(mockStoppedTask as never);
 		const handler = new IssueCommentHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,

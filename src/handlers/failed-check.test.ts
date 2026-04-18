@@ -67,7 +67,7 @@ describe("FailedCheckHandler", () => {
 	test("fetches failed job logs and sends formatted message", async () => {
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -95,7 +95,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -116,7 +116,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -138,7 +138,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -160,7 +160,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			ctx,
 			logger,
@@ -177,7 +177,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -194,7 +194,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,
@@ -217,7 +217,7 @@ describe("FailedCheckHandler", () => {
 
 		const handler = new FailedCheckHandler(
 			coder,
-			github as unknown as import("../github-client").GitHubClient,
+			github as unknown as import("../services/github/client").GitHubClient,
 			baseInputs,
 			validContext,
 			logger,

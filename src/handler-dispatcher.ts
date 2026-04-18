@@ -1,5 +1,5 @@
 import type { CoderClient } from "./services/coder/client";
-import { GitHubClient, type Octokit } from "./github-client";
+import { GitHubClient, type Octokit } from "./services/github/client";
 import { CloseTaskHandler } from "./handlers/close-task";
 import { CreateTaskHandler } from "./handlers/create-task";
 import { FailedCheckHandler } from "./handlers/failed-check";

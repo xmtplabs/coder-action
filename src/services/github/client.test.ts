@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
-import { GitHubClient } from "./github-client";
-import { TestLogger } from "./infra/logger";
+import { GitHubClient } from "./client";
+import { TestLogger } from "../../infra/logger";
 
 function createMockOctokit(overrides: Record<string, unknown> = {}) {
 	return {
@@ -45,7 +45,7 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 		},
 		graphql: mock(() => Promise.resolve({})),
 		...overrides,
-	} as unknown as import("./github-client").Octokit;
+	} as unknown as import("./client").Octokit;
 }
 
 describe("GitHubClient", () => {
