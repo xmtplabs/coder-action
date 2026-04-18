@@ -14,9 +14,9 @@ if [ -d src/actions ]; then
   [ -n "$out" ] && report "actions import Coder internals" "$out"
 fi
 
-# @octokit/webhooks-methods: only used by the Worker fetch handler now.
-out=$(grep -rnE 'from "@octokit/webhooks-methods' src/ --include='*.ts' | grep -v '^src/main.ts:' || true)
-[ -n "$out" ] && report "@octokit/webhooks-methods import outside src/main.ts" "$out"
+# @octokit/webhooks-methods: confined to the HTTP layer (src/http/).
+out=$(grep -rnE 'from "@octokit/webhooks-methods' src/ --include='*.ts' | grep -v '^src/http/' || true)
+[ -n "$out" ] && report "@octokit/webhooks-methods import outside src/http/" "$out"
 
 # TaskName/TaskId brand declarations only in services/task-runner.ts
 out=$(grep -rnE '\.brand\("(TaskName|TaskId)"' src/ --include='*.ts' | grep -v '^src/services/task-runner.ts:' || true)

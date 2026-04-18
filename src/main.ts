@@ -1,50 +1,22 @@
-import { createAppAuth } from "@octokit/auth-app";
-import { Octokit } from "@octokit/rest";
-import { verify } from "@octokit/webhooks-methods";
 import { loadConfig } from "./config/app-config";
+import {
+	__setAppBotLoginForTests,
+	resolveAppBotLogin,
+} from "./http/app-bot-login";
+import {
+	parseWebhookRequest,
+	WebhookRequestError,
+} from "./http/parse-webhook-request";
 import { createLogger } from "./infra/logger";
 import { WebhookRouter } from "./webhooks/github/router";
+import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
 import {
 	buildInstanceId,
 	isDuplicateInstanceError,
 } from "./workflows/instance-id";
-import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
 
 export { CoderTaskWorkflow } from "./workflows/coder-task-workflow";
-
-// ── Module-scope caches (shared across requests on the same isolate) ─────────
-//
-// Workers reuse isolates. These caches are safe because:
-//  1. The app-bot login is account-wide (no request-specific data).
-//  2. `@octokit/auth-app` manages installation-token refresh internally.
-//  3. No mutable state tied to the request/response lifecycle lives here.
-
-let appBotLoginCache: string | undefined;
-
-/**
- * Test-only helper: pre-seed the app-bot login cache to avoid a live call to
- * GitHub's `GET /app` endpoint in integration tests.
- */
-export function __setAppBotLoginForTests(login: string | undefined): void {
-	appBotLoginCache = login;
-}
-
-async function resolveAppBotLogin(
-	_env: CoderTaskWorkflowEnv,
-	config: ReturnType<typeof loadConfig>,
-): Promise<string> {
-	if (appBotLoginCache) return appBotLoginCache;
-	// `AGENT_GITHUB_USERNAME` env var is the human-user identity the agent
-	// posts as — distinct from the bot login. We only resolve the latter here.
-	const appOctokit = new Octokit({
-		authStrategy: createAppAuth,
-		auth: { appId: config.appId, privateKey: config.privateKey },
-	});
-	const res = await appOctokit.rest.apps.getAuthenticated();
-	const slug = res.data?.slug ?? "unknown";
-	appBotLoginCache = `${slug}[bot]`;
-	return appBotLoginCache;
-}
+export { __setAppBotLoginForTests };
 
 // ── Worker entrypoint ────────────────────────────────────────────────────────
 
@@ -78,48 +50,29 @@ async function handleWebhook(
 	const logger = createLogger({ logFormat: env.LOG_FORMAT });
 	const started = Date.now();
 
-	const rawBody = await request.text();
-
-	const signature = request.headers.get("X-Hub-Signature-256");
-	if (!signature) {
-		logger.info("Webhook rejected: missing signature", { status: 401 });
-		return new Response("Unauthorized: missing signature", { status: 401 });
-	}
-
-	let signatureValid = false;
+	// Stage 1: verify signature + decode headers + parse JSON.
+	let parsed: Awaited<ReturnType<typeof parseWebhookRequest>>;
 	try {
-		signatureValid = await verify(config.webhookSecret, rawBody, signature);
-	} catch {
-		signatureValid = false;
-	}
-	if (!signatureValid) {
-		logger.info("Webhook rejected: invalid signature", { status: 401 });
-		return new Response("Unauthorized: invalid signature", { status: 401 });
-	}
-
-	const eventName = request.headers.get("X-GitHub-Event");
-	if (!eventName) {
-		return new Response("Bad Request: missing X-GitHub-Event", { status: 400 });
-	}
-	const deliveryId = request.headers.get("X-GitHub-Delivery") ?? "unknown";
-
-	let payload: unknown;
-	try {
-		payload = JSON.parse(rawBody);
-	} catch {
-		return new Response("Bad Request: invalid JSON body", { status: 400 });
+		parsed = await parseWebhookRequest(request, config.webhookSecret);
+	} catch (err) {
+		if (err instanceof WebhookRequestError) {
+			logger.info(`Webhook rejected: ${err.message}`, { status: err.status });
+			return new Response(err.body, { status: err.status });
+		}
+		throw err;
 	}
 
+	const { eventName, deliveryId, payload } = parsed;
 	const reqLogger = logger.child({ deliveryId, eventName });
 	reqLogger.info("Webhook received");
 
-	const appBotLogin = await resolveAppBotLogin(env, config);
+	// Stage 2: route via WebhookRouter.
+	const appBotLogin = await resolveAppBotLogin(config);
 	const router = new WebhookRouter({
 		agentGithubUsername: config.agentGithubUsername,
 		appBotLogin,
 		logger: reqLogger,
 	});
-
 	const result = await router.handleWebhook(eventName, deliveryId, payload);
 	if ("dispatched" in result) {
 		const status = result.validationError === true ? 400 : 200;
@@ -131,6 +84,7 @@ async function handleWebhook(
 		return new Response("ok", { status });
 	}
 
+	// Stage 3: dispatch to Workflow (fire-and-return-202).
 	const instanceId = buildInstanceId(result, deliveryId);
 	try {
 		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params: result });
@@ -151,7 +105,7 @@ async function handleWebhook(
 			return new Response("ok", { status: 200 });
 		}
 		reqLogger.error("Webhook workflow.create failed", {
-			error: String(err),
+			error: err instanceof Error ? err.message : "unknown error",
 			status: 500,
 		});
 		return new Response("Internal Server Error", { status: 500 });

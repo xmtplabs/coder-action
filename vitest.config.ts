@@ -29,6 +29,19 @@ export default defineConfig({
 			wrangler: { configPath: "./wrangler.toml" },
 			miniflare: {
 				bindings: TEST_BINDINGS,
+				// Pre-declare the compatibility flags that `@cloudflare/vitest-pool-workers`
+				// would otherwise auto-add at runtime, each emitting a `[vpw:debug]` line.
+				// `nodejs_compat` is included because this list overrides (not merges with)
+				// `wrangler.toml`'s `compatibility_flags`.
+				compatibilityFlags: [
+					"nodejs_compat",
+					"enable_nodejs_tty_module",
+					"enable_nodejs_fs_module",
+					"enable_nodejs_http_modules",
+					"enable_nodejs_perf_hooks_module",
+					"enable_nodejs_v8_module",
+					"enable_nodejs_process_v2",
+				],
 			},
 		}),
 	],

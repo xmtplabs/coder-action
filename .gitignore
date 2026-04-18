@@ -7,3 +7,4 @@ docs/plans/
 .dev.vars.*
 !.dev.vars.example
 .wrangler/
+.claude/
