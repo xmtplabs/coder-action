@@ -7,7 +7,7 @@ import { IssueCommentHandler } from "./handlers/issue-comment";
 import { PRCommentHandler } from "./handlers/pr-comment";
 import type { Logger } from "./infra/logger";
 import type { ActionOutputs, HandlerConfig } from "./schemas";
-import type { AppConfig } from "./config";
+import type { AppConfig } from "./config/app-config";
 import type { RouteResult } from "./webhook-router";
 
 // ── Public interface ──────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadConfig } from "./config";
+import { loadConfig } from "./app-config";
 
 const validEnv = {
 	APP_ID: "12345",

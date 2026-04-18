@@ -7,7 +7,7 @@ import {
 	mockTask,
 } from "./test-helpers";
 import { TestLogger } from "./infra/logger";
-import type { AppConfig } from "./config";
+import type { AppConfig } from "./config/app-config";
 import type {
 	RouteResult,
 	CreateTaskContext,
