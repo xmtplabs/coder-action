@@ -3,65 +3,7 @@ import type { CoderClient } from "../services/coder/client";
 import { CoderAPIError } from "../services/coder/client";
 import { TestLogger } from "../infra/logger";
 import { MockCoderClient, mockTask } from "../testing/helpers";
-import {
-	generateTaskName,
-	lookupAndEnsureActiveTask,
-	parseIssueURL,
-	sendInputWithRetry,
-} from "./task-utils";
-
-describe("generateTaskName", () => {
-	test("generates correct name", () => {
-		expect(generateTaskName("gh", "libxmtp", 42)).toBe("gh-libxmtp-42");
-	});
-
-	test("handles custom prefix", () => {
-		expect(generateTaskName("coder", "myrepo", 1)).toBe("coder-myrepo-1");
-	});
-
-	test("truncates long repo names to fit 32-char limit", () => {
-		const name = generateTaskName("gh", "a-very-long-repository-name-here", 42);
-		expect(name.length).toBeLessThanOrEqual(32);
-		expect(name).toBe("gh-a-very-long-repository-nam-42");
-	});
-
-	test("truncates repo with 5-digit issue number", () => {
-		const name = generateTaskName(
-			"gh",
-			"a-very-long-repository-name-here",
-			99999,
-		);
-		expect(name.length).toBeLessThanOrEqual(32);
-		expect(name).toBe("gh-a-very-long-repository-99999");
-	});
-
-	test("does not truncate short repo names", () => {
-		expect(generateTaskName("gh", "short", 1)).toBe("gh-short-1");
-	});
-
-	test("throws when prefix and issue number leave no room for repo", () => {
-		expect(() =>
-			generateTaskName("a-very-long-prefix-that-is-huge", "repo", 12345),
-		).toThrow("leave no room for the repo name");
-	});
-});
-
-describe("parseIssueURL", () => {
-	test("parses standard issue URL", () => {
-		const result = parseIssueURL("https://github.com/xmtp/libxmtp/issues/42");
-		expect(result).toEqual({ owner: "xmtp", repo: "libxmtp", issueNumber: 42 });
-	});
-
-	test("throws on invalid URL", () => {
-		expect(() => parseIssueURL("https://github.com/xmtp/libxmtp")).toThrow();
-	});
-
-	test("throws on non-github URL", () => {
-		expect(() =>
-			parseIssueURL("https://gitlab.com/xmtp/repo/issues/1"),
-		).toThrow();
-	});
-});
+import { lookupAndEnsureActiveTask, sendInputWithRetry } from "./task-utils";
 
 describe("lookupAndEnsureActiveTask", () => {
 	test("returns task when active", async () => {

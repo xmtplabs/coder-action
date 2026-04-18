@@ -3,11 +3,8 @@ import type { GitHubClient, PRInfo } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "./messages";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import {
-	generateTaskName,
-	lookupAndEnsureActiveTask,
-	sendInputWithRetry,
-} from "./task-utils";
+import { generateTaskName } from "./task-naming";
+import { lookupAndEnsureActiveTask, sendInputWithRetry } from "./task-utils";
 
 const MAX_LOG_LINES = 100;
 

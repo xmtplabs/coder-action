@@ -3,11 +3,8 @@ import type { GitHubClient } from "../services/github/client";
 import type { Logger } from "../infra/logger";
 import { formatIssueCommentMessage } from "./messages";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
-import {
-	generateTaskName,
-	lookupAndEnsureActiveTask,
-	sendInputWithRetry,
-} from "./task-utils";
+import { generateTaskName } from "./task-naming";
+import { lookupAndEnsureActiveTask, sendInputWithRetry } from "./task-utils";
 
 export interface IssueCommentContext {
 	owner: string;
