@@ -172,6 +172,9 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 		);
 		await instance.modify(async (m) => {
 			await m.disableSleeps();
+			// PR-kind comments resolve the linked issue first — the task is
+			// keyed on the issue number, not the PR number.
+			await m.mockStepResult({ name: "find-linked-issues" }, [{ number: 7 }]);
 			await m.mockStepResult(
 				{ name: "locate-task" },
 				{ taskId: "22222222-2222-2222-2222-222222222222", owner: "coder-user" },

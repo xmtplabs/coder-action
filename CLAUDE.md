@@ -63,7 +63,8 @@ The Worker does ~zero long-running work in the request path: signature verificat
 |---|---|
 | `issues.assigned` | `check-github-permission` → `lookup-coder-user` → `create-coder-task` → `comment-on-issue` |
 | `issues.closed` | `delete-coder-task` → `comment-on-issue` |
-| `issue_comment` / `pull_request_review_comment` / `pull_request_review` | `locate-task` → `ensureTaskReady` (pre-poll + poll loop) → `send-task-input` → `react-to-comment` |
+| `issue_comment` on an issue | `locate-task` → `ensureTaskReady` (pre-poll + poll loop) → `send-task-input` → `react-to-comment` |
+| `issue_comment` / `pull_request_review_comment` / `pull_request_review` on an agent PR | `find-linked-issues` → `locate-task` → `ensureTaskReady` → `send-task-input` → `react-to-comment`. PR comments must be keyed on the linked issue number, not the PR number, because tasks are named `{prefix}-{repo}-{issueNumber}` deterministically. A PR with no linked issue silently no-ops. |
 | `workflow_run.completed` (failure) | `fetch-pr-info` → `find-linked-issues` → `locate-task` → `fetch-failed-jobs` → `fetch-job-logs-<id>` × N → `ensureTaskReady` → `send-task-input` |
 
 ### Waiting for Coder tasks

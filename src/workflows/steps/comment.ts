@@ -35,11 +35,44 @@ function buildCommentMessage(event: CommentPostedEvent): string {
 }
 
 /**
+ * Resolve the *issue* number that the comment's task should be keyed under.
+ *
+ * Tasks are named `{prefix}-{repo}-{issueNumber}` — deterministic per ISSUE,
+ * not per PR. For issue-kind comments `event.target.number` is already the
+ * issue number, so no resolution is needed. For PR-kind comments
+ * `event.target.number` is the PR number; the backing task was originally
+ * created for an issue, and the PR's `closingIssuesReferences` GraphQL field
+ * is what links them. We look up the first linked issue and use its number.
+ *
+ * Returns `null` when the PR has no linked issue — meaning no task was ever
+ * created for this change, and the comment has nothing to route to.
+ */
+async function resolveIssueNumber(
+	step: WorkflowStep,
+	github: GitHubClient,
+	event: CommentPostedEvent,
+): Promise<number | null> {
+	if (event.target.kind === "issue") {
+		return event.target.number;
+	}
+	const linked = await step.do("find-linked-issues", async () => {
+		const issues = await github.findLinkedIssues(
+			event.repository.owner,
+			event.repository.name,
+			event.target.number,
+		);
+		return issues.map((i) => ({ number: i.number }));
+	});
+	return linked[0]?.number ?? null;
+}
+
+/**
  * Workflow step factory for `comment_posted` (both PR and issue kinds).
  *
- * Flow: locate-task → ensureTaskReady → send-task-input → react-to-comment.
- * Throws `NonRetryableError` if the task doesn't exist — there's nothing to
- * send to, and retrying won't create it.
+ * Flow: [find-linked-issues for PR comments] → locate-task → ensureTaskReady
+ * → send-task-input → react-to-comment. Throws `NonRetryableError` if the
+ * task doesn't exist — there's nothing to send to, and retrying won't create
+ * it.
  *
  * The task input is wrapped in the same `[INSTRUCTIONS]` / `[COMMENT]` template
  * the pre-migration action classes used (`formatPRCommentMessage` /
@@ -50,10 +83,17 @@ function buildCommentMessage(event: CommentPostedEvent): string {
 export async function runComment(ctx: RunCommentContext): Promise<void> {
 	const { step, coder, github, config, event } = ctx;
 
+	const issueNumber = await resolveIssueNumber(step, github, event);
+	if (issueNumber == null) {
+		// PR comment on a PR with no linked issue → no task exists for it.
+		// Silently skip (matches failed-check.ts's "no linked issue" short-circuit).
+		return;
+	}
+
 	const taskName = generateTaskName(
 		config.coderTaskNamePrefix,
 		event.repository.name,
-		event.target.number,
+		issueNumber,
 	);
 
 	const located = await step.do("locate-task", async () => {
