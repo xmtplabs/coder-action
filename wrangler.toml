@@ -1,0 +1,25 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "coder-action"
+main = "src/main.ts"
+compatibility_date = "2026-04-18"
+compatibility_flags = ["nodejs_compat"]
+
+[[workflows]]
+name = "coder-task-workflow"
+binding = "CODER_TASK_WORKFLOW"
+class_name = "CoderTaskWorkflow"
+
+[limits]
+cpu_ms = 30000
+
+[observability]
+enabled = true
+
+[vars]
+AGENT_GITHUB_USERNAME = "xmtp-coder-agent"
+CODER_URL = "https://coder.example.com"
+CODER_TASK_NAME_PREFIX = "gh"
+CODER_TEMPLATE_NAME = "task-template"
+CODER_TEMPLATE_NAME_CODEX = "task-template-codex"
+CODER_ORGANIZATION = "default"
+LOG_FORMAT = "json"
