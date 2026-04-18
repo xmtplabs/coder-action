@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { waitForTaskIdle } from "./polling";
 import type { ExperimentalCoderSDKTask } from "./schemas";
 import { TaskIdSchema, TaskNameSchema } from "../task-runner";

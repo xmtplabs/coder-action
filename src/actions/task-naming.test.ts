@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { TaskNameSchema } from "../services/task-runner";
 import { generateTaskName } from "./task-naming";
 
