@@ -134,7 +134,7 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 			await m.disableSleeps();
 			await m.mockStepResult(
 				{ name: "locate-task" },
-				{ taskId: "11111111-1111-1111-1111-111111111111", owner: "coder-user" },
+				{ taskId: "11111111-1111-4111-8111-111111111111", owner: "coder-user" },
 			);
 			// ensureTaskReady fast-path: lookup-task returns active+idle → early return
 			await m.mockStepResult(
@@ -177,7 +177,7 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 			await m.mockStepResult({ name: "find-linked-issues" }, [{ number: 7 }]);
 			await m.mockStepResult(
 				{ name: "locate-task" },
-				{ taskId: "22222222-2222-2222-2222-222222222222", owner: "coder-user" },
+				{ taskId: "22222222-2222-4222-8222-222222222222", owner: "coder-user" },
 			);
 			await m.mockStepResult(
 				{ name: "lookup-task" },
@@ -222,7 +222,7 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 			await m.disableSleeps();
 			await m.mockStepResult(
 				{ name: "locate-task" },
-				{ taskId: "33333333-3333-3333-3333-333333333333", owner: "coder-user" },
+				{ taskId: "33333333-3333-4333-8333-333333333333", owner: "coder-user" },
 			);
 			// Pre-poll sees paused → triggers resume → first poll sees idle
 			await m.mockStepResult(
@@ -278,7 +278,7 @@ describe("CoderTaskWorkflow dispatch — check_failed", () => {
 			await m.mockStepResult({ name: "find-linked-issues" }, [{ number: 1 }]);
 			await m.mockStepResult(
 				{ name: "locate-task" },
-				{ taskId: "44444444-4444-4444-4444-444444444444", owner: "coder-user" },
+				{ taskId: "44444444-4444-4444-8444-444444444444", owner: "coder-user" },
 			);
 			await m.mockStepResult({ name: "fetch-failed-jobs" }, [
 				{ id: 7, name: "test", conclusion: "failure" },

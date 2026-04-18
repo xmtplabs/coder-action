@@ -20,16 +20,15 @@
 		"@octokit/graphql": "^9.0.3",
 		"@octokit/rest": "^22.0.1",
 		"@octokit/webhooks": "^14.2.0",
-		"hono": "^4.12.9",
-		"zod": "^3.25.76"
+		"zod": "^4.3.6"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.7",
-		"@cloudflare/vitest-pool-workers": "latest",
-		"@cloudflare/workers-types": "latest",
+		"@biomejs/biome": "^2.4.12",
+		"@cloudflare/vitest-pool-workers": "^0.14.7",
+		"@cloudflare/workers-types": "^4.20260418.1",
 		"@types/node": "^25.6.0",
-		"typescript": "^5.9.3",
+		"typescript": "^6.0.3",
 		"vitest": "^4.1.0",
-		"wrangler": "^4.79.0"
+		"wrangler": "^4.83.0"
 	}
 }

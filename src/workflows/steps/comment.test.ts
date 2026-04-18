@@ -40,7 +40,7 @@ type GithubStub = {
 function makeCoder(overrides: Partial<CoderStub> = {}): CoderStub {
 	return {
 		findTaskByName: vi.fn(async () => ({
-			id: "11111111-1111-1111-1111-111111111111",
+			id: "11111111-1111-4111-8111-111111111111",
 			owner_id: "owner-uuid",
 			status: "active",
 			current_state: { state: "idle" },
@@ -48,7 +48,7 @@ function makeCoder(overrides: Partial<CoderStub> = {}): CoderStub {
 		})),
 		resumeWorkspace: vi.fn(async () => {}),
 		getTaskById: vi.fn(async () => ({
-			id: "11111111-1111-1111-1111-111111111111",
+			id: "11111111-1111-4111-8111-111111111111",
 			status: "active",
 			current_state: { state: "idle" },
 			workspace_id: "ws-1",

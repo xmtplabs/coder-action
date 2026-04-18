@@ -43,7 +43,7 @@ export class MockTaskRunner implements TaskRunner {
 			id: "00000000-0000-0000-0000-000000000000",
 			status: "active",
 			current_state: { state: "idle" },
-			workspace_id: "00000000-0000-0000-0000-000000000099",
+			workspace_id: "99999999-9999-4999-8999-999999999999",
 		}),
 	);
 	create = vi.fn(

@@ -3,7 +3,7 @@ import type { CoderService } from "../services/coder/service";
 import { TaskIdSchema } from "../services/task-runner";
 import { ensureTaskReady } from "./ensure-task-ready";
 
-const taskId = TaskIdSchema.parse("11111111-1111-1111-1111-111111111111");
+const taskId = TaskIdSchema.parse("11111111-1111-4111-8111-111111111111");
 
 // ── Test harness ─────────────────────────────────────────────────────────
 // A fake WorkflowStep that:

@@ -97,7 +97,7 @@ describe("runCreateTask", () => {
 		const coder = {
 			lookupUser: vi.fn(async () => "coder-user"),
 			create: vi.fn(async () => ({
-				id: "11111111-1111-1111-1111-111111111111",
+				id: "11111111-1111-4111-8111-111111111111",
 				name: "gh-repo-42",
 				status: "ready",
 				owner: "coder-user",
@@ -124,7 +124,7 @@ describe("runCreateTask", () => {
 		expect(result).toEqual({
 			taskName: "gh-repo-42",
 			owner: "coder-user",
-			taskId: "11111111-1111-1111-1111-111111111111",
+			taskId: "11111111-1111-4111-8111-111111111111",
 			url: "https://coder/t",
 			status: "ready",
 		});
