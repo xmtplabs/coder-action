@@ -8,11 +8,11 @@ import { PRCommentAction } from "../actions/pr-comment";
 import type { Logger } from "../infra/logger";
 import type { ActionOutputs, HandlerConfig } from "../config/handler-config";
 import type { AppConfig } from "../config/app-config";
-import type { RouteResult } from "../webhooks/github/router";
+import type { Event } from "./types";
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
-export interface HandlerDispatcherOptions {
+export interface EventDispatcherOptions {
 	config: AppConfig;
 	createInstallationOctokit: (installationId: number) => Octokit;
 	taskRunner: TaskRunner;
@@ -25,22 +25,24 @@ export interface HandlerDispatcherOptions {
 	createGitHubClient?: (octokit: Octokit) => GitHubClient;
 }
 
-// Helper type to extract dispatched route results
-type DispatchedResult = Extract<RouteResult, { dispatched: true }>;
-
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
-export class HandlerDispatcher {
-	constructor(private readonly options: HandlerDispatcherOptions) {}
+export class EventDispatcher {
+	private readonly octokitCache = new Map<number, Octokit>();
 
-	async dispatch(
-		result: DispatchedResult,
-		requestLogger?: Logger,
-	): Promise<ActionOutputs> {
+	constructor(private readonly options: EventDispatcherOptions) {}
+
+	async dispatch(event: Event, requestLogger?: Logger): Promise<ActionOutputs> {
 		const logger = requestLogger ?? this.options.logger;
-		const octokit = this.options.createInstallationOctokit(
-			result.installationId,
-		);
+
+		// Build the per-installation Octokit (cached)
+		const installationId = event.source.installationId;
+		let octokit = this.octokitCache.get(installationId);
+		if (!octokit) {
+			octokit = this.options.createInstallationOctokit(installationId);
+			this.octokitCache.set(installationId, octokit);
+		}
+
 		const createGitHubClient =
 			this.options.createGitHubClient ??
 			((oct: Octokit) => new GitHubClient(oct, logger));
@@ -57,109 +59,100 @@ export class HandlerDispatcher {
 			agentGithubUsername: this.options.config.agentGithubUsername,
 		};
 
-		switch (result.handler) {
-			case "create_task": {
-				const ctx = result.context;
+		switch (event.type) {
+			case "task_requested": {
 				const action = new CreateTaskAction(
 					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
-						owner: ctx.repoOwner,
-						repo: ctx.repoName,
-						issueNumber: ctx.issueNumber,
-						issueUrl: ctx.issueUrl,
-						issueTitle: ctx.issueTitle,
-						issueLabels: ctx.issueLabels,
-						senderLogin: ctx.senderLogin,
-						senderId: ctx.senderId,
+						owner: event.repository.owner,
+						repo: event.repository.name,
+						issueNumber: event.issue.number,
+						issueUrl: event.issue.url,
+						issueTitle: "",
+						issueLabels: [],
+						senderLogin: event.requester.login,
+						senderId: event.requester.externalId,
 					},
 					logger,
 				);
 				return action.run();
 			}
 
-			case "close_task": {
-				const ctx = result.context;
+			case "task_closed": {
 				const action = new CloseTaskAction(
 					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
-						owner: ctx.repoOwner,
-						repo: ctx.repoName,
-						issueNumber: ctx.issueNumber,
+						owner: event.repository.owner,
+						repo: event.repository.name,
+						issueNumber: event.issue.number,
 					},
 					logger,
 				);
 				return action.run();
 			}
 
-			case "pr_comment": {
-				const ctx = result.context;
-				const action = new PRCommentAction(
-					this.options.taskRunner,
-					github,
-					handlerConfig,
-					{
-						owner: ctx.repoOwner,
-						repo: ctx.repoName,
-						prNumber: ctx.issueNumber,
-						prAuthor: ctx.prAuthor,
-						commenterLogin: ctx.commenterLogin,
-						commentId: ctx.commentId,
-						commentUrl: ctx.commentUrl,
-						commentBody: ctx.commentBody,
-						commentCreatedAt: ctx.commentCreatedAt,
-						isReviewComment: ctx.isReviewComment,
-						isReviewSubmission: ctx.isReviewSubmission,
-						filePath: ctx.filePath,
-						lineNumber: ctx.lineNumber,
-					},
-					logger,
-				);
-				return action.run();
-			}
+			case "comment_posted": {
+				if (event.target.kind === "pull_request") {
+					const action = new PRCommentAction(
+						this.options.taskRunner,
+						github,
+						handlerConfig,
+						{
+							owner: event.repository.owner,
+							repo: event.repository.name,
+							prNumber: event.target.number,
+							prAuthor: event.target.authorLogin,
+							commenterLogin: event.comment.authorLogin,
+							commentId: event.comment.id,
+							commentUrl: event.comment.url,
+							commentBody: event.comment.body,
+							commentCreatedAt: event.comment.createdAt,
+							isReviewComment: event.comment.isReviewComment,
+							isReviewSubmission: event.comment.isReviewSubmission,
+						},
+						logger,
+					);
+					return action.run();
+				}
 
-			case "issue_comment": {
-				const ctx = result.context;
+				// kind === "issue"
 				const action = new IssueCommentAction(
 					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
-						owner: ctx.repoOwner,
-						repo: ctx.repoName,
-						issueNumber: ctx.issueNumber,
-						commentId: ctx.commentId,
-						commenterLogin: ctx.commenterLogin,
-						commentUrl: ctx.commentUrl,
-						commentBody: ctx.commentBody,
-						commentCreatedAt: ctx.commentCreatedAt,
+						owner: event.repository.owner,
+						repo: event.repository.name,
+						issueNumber: event.target.number,
+						commentId: event.comment.id,
+						commenterLogin: event.comment.authorLogin,
+						commentUrl: event.comment.url,
+						commentBody: event.comment.body,
+						commentCreatedAt: event.comment.createdAt,
 					},
 					logger,
 				);
 				return action.run();
 			}
 
-			case "failed_check": {
-				const ctx = result.context;
+			case "check_failed": {
 				const action = new FailedCheckAction(
 					this.options.taskRunner,
 					github,
 					handlerConfig,
 					{
-						owner: ctx.repoOwner,
-						repo: ctx.repoName,
-						runId: ctx.workflowRunId,
-						runUrl: ctx.workflowRunUrl,
-						headSha: ctx.headSha,
-						workflowName: ctx.workflowName ?? "unknown",
-						workflowFile:
-							ctx.workflowPath != null
-								? (ctx.workflowPath.split("/").pop() ?? "unknown")
-								: "unknown",
-						pullRequests: ctx.pullRequestNumbers.map((n) => ({ number: n })),
+						owner: event.repository.owner,
+						repo: event.repository.name,
+						runId: event.run.id,
+						runUrl: event.run.url,
+						headSha: event.run.headSha,
+						workflowName: event.run.workflowName,
+						workflowFile: event.run.workflowFile,
+						pullRequests: event.pullRequestNumbers.map((n) => ({ number: n })),
 					},
 					logger,
 				);

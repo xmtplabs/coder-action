@@ -16,109 +16,22 @@ import {
 	isWorkflowFailure,
 	isEmptyReviewBody,
 } from "./guards";
+import type {
+	Event,
+	TaskRequestedEvent,
+	TaskClosedEvent,
+	CommentPostedEvent,
+	CheckFailedEvent,
+} from "../../events/types";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export type HandlerType =
-	| "create_task"
-	| "close_task"
-	| "pr_comment"
-	| "issue_comment"
-	| "failed_check";
-
-export type CreateTaskContext = {
-	issueNumber: number;
-	issueUrl: string;
-	issueTitle: string;
-	issueLabels: string[];
-	repoName: string;
-	repoOwner: string;
-	senderLogin: string;
-	senderId: number;
+export type SkipResult = {
+	dispatched: false;
+	reason: string;
+	/** Set to true when the failure is due to a payload validation error. */
+	validationError?: boolean;
 };
-
-export type CloseTaskContext = {
-	issueNumber: number;
-	repoName: string;
-	repoOwner: string;
-};
-
-export type PRCommentContext = {
-	issueNumber: number;
-	commentBody: string;
-	commentUrl: string;
-	commentId: number;
-	commentCreatedAt: string;
-	repoName: string;
-	repoOwner: string;
-	prAuthor: string;
-	commenterLogin: string;
-	isReviewComment: boolean;
-	isReviewSubmission: boolean;
-	filePath?: string;
-	lineNumber?: number;
-};
-
-export type IssueCommentContext = {
-	issueNumber: number;
-	commentBody: string;
-	commentUrl: string;
-	commentId: number;
-	commentCreatedAt: string;
-	repoName: string;
-	repoOwner: string;
-	commenterLogin: string;
-};
-
-export type FailedCheckContext = {
-	workflowRunId: number;
-	workflowName: string | null;
-	workflowPath: string | null;
-	headSha: string;
-	workflowRunUrl: string;
-	conclusion: string | null;
-	pullRequestNumbers: number[];
-	repoName: string;
-	repoOwner: string;
-};
-
-export type RouteResult =
-	| {
-			dispatched: true;
-			handler: "create_task";
-			installationId: number;
-			context: CreateTaskContext;
-	  }
-	| {
-			dispatched: true;
-			handler: "close_task";
-			installationId: number;
-			context: CloseTaskContext;
-	  }
-	| {
-			dispatched: true;
-			handler: "pr_comment";
-			installationId: number;
-			context: PRCommentContext;
-	  }
-	| {
-			dispatched: true;
-			handler: "issue_comment";
-			installationId: number;
-			context: IssueCommentContext;
-	  }
-	| {
-			dispatched: true;
-			handler: "failed_check";
-			installationId: number;
-			context: FailedCheckContext;
-	  }
-	| {
-			dispatched: false;
-			reason: string;
-			/** Set to true when the failure is due to a payload validation error. */
-			validationError?: boolean;
-	  };
 
 export interface WebhookRouterOptions {
 	agentGithubUsername: string;
@@ -164,7 +77,7 @@ export class WebhookRouter {
 		eventName: string,
 		deliveryId: string,
 		payload: unknown,
-	): Promise<RouteResult> {
+	): Promise<Event | SkipResult> {
 		this.options.logger.debug("Routing webhook", { eventName, deliveryId });
 
 		const action = getAction(payload);
@@ -230,7 +143,7 @@ export class WebhookRouter {
 	private routeIssuesAssigned(
 		payload: IssuesAssignedPayload,
 		instId: number,
-	): RouteResult {
+	): TaskRequestedEvent | SkipResult {
 		const assignee = payload.assignee;
 		if (!isAssigneeAgent(payload, this.options.agentGithubUsername)) {
 			return {
@@ -238,45 +151,47 @@ export class WebhookRouter {
 				reason: `Skipping: assignee login "${assignee?.login}" does not match agent login`,
 			};
 		}
-		return {
-			dispatched: true,
-			handler: "create_task",
-			installationId: instId,
-			context: {
-				issueNumber: payload.issue.number,
-				issueUrl: payload.issue.html_url,
-				issueTitle: payload.issue.title,
-				issueLabels: (payload.issue.labels ?? []).map((l) =>
-					typeof l === "string" ? l : (l.name ?? ""),
-				),
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
-				senderLogin: payload.sender.login,
-				senderId: payload.sender.id,
+		const event: TaskRequestedEvent = {
+			type: "task_requested",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			issue: {
+				number: payload.issue.number,
+				url: payload.issue.html_url,
+			},
+			requester: {
+				login: payload.sender.login,
+				externalId: payload.sender.id,
 			},
 		};
+		return event;
 	}
 
 	private routeIssuesClosed(
 		payload: IssuesClosedPayload,
 		instId: number,
-	): RouteResult {
-		return {
-			dispatched: true,
-			handler: "close_task",
-			installationId: instId,
-			context: {
-				issueNumber: payload.issue.number,
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
+	): TaskClosedEvent | SkipResult {
+		const event: TaskClosedEvent = {
+			type: "task_closed",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			issue: {
+				number: payload.issue.number,
 			},
 		};
+		return event;
 	}
 
 	private routeIssueComment(
 		payload: IssueCommentCreatedPayload | IssueCommentEditedPayload,
 		instId: number,
-	): RouteResult {
+	): CommentPostedEvent | SkipResult {
 		const commentUserLogin = payload.comment.user?.login ?? "";
 		const issueUserLogin = payload.issue.user?.login ?? "";
 
@@ -303,48 +218,61 @@ export class WebhookRouter {
 					reason: `Skipping: PR author "${issueUserLogin}" does not match agent login`,
 				};
 			}
-			return {
-				dispatched: true,
-				handler: "pr_comment",
-				installationId: instId,
-				context: {
-					issueNumber: payload.issue.number,
-					commentBody: payload.comment.body,
-					commentUrl: payload.comment.html_url,
-					commentId: payload.comment.id,
-					commentCreatedAt: payload.comment.created_at,
-					repoName: payload.repository.name,
-					repoOwner: payload.repository.owner.login,
-					prAuthor: issueUserLogin,
-					commenterLogin: commentUserLogin,
+			const event: CommentPostedEvent = {
+				type: "comment_posted",
+				source: { type: "github", installationId: instId },
+				repository: {
+					owner: payload.repository.owner.login,
+					name: payload.repository.name,
+				},
+				target: {
+					kind: "pull_request",
+					number: payload.issue.number,
+					authorLogin: issueUserLogin,
+				},
+				comment: {
+					id: payload.comment.id,
+					body: payload.comment.body,
+					url: payload.comment.html_url,
+					createdAt: payload.comment.created_at,
+					authorLogin: commentUserLogin,
 					isReviewComment: false,
 					isReviewSubmission: false,
 				},
 			};
+			return event;
 		}
 
 		// Plain issue comment
-		return {
-			dispatched: true,
-			handler: "issue_comment",
-			installationId: instId,
-			context: {
-				issueNumber: payload.issue.number,
-				commentBody: payload.comment.body,
-				commentUrl: payload.comment.html_url,
-				commentId: payload.comment.id,
-				commentCreatedAt: payload.comment.created_at,
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
-				commenterLogin: commentUserLogin,
+		const event: CommentPostedEvent = {
+			type: "comment_posted",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			target: {
+				kind: "issue",
+				number: payload.issue.number,
+				authorLogin: issueUserLogin,
+			},
+			comment: {
+				id: payload.comment.id,
+				body: payload.comment.body,
+				url: payload.comment.html_url,
+				createdAt: payload.comment.created_at,
+				authorLogin: commentUserLogin,
+				isReviewComment: false,
+				isReviewSubmission: false,
 			},
 		};
+		return event;
 	}
 
 	private routePRReviewComment(
 		payload: PRReviewCommentCreatedPayload | PRReviewCommentEditedPayload,
 		instId: number,
-	): RouteResult {
+	): CommentPostedEvent | SkipResult {
 		const prUserLogin = payload.pull_request.user?.login ?? "";
 		const commentUserLogin = payload.comment.user?.login ?? "";
 
@@ -367,32 +295,35 @@ export class WebhookRouter {
 			};
 		}
 
-		return {
-			dispatched: true,
-			handler: "pr_comment",
-			installationId: instId,
-			context: {
-				issueNumber: payload.pull_request.number,
-				commentBody: payload.comment.body,
-				commentUrl: payload.comment.html_url,
-				commentId: payload.comment.id,
-				commentCreatedAt: payload.comment.created_at,
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
-				prAuthor: prUserLogin,
-				commenterLogin: commentUserLogin,
+		const event: CommentPostedEvent = {
+			type: "comment_posted",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			target: {
+				kind: "pull_request",
+				number: payload.pull_request.number,
+				authorLogin: prUserLogin,
+			},
+			comment: {
+				id: payload.comment.id,
+				body: payload.comment.body,
+				url: payload.comment.html_url,
+				createdAt: payload.comment.created_at,
+				authorLogin: commentUserLogin,
 				isReviewComment: true,
 				isReviewSubmission: false,
-				filePath: payload.comment.path,
-				lineNumber: payload.comment.line ?? undefined,
 			},
 		};
+		return event;
 	}
 
 	private routePRReviewSubmitted(
 		payload: PRReviewSubmittedPayload,
 		instId: number,
-	): RouteResult {
+	): CommentPostedEvent | SkipResult {
 		const prUserLogin = payload.pull_request.user?.login ?? "";
 		const reviewUserLogin = payload.review.user?.login ?? "";
 
@@ -422,30 +353,35 @@ export class WebhookRouter {
 			};
 		}
 
-		return {
-			dispatched: true,
-			handler: "pr_comment",
-			installationId: instId,
-			context: {
-				issueNumber: payload.pull_request.number,
-				commentBody: payload.review.body ?? "",
-				commentUrl: payload.review.html_url,
-				commentId: payload.review.id,
-				commentCreatedAt: payload.review.submitted_at ?? "",
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
-				prAuthor: prUserLogin,
-				commenterLogin: reviewUserLogin,
+		const event: CommentPostedEvent = {
+			type: "comment_posted",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
+			},
+			target: {
+				kind: "pull_request",
+				number: payload.pull_request.number,
+				authorLogin: prUserLogin,
+			},
+			comment: {
+				id: payload.review.id,
+				body: payload.review.body ?? "",
+				url: payload.review.html_url,
+				createdAt: payload.review.submitted_at ?? "",
+				authorLogin: reviewUserLogin,
 				isReviewComment: false,
 				isReviewSubmission: true,
 			},
 		};
+		return event;
 	}
 
 	private routeWorkflowRunCompleted(
 		payload: WorkflowRunCompletedPayload,
 		instId: number,
-	): RouteResult {
+	): CheckFailedEvent | SkipResult {
 		if (!isWorkflowFailure(payload)) {
 			return {
 				dispatched: false,
@@ -453,23 +389,30 @@ export class WebhookRouter {
 			};
 		}
 
-		return {
-			dispatched: true,
-			handler: "failed_check",
-			installationId: instId,
-			context: {
-				workflowRunId: payload.workflow_run.id,
-				workflowName: payload.workflow_run.name,
-				workflowPath: payload.workflow_run.path ?? null,
-				headSha: payload.workflow_run.head_sha,
-				workflowRunUrl: payload.workflow_run.html_url,
-				conclusion: payload.workflow_run.conclusion,
-				pullRequestNumbers: payload.workflow_run.pull_requests
-					.filter((pr): pr is NonNullable<typeof pr> => pr !== null)
-					.map((pr) => pr.number),
-				repoName: payload.repository.name,
-				repoOwner: payload.repository.owner.login,
+		const workflowPath = payload.workflow_run.path ?? null;
+		const workflowFile =
+			workflowPath != null
+				? (workflowPath.split("/").pop() ?? "unknown")
+				: "unknown";
+
+		const event: CheckFailedEvent = {
+			type: "check_failed",
+			source: { type: "github", installationId: instId },
+			repository: {
+				owner: payload.repository.owner.login,
+				name: payload.repository.name,
 			},
+			run: {
+				id: payload.workflow_run.id,
+				url: payload.workflow_run.html_url,
+				headSha: payload.workflow_run.head_sha,
+				workflowName: payload.workflow_run.name ?? "unknown",
+				workflowFile,
+			},
+			pullRequestNumbers: payload.workflow_run.pull_requests
+				.filter((pr): pr is NonNullable<typeof pr> => pr !== null)
+				.map((pr) => pr.number),
 		};
+		return event;
 	}
 }

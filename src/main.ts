@@ -3,8 +3,8 @@ import { Octokit } from "@octokit/rest";
 import { loadConfig } from "./config/app-config";
 import { createLogger } from "./infra/logger";
 import { CoderService } from "./services/coder/service";
-import { WebhookRouter } from "./webhooks/github/router";
-import { HandlerDispatcher } from "./events/dispatcher";
+import { WebhookRouter, type SkipResult } from "./webhooks/github/router";
+import { EventDispatcher } from "./events/dispatcher";
 import { createApp } from "./http/server";
 
 // ── Startup context ───────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
 		return octokit;
 	};
 
-	const dispatcher = new HandlerDispatcher({
+	const dispatcher = new EventDispatcher({
 		config,
 		createInstallationOctokit,
 		taskRunner,
@@ -104,13 +104,17 @@ async function main(): Promise<void> {
 		webhookSecret: config.webhookSecret,
 		handleWebhook: async (eventName, deliveryId, payload, reqLogger) => {
 			const result = await router.handleWebhook(eventName, deliveryId, payload);
-			if (result.dispatched) {
-				await dispatcher.dispatch(result, reqLogger);
-				return { dispatched: true, handler: result.handler };
+			// SkipResult has `dispatched: false`; Events have a `type` field instead.
+			const isSkip = (r: typeof result): r is SkipResult =>
+				"dispatched" in r && (r as SkipResult).dispatched === false;
+			if (isSkip(result)) {
+				// If the failure was due to a Zod schema validation error, signal 400.
+				const status = result.validationError === true ? 400 : 200;
+				return { dispatched: false, status };
 			}
-			// If the failure was due to a Zod schema validation error, signal 400.
-			const status = result.validationError === true ? 400 : 200;
-			return { dispatched: false, status };
+			// result is an Event
+			await dispatcher.dispatch(result, reqLogger);
+			return { dispatched: true, handler: result.type };
 		},
 		logger,
 	});
