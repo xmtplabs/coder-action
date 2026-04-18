@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { Event, EventSource } from "./types";
 
 describe("Event union", () => {

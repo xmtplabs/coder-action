@@ -1,10 +1,10 @@
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, test, vi } from "vitest";
 import { createStartupContext } from "./main";
 import type { StartupContextOptions } from "./main";
 
 describe("createStartupContext", () => {
 	test("calls GET /app to discover bot identity", async () => {
-		const mockGetApp: StartupContextOptions["getAppInfo"] = mock(() =>
+		const mockGetApp: StartupContextOptions["getAppInfo"] = vi.fn(() =>
 			Promise.resolve({
 				data: { slug: "xmtp-coder-app", id: 12345 },
 			}),
@@ -20,7 +20,7 @@ describe("createStartupContext", () => {
 	});
 
 	test("throws if GET /app fails", async () => {
-		const mockGetApp: StartupContextOptions["getAppInfo"] = mock(() =>
+		const mockGetApp: StartupContextOptions["getAppInfo"] = vi.fn(() =>
 			Promise.reject(new Error("auth failed")),
 		);
 
