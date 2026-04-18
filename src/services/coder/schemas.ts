@@ -56,17 +56,6 @@ export type CoderSDKTemplateVersionPresetsResponse = z.infer<
 	typeof CoderSDKTemplateVersionPresetsResponseSchema
 >;
 
-// ExperimentalCoderSDKCreateTaskRequestSchema is the schema for experimental codersdk.CreateTaskRequest.
-export const ExperimentalCoderSDKCreateTaskRequestSchema = z.object({
-	name: z.string().min(1),
-	template_version_id: z.string().min(1),
-	template_version_preset_id: z.string().min(1).optional(),
-	input: z.string().min(1),
-});
-export type ExperimentalCoderSDKCreateTaskRequest = z.infer<
-	typeof ExperimentalCoderSDKCreateTaskRequestSchema
->;
-
 // ExperimentalCoderSDKTaskStateEntrySchema is the schema for experimental codersdk.TaskState.
 export const ExperimentalCoderSDKTaskStateEntrySchema = z.object({
 	state: z.enum(["idle", "working", "complete", "failed"]),
@@ -112,13 +101,3 @@ export const ExperimentalCoderSDKTaskListResponseSchema = z.object({
 export type ExperimentalCoderSDKTaskListResponse = z.infer<
 	typeof ExperimentalCoderSDKTaskListResponseSchema
 >;
-
-// WorkspaceSchema is the schema for codersdk.Workspace (minimal fields needed here).
-export const WorkspaceSchema = z.object({
-	id: z.string(),
-	latest_build: z.object({
-		status: z.string(),
-		transition: z.string(),
-	}),
-});
-export type Workspace = z.infer<typeof WorkspaceSchema>;

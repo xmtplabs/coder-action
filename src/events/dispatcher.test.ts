@@ -198,12 +198,12 @@ describe("EventDispatcher", () => {
 			expect(outputs.taskName).toBeDefined();
 		});
 
-		test("installation caching: second dispatch reuses Octokit", async () => {
+		test("installation caching: createInstallationOctokit called for each dispatch (factory owns caching)", async () => {
 			const event = makeTaskRequestedEvent();
 			await dispatcher.dispatch(event);
 			await dispatcher.dispatch(event);
-			// createInstallationOctokit called once — cached on second call
-			expect(createInstallationOctokit).toHaveBeenCalledTimes(1);
+			// Dispatcher delegates caching to the factory; called once per dispatch
+			expect(createInstallationOctokit).toHaveBeenCalledTimes(2);
 		});
 	});
 
@@ -352,18 +352,20 @@ describe("EventDispatcher", () => {
 
 	// ── installation caching (cross-event) ───────────────────────────────────
 
-	describe("installation caching", () => {
-		test("two dispatches with same installationId reuse the Octokit instance", async () => {
+	describe("installation id forwarding", () => {
+		test("two dispatches with same installationId call factory twice (caching is in factory)", async () => {
 			const event1 = makeTaskClosedEvent();
 			const event2 = makeTaskClosedEvent();
 
 			await dispatcher.dispatch(event1);
 			await dispatcher.dispatch(event2);
 
-			expect(createInstallationOctokit).toHaveBeenCalledTimes(1);
+			// Dispatcher no longer caches — it delegates to the factory each time.
+			// The factory (createInstallationOctokit in main.ts) does the caching.
+			expect(createInstallationOctokit).toHaveBeenCalledTimes(2);
 		});
 
-		test("two dispatches with different installationIds create separate Octokits", async () => {
+		test("two dispatches with different installationIds call factory with correct ids", async () => {
 			const event1 = makeTaskClosedEvent({
 				source: { type: "github", installationId: 11111 },
 			});

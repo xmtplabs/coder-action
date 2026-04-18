@@ -28,20 +28,15 @@ export interface EventDispatcherOptions {
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 export class EventDispatcher {
-	private readonly octokitCache = new Map<number, Octokit>();
-
 	constructor(private readonly options: EventDispatcherOptions) {}
 
 	async dispatch(event: Event, requestLogger?: Logger): Promise<ActionOutputs> {
 		const logger = requestLogger ?? this.options.logger;
 
-		// Build the per-installation Octokit (cached)
+		// Build the per-installation Octokit.
+		// Caching is handled by the createInstallationOctokit factory (main.ts).
 		const installationId = event.source.installationId;
-		let octokit = this.octokitCache.get(installationId);
-		if (!octokit) {
-			octokit = this.options.createInstallationOctokit(installationId);
-			this.octokitCache.set(installationId, octokit);
-		}
+		const octokit = this.options.createInstallationOctokit(installationId);
 
 		const createGitHubClient =
 			this.options.createGitHubClient ??
