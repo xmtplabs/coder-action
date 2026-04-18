@@ -68,6 +68,7 @@ export async function waitForTaskIdle(params: {
 				break;
 			}
 			case "error": {
+				nilStateSince = null;
 				if (errorSince === null) {
 					errorSince = current;
 				}

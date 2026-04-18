@@ -215,11 +215,10 @@ describe("CoderService.create", () => {
 		expect(task.name).toBe(TASK_NAME);
 	});
 
-	test("skips preset lookup when no templatePreset configured and uses default preset", async () => {
-		const calls: string[] = [];
+	test("fetches default preset when no templatePreset configured and uses it in POST body", async () => {
+		const postBodies: unknown[] = [];
 		const fetchFn = mock((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
-			calls.push(`${method} ${url}`);
 
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
@@ -231,6 +230,9 @@ describe("CoderService.create", () => {
 				return Promise.resolve(createMockResponse(makePresets(true)));
 			}
 			if (method === "POST" && url.includes("/api/experimental/tasks/")) {
+				postBodies.push(
+					init?.body ? JSON.parse(init.body as string) : undefined,
+				);
 				return Promise.resolve(
 					createMockResponse(
 						makeTask({ status: "pending", current_state: null }),
@@ -243,9 +245,10 @@ describe("CoderService.create", () => {
 		const service = makeService(fetchFn as unknown as typeof fetch);
 		await service.create({ taskName: TASK_NAME, owner: OWNER, input: "test" });
 
-		// Preset fetch happens because we pick the default preset
-		const presetCalls = calls.filter((c) => c.includes("/presets"));
-		expect(presetCalls.length).toBeGreaterThanOrEqual(1);
+		// POST body must include the default preset's ID
+		expect(postBodies).toHaveLength(1);
+		const body = postBodies[0] as Record<string, unknown>;
+		expect(body.template_version_preset_id).toBe(PRESET_ID);
 	});
 });
 
@@ -382,6 +385,50 @@ describe("CoderService.sendInput", () => {
 
 		expect(waitFn).toHaveBeenCalledTimes(1);
 
+		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
+		const sendCalls = allCalls.filter(
+			([url, init]) =>
+				(init?.method ?? "GET") === "POST" && url.includes("/send"),
+		);
+		expect(sendCalls).toHaveLength(1);
+	});
+
+	// ── Test 5b: active+working task — waits before sending ───────────────────
+
+	test("active+working task — waitForTaskIdle called once before send", async () => {
+		const fetchFn = mock((url: string, init?: RequestInit) => {
+			const method = init?.method ?? "GET";
+
+			// Resolve task — active+working
+			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
+				return Promise.resolve(
+					createMockResponse({
+						tasks: [
+							makeTask({
+								status: "active",
+								current_state: { state: "working" },
+							}),
+						],
+					}),
+				);
+			}
+			if (method === "POST" && url.includes("/send")) {
+				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
+			}
+			throw new Error(`Unexpected fetch: ${method} ${url}`);
+		});
+
+		const waitFn = mock((_params: unknown) => Promise.resolve());
+		const service = makeService(fetchFn as unknown as typeof fetch, {
+			waitForTaskIdleFn: waitFn as unknown as NonNullable<WaitFnType>,
+		});
+
+		await service.sendInput({ taskName: TASK_NAME, owner: OWNER, input: "hi" });
+
+		// waitForTaskIdle must be called once (task is not directly ready)
+		expect(waitFn).toHaveBeenCalledTimes(1);
+
+		// exactly one send POST
 		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
 		const sendCalls = allCalls.filter(
 			([url, init]) =>
@@ -531,6 +578,47 @@ describe("CoderService.delete", () => {
 		expect(deleteCalls).toHaveLength(1);
 		// No workspace calls at all
 		expect(workspaceCalls).toHaveLength(0);
+	});
+
+	test("without owner, resolves UUID owner_id to username before DELETE", async () => {
+		const OWNER_UUID = "550e8400-e29b-41d4-a716-446655440004"; // makeTask() owner_id
+		const RESOLVED_USERNAME = "resolved-username";
+
+		const fetchFn = mock((url: string, init?: RequestInit) => {
+			const method = init?.method ?? "GET";
+			if (
+				method === "GET" &&
+				url.includes("/api/experimental/tasks") &&
+				!url.includes("/api/v2/users/")
+			) {
+				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
+			}
+			if (method === "GET" && url.includes(`/api/v2/users/${OWNER_UUID}`)) {
+				return Promise.resolve(
+					createMockResponse({
+						id: OWNER_UUID,
+						username: RESOLVED_USERNAME,
+						email: `${RESOLVED_USERNAME}@test.com`,
+						organization_ids: [],
+					}),
+				);
+			}
+			if (method === "DELETE" && url.includes("/api/experimental/tasks/")) {
+				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
+			}
+			throw new Error(`Unexpected fetch: ${method} ${url}`);
+		});
+
+		const service = makeService(fetchFn as unknown as typeof fetch);
+		const result = await service.delete({ taskName: TASK_NAME });
+		expect(result).toEqual({ deleted: true });
+
+		const allCalls = fetchFn.mock.calls as Array<[string, RequestInit?]>;
+		const deleteCall = allCalls.find(([, init]) => init?.method === "DELETE");
+		expect(deleteCall).toBeDefined();
+		// DELETE URL must contain the resolved username, NOT the UUID
+		expect(deleteCall?.[0]).toContain(`/tasks/${RESOLVED_USERNAME}/`);
+		expect(deleteCall?.[0]).not.toContain(OWNER_UUID);
 	});
 
 	test("no-op when task missing — no DELETE call, returns { deleted: false } (EARS-REQ-11)", async () => {

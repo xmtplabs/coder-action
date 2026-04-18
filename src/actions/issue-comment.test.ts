@@ -60,6 +60,7 @@ describe("IssueCommentAction", () => {
 		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
 			{ taskName: string; input: string; timeout: number },
 		];
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
 		expect(sendArgs[0].input).toContain("New Comment on Issue:");
 		expect(sendArgs[0].input).toContain("Actually, the requirement changed");
 		expect(sendArgs[0].timeout).toBe(120_000);
@@ -144,7 +145,7 @@ describe("IssueCommentAction", () => {
 		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
 	// Task in error state — skip

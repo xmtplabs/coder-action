@@ -501,7 +501,8 @@ export class CoderService implements TaskRunner {
 		const raw = await this.findTask(taskName, owner);
 		if (!raw) return { deleted: false };
 
-		const resolvedOwner = owner ?? raw.owner_id;
+		const resolvedOwner =
+			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
 		await this.request(
 			`/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(raw.id)}`,
 			{ method: "DELETE" },

@@ -71,6 +71,26 @@ describe("waitForTaskIdle", () => {
 		).rejects.toThrow(/error/i);
 	});
 
+	test("resolves when error clears within grace window", async () => {
+		// First two polls return error, third returns active+idle
+		const client = fakeClient([
+			{ status: "error" },
+			{ status: "error" },
+			{ status: "active", current_state: { state: "idle" } },
+		]);
+		// 60s steps — two error polls each advance by 60s (well inside 5-minute grace)
+		await waitForTaskIdle({
+			client,
+			taskId,
+			owner: "u1",
+			log: logNoop,
+			sleepFn: noSleep,
+			now: fakeClock(60_000),
+			timeoutMs: 10 * 60_000,
+		});
+		// Should resolve without throwing
+	});
+
 	test("treats active+null current_state as ready after 30s grace", async () => {
 		const client = fakeClient([{ status: "active", current_state: null }]);
 		await waitForTaskIdle({
@@ -82,6 +102,38 @@ describe("waitForTaskIdle", () => {
 			now: fakeClock(11_000),
 			timeoutMs: 120_000,
 		});
+	});
+
+	test("resets nil-state grace window after error recovery", async () => {
+		// active+null → error → active+null → active+idle
+		// With 15s steps, without the reset the stale nilStateSince from poll 1
+		// would be (15s older than current) + 15s (error) + 15s (recover) = 30s,
+		// tripping NIL_STATE_GRACE_MS and returning on poll 3. The fix keeps it
+		// waiting until poll 4 when the task reports idle.
+		const seq: Array<Partial<ExperimentalCoderSDKTask>> = [
+			{ status: "active", current_state: null },
+			{ status: "error" },
+			{ status: "active", current_state: null },
+			{ status: "active", current_state: { state: "idle" } },
+		];
+		let calls = 0;
+		const client = {
+			getTaskById: async (_id: string, _owner?: string) => {
+				const task = baseTask(seq[Math.min(calls, seq.length - 1)]);
+				calls += 1;
+				return task;
+			},
+		};
+		await waitForTaskIdle({
+			client,
+			taskId,
+			owner: "u1",
+			log: logNoop,
+			sleepFn: noSleep,
+			now: fakeClock(15_000),
+			timeoutMs: 10 * 60_000,
+		});
+		expect(calls).toBe(4);
 	});
 
 	test("rejects on paused status during wait", async () => {

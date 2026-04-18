@@ -82,6 +82,8 @@ describe("FailedCheckAction", () => {
 		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
 			{ taskName: string; input: string; timeout: number },
 		];
+		// linked issue #42 → task name includes issue number
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
 		expect(sendArgs[0].input).toContain("CI Check Failed on PR:");
 		expect(sendArgs[0].input).toContain("test assertion failed");
 		expect(sendArgs[0].timeout).toBe(120_000);
@@ -202,7 +204,7 @@ describe("FailedCheckAction", () => {
 		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("no-linked-issue");
+		expect(result.skipReason).toBe("no-linked-issue");
 	});
 
 	// Edge: task not found
@@ -219,7 +221,7 @@ describe("FailedCheckAction", () => {
 		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
 	// Edge: task in error state — skip

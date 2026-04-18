@@ -70,6 +70,7 @@ describe("PRCommentAction", () => {
 		const sendArgs = runner.sendInput.mock.calls[0] as unknown as [
 			{ taskName: string; input: string; timeout: number },
 		];
+		expect(String(sendArgs[0].taskName)).toBe("gh-libxmtp-42");
 		expect(sendArgs[0].input).toContain("New Comment on PR:");
 		expect(sendArgs[0].input).toContain("Please fix the typo");
 		expect(sendArgs[0].timeout).toBe(120_000);
@@ -142,20 +143,6 @@ describe("PRCommentAction", () => {
 		expect(result.skipReason).toBe("self-comment");
 	});
 
-	test("skips self-comment using agentGithubUsername", async () => {
-		const ctx = { ...validContext, commenterLogin: "xmtp-coder-agent" };
-		const action = new PRCommentAction(
-			runner,
-			github as unknown as import("../services/github/client").GitHubClient,
-			baseInputs,
-			ctx,
-			logger,
-		);
-		const result = await action.run();
-		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toBe("self-comment");
-	});
-
 	// AC #13: No linked issue
 	test("skips when no linked issue found", async () => {
 		github.findLinkedIssues.mockResolvedValue([]);
@@ -169,7 +156,7 @@ describe("PRCommentAction", () => {
 		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("no-linked-issue");
+		expect(result.skipReason).toBe("no-linked-issue");
 	});
 
 	// AC #14: Task not found
@@ -185,7 +172,7 @@ describe("PRCommentAction", () => {
 		const result = await action.run();
 
 		expect(result.skipped).toBe(true);
-		expect(result.skipReason).toContain("task-not-found");
+		expect(result.skipReason).toBe("task-not-found");
 	});
 
 	// AC #14: Task in error state — skip
