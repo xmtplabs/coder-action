@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { Logger } from "./infra/logger";
-import { type WebhookEnv, webhookSignatureMiddleware } from "./http/middleware";
+import type { Logger } from "../infra/logger";
+import { type WebhookEnv, webhookSignatureMiddleware } from "./middleware";
 
 export interface WebhookHandleResult {
 	dispatched: boolean;

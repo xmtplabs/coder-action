@@ -5,7 +5,7 @@ import { createLogger } from "./infra/logger";
 import { RealCoderClient } from "./services/coder/client";
 import { WebhookRouter } from "./webhook-router";
 import { HandlerDispatcher } from "./handler-dispatcher";
-import { createApp } from "./server";
+import { createApp } from "./http/server";
 
 // ── Startup context ───────────────────────────────────────────────────────────
 

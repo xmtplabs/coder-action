@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { createApp } from "./server";
-import { TestLogger } from "./infra/logger";
+import { TestLogger } from "../infra/logger";
 
 async function computeSignature(secret: string, body: string): Promise<string> {
 	const encoder = new TextEncoder();

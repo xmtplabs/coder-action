@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { createApp } from "./server";
+import { createApp } from "./http/server";
 import {
 	WebhookRouter,
 	type RouteResult,
