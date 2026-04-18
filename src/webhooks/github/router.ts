@@ -9,6 +9,13 @@ import type {
 	PRReviewSubmittedPayload,
 	WorkflowRunCompletedPayload,
 } from "./payload-types";
+import {
+	isIgnoredLogin,
+	isAssigneeAgent,
+	isPrAuthoredByAgent,
+	isWorkflowFailure,
+	isEmptyReviewBody,
+} from "./guards";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -146,14 +153,7 @@ function getInstallationId(payload: unknown): number {
 // ── Router ────────────────────────────────────────────────────────────────────
 
 export class WebhookRouter {
-	private readonly ignoredLogins: Set<string>;
-
-	constructor(private readonly options: WebhookRouterOptions) {
-		this.ignoredLogins = new Set([
-			options.appBotLogin,
-			options.agentGithubUsername,
-		]);
-	}
+	constructor(private readonly options: WebhookRouterOptions) {}
 
 	/**
 	 * Routes a webhook payload to the appropriate handler based on the
@@ -232,7 +232,7 @@ export class WebhookRouter {
 		instId: number,
 	): RouteResult {
 		const assignee = payload.assignee;
-		if (!assignee || assignee.login !== this.options.agentGithubUsername) {
+		if (!isAssigneeAgent(payload, this.options.agentGithubUsername)) {
 			return {
 				dispatched: false,
 				reason: `Skipping: assignee login "${assignee?.login}" does not match agent login`,
@@ -280,7 +280,12 @@ export class WebhookRouter {
 		const commentUserLogin = payload.comment.user?.login ?? "";
 		const issueUserLogin = payload.issue.user?.login ?? "";
 
-		if (this.ignoredLogins.has(commentUserLogin)) {
+		if (
+			isIgnoredLogin(commentUserLogin, {
+				agentLogin: this.options.agentGithubUsername,
+				appBotLogin: this.options.appBotLogin,
+			})
+		) {
 			return {
 				dispatched: false,
 				reason: `Skipping: comment author "${commentUserLogin}" is in ignored logins`,
@@ -290,7 +295,9 @@ export class WebhookRouter {
 		// Issue comment on a PR (issue.pull_request is present and non-null)
 		// Guard: only forward comments on PRs opened by the agent
 		if (payload.issue.pull_request != null) {
-			if (issueUserLogin !== this.options.agentGithubUsername) {
+			if (
+				!isPrAuthoredByAgent(issueUserLogin, this.options.agentGithubUsername)
+			) {
 				return {
 					dispatched: false,
 					reason: `Skipping: PR author "${issueUserLogin}" does not match agent login`,
@@ -341,14 +348,19 @@ export class WebhookRouter {
 		const prUserLogin = payload.pull_request.user?.login ?? "";
 		const commentUserLogin = payload.comment.user?.login ?? "";
 
-		if (prUserLogin !== this.options.agentGithubUsername) {
+		if (!isPrAuthoredByAgent(prUserLogin, this.options.agentGithubUsername)) {
 			return {
 				dispatched: false,
 				reason: `Skipping: pull_request.user login "${prUserLogin}" does not match agent login`,
 			};
 		}
 
-		if (this.ignoredLogins.has(commentUserLogin)) {
+		if (
+			isIgnoredLogin(commentUserLogin, {
+				agentLogin: this.options.agentGithubUsername,
+				appBotLogin: this.options.appBotLogin,
+			})
+		) {
 			return {
 				dispatched: false,
 				reason: `Skipping: comment author "${commentUserLogin}" is in ignored logins`,
@@ -384,21 +396,26 @@ export class WebhookRouter {
 		const prUserLogin = payload.pull_request.user?.login ?? "";
 		const reviewUserLogin = payload.review.user?.login ?? "";
 
-		if (prUserLogin !== this.options.agentGithubUsername) {
+		if (!isPrAuthoredByAgent(prUserLogin, this.options.agentGithubUsername)) {
 			return {
 				dispatched: false,
 				reason: `Skipping: pull_request.user login "${prUserLogin}" does not match agent login`,
 			};
 		}
 
-		if (this.ignoredLogins.has(reviewUserLogin)) {
+		if (
+			isIgnoredLogin(reviewUserLogin, {
+				agentLogin: this.options.agentGithubUsername,
+				appBotLogin: this.options.appBotLogin,
+			})
+		) {
 			return {
 				dispatched: false,
 				reason: `Skipping: review author "${reviewUserLogin}" is in ignored logins`,
 			};
 		}
 
-		if (!payload.review.body) {
+		if (isEmptyReviewBody(payload)) {
 			return {
 				dispatched: false,
 				reason: "Skipping: review body is empty or null",
@@ -411,7 +428,7 @@ export class WebhookRouter {
 			installationId: instId,
 			context: {
 				issueNumber: payload.pull_request.number,
-				commentBody: payload.review.body,
+				commentBody: payload.review.body ?? "",
 				commentUrl: payload.review.html_url,
 				commentId: payload.review.id,
 				commentCreatedAt: payload.review.submitted_at ?? "",
@@ -429,7 +446,7 @@ export class WebhookRouter {
 		payload: WorkflowRunCompletedPayload,
 		instId: number,
 	): RouteResult {
-		if (payload.workflow_run.conclusion !== "failure") {
+		if (!isWorkflowFailure(payload)) {
 			return {
 				dispatched: false,
 				reason: `Skipping: workflow_run conclusion is "${payload.workflow_run.conclusion}", not "failure"`,
