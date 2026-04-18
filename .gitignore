@@ -3,3 +3,7 @@ dist/
 .DS_Store
 *.log
 docs/plans/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/

@@ -1,0 +1,7 @@
+# GitHub App secrets
+APP_ID=
+PRIVATE_KEY=
+WEBHOOK_SECRET=
+
+# Coder API token
+CODER_TOKEN=
