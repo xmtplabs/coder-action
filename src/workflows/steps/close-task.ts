@@ -28,7 +28,10 @@ export async function runCloseTask(ctx: RunCloseTaskContext): Promise<void> {
 	);
 
 	const result = await step.do("delete-coder-task", async () => {
-		return await coder.delete({ taskName });
+		const raw = await coder.delete({ taskName });
+		// Explicit scalar projection — guards against future callees adding
+		// fields that would leak into the cached step output (EARS-REQ-16a).
+		return { deleted: raw.deleted };
 	});
 
 	if (!result.deleted) {

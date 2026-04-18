@@ -152,6 +152,7 @@ describe("runComment", () => {
 	});
 
 	test("throws NonRetryableError when task not found", async () => {
+		const { NonRetryableError } = await import("cloudflare:workflows");
 		const step = makeStep();
 		const coder = {
 			findTaskByName: vi.fn(async () => null),
@@ -171,6 +172,111 @@ describe("runComment", () => {
 				config,
 				event: commentEvent("pull_request"),
 			}),
-		).rejects.toThrow();
+			// Assert the specific error type so a regression that throws a
+			// generic Error (and thus gets retried by the engine instead of
+			// terminating the instance) fails this test.
+		).rejects.toThrowError(NonRetryableError);
+	});
+
+	test("PR review comment passes structured formatPRCommentMessage body with file:line to sendTaskInput", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				owner_id: "owner-uuid",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			getTaskById: vi.fn(async () => ({
+				id: "11111111-1111-1111-1111-111111111111",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-1",
+			})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			addReactionToComment: vi.fn(async () => {}),
+			addReactionToReviewComment: vi.fn(async () => {}),
+		};
+
+		await runComment({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: commentEvent("pull_request", {
+				isReviewComment: true,
+				body: "please handle this edge case",
+				authorLogin: "alice",
+				url: "https://github.com/acme/repo/pull/42#r-700",
+				filePath: "src/foo.ts",
+				lineNumber: 7,
+			}),
+		});
+
+		// sendTaskInput should receive the STRUCTURED message, not the raw body.
+		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+		const call = coder.sendTaskInput.mock.calls[0] as unknown as [
+			unknown,
+			unknown,
+			string,
+		];
+		const body = call[2];
+		expect(body).toContain("New Comment on PR:");
+		expect(body).toContain("[INSTRUCTIONS]");
+		expect(body).toContain("[COMMENT]");
+		// Commenter, body text, and the file:line context must all be wrapped in.
+		expect(body).toContain("alice");
+		expect(body).toContain("please handle this edge case");
+		expect(body).toContain("File: src/foo.ts:7");
+	});
+
+	test("issue comment passes structured formatIssueCommentMessage body to sendTaskInput", async () => {
+		const step = makeStep();
+		const coder = {
+			findTaskByName: vi.fn(async () => ({
+				id: "22222222-2222-2222-2222-222222222222",
+				owner_id: "owner-uuid",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-2",
+			})),
+			getTaskById: vi.fn(async () => ({
+				id: "22222222-2222-2222-2222-222222222222",
+				status: "active",
+				current_state: { state: "idle" },
+				workspace_id: "ws-2",
+			})),
+			resumeWorkspace: vi.fn(async () => {}),
+			sendTaskInput: vi.fn(async () => {}),
+		};
+		const github = {
+			addReactionToComment: vi.fn(async () => {}),
+			addReactionToReviewComment: vi.fn(async () => {}),
+		};
+
+		await runComment({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: commentEvent("issue"),
+		});
+
+		expect(coder.sendTaskInput).toHaveBeenCalledTimes(1);
+		const call = coder.sendTaskInput.mock.calls[0] as unknown as [
+			unknown,
+			unknown,
+			string,
+		];
+		const body = call[2];
+		expect(body).toContain("New Comment on Issue:");
+		expect(body).toContain("[INSTRUCTIONS]");
+		expect(body).toContain("[COMMENT]");
+		// PR-only "File:" line MUST be absent from the issue message.
+		expect(body).not.toContain("File:");
 	});
 });

@@ -221,6 +221,23 @@ describe("ensureTaskReady — poll loop transitions", () => {
 		).rejects.toThrowError(/beyond 5-minute grace/);
 	});
 
+	test("unknown within grace → active + idle → recovers (analogue of error within grace)", async () => {
+		const step = makeStep();
+		const coder = makeCoder([
+			{ status: "active", state: "working" }, // lookup-task
+			{ status: "unknown", state: null }, // attempt 1
+			{ status: "unknown", state: null }, // attempt 2
+			{ status: "active", state: "idle" }, // attempt 3 — recovers
+		]);
+		await ensureTaskReady({ step: step as never, coder, taskId, owner: "o" });
+		expect(step.calls).toEqual([
+			"lookup-task",
+			"check-status-1",
+			"check-status-2",
+			"check-status-3",
+		]);
+	});
+
 	test("unknown persisting beyond grace → NonRetryableError", async () => {
 		const step = makeStep();
 		const observations: Array<{ status: string; state: string | null }> = [

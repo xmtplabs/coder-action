@@ -63,10 +63,16 @@ describe("runCloseTask", () => {
 		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
 
-	test("delete-coder-task returns plain `{deleted: boolean}`", async () => {
+	test("delete-coder-task step output projects ONLY `{deleted}` (strips any extra fields returned by the coder client)", async () => {
 		const step = makeStep();
+		// Simulate a future coder.delete returning extra fields — the step
+		// callback must not let them leak into the cached step output.
 		const coder = {
-			delete: vi.fn(async () => ({ deleted: true })),
+			delete: vi.fn(async () => ({
+				deleted: true,
+				_internal: "should not appear",
+				warnings: ["ignored"],
+			})),
 		};
 		const github = { commentOnIssue: vi.fn(async () => {}) };
 		await runCloseTask({
@@ -78,5 +84,6 @@ describe("runCloseTask", () => {
 		});
 		const result = await step.do.mock.results[0]?.value;
 		expect(result).toEqual({ deleted: true });
+		expect(Object.keys(result as object)).toEqual(["deleted"]);
 	});
 });

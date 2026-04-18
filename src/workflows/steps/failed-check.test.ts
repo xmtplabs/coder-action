@@ -213,10 +213,22 @@ describe("runFailedCheck", () => {
 			config,
 			event: event(),
 		});
-		const idx = step.do.mock.calls.findIndex(
+		// fetch-failed-jobs returns the scalar projection per spec §4
+		// serialization table: Array<{ id, name, conclusion }> — no extra raw
+		// Octokit fields.
+		const failedJobsIdx = step.do.mock.calls.findIndex(
 			(c: unknown[]) => c[0] === "fetch-failed-jobs",
 		);
-		const result = await step.do.mock.results[idx]?.value;
-		expect(Array.isArray(result)).toBe(true);
+		const failedJobsResult = await step.do.mock.results[failedJobsIdx]?.value;
+		expect(failedJobsResult).toEqual([
+			{ id: 1, name: "unit", conclusion: "failure" },
+		]);
+
+		// fetch-job-logs-<id> returns a plain string.
+		const logsIdx = step.do.mock.calls.findIndex(
+			(c: unknown[]) => c[0] === "fetch-job-logs-1",
+		);
+		const logsResult = await step.do.mock.results[logsIdx]?.value;
+		expect(logsResult).toBe("log");
 	});
 });
