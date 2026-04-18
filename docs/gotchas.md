@@ -87,7 +87,7 @@ The raw shape uses `owner_id` (UUID) and needs `resolveOwnerUsername` before bui
 
 ## `resolveOwnerUsername` UUID detection
 
-When `owner_id` from a raw task is a UUID (v4 pattern), `CoderService.resolveOwnerUsername()` calls `GET /api/v2/users/<id>` to translate to a username. Otherwise it assumes the input is already a username and returns it unchanged. This matters for URL composition (`Task.url` must carry a human-readable username) and for the `POST /api/experimental/tasks/<owner>/<id>/send` endpoint (which accepts either, but username is conventional).
+When `owner_id` from a raw task is a UUID (v4 pattern), `CoderService.resolveOwnerUsername()` calls `GET /api/v2/users/<id>` to translate to a username. Otherwise it assumes the input is already a username and returns it unchanged. This matters for URL composition (`Task.url` must carry a human-readable username) and for the `POST /api/v2/tasks/<owner>/<id>/send` endpoint (which accepts either, but username is conventional).
 
 If a future Coder release changes the UUID format, the regex in `resolveOwnerUsername` needs updating.
 

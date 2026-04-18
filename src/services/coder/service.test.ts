@@ -139,11 +139,11 @@ describe("CoderService.create", () => {
 				return Promise.resolve(createMockResponse(makePresets(true)));
 			}
 			// GET existing tasks (returns empty — no pre-existing task)
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			// POST create
-			if (method === "POST" && url.includes("/api/experimental/tasks")) {
+			if (method === "POST" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(
 					createMockResponse(
 						makeTask({ status: "initializing", current_state: null }),
@@ -162,13 +162,13 @@ describe("CoderService.create", () => {
 
 		// Must have: GET tasks (existing check), GET template, GET presets, POST create
 		const getTaskCall = calls.find((c) =>
-			c.includes("/api/experimental/tasks"),
+			c.includes("/api/v2/tasks"),
 		);
 		const getTemplateCall = calls.find((c) =>
 			c.includes(`/api/v2/organizations/${ORG}/templates/${TEMPLATE_NAME}`),
 		);
 		const postCreateCalls = calls.filter(
-			(c) => c.startsWith("POST") && c.includes("/api/experimental/tasks"),
+			(c) => c.startsWith("POST") && c.includes("/api/v2/tasks"),
 		);
 
 		expect(getTaskCall).toBeDefined();
@@ -189,7 +189,7 @@ describe("CoderService.create", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 			// pre-create lookup returns a match
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -214,7 +214,7 @@ describe("CoderService.create", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			if (method === "GET" && url.includes("/api/v2/organizations/")) {
@@ -223,7 +223,7 @@ describe("CoderService.create", () => {
 			if (method === "GET" && url.includes("/presets")) {
 				return Promise.resolve(createMockResponse(makePresets(true)));
 			}
-			if (method === "POST" && url.includes("/api/experimental/tasks")) {
+			if (method === "POST" && url.includes("/api/v2/tasks")) {
 				postBodies.push(
 					init?.body ? JSON.parse(init.body as string) : undefined,
 				);
@@ -260,11 +260,11 @@ describe("CoderService.delete", () => {
 			const method = init?.method ?? "GET";
 
 			// Resolve task by name
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			// DELETE
-			if (method === "DELETE" && url.includes("/api/experimental/tasks")) {
+			if (method === "DELETE" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -295,7 +295,7 @@ describe("CoderService.delete", () => {
 			const method = init?.method ?? "GET";
 			if (
 				method === "GET" &&
-				url.includes("/api/experimental/tasks") &&
+				url.includes("/api/v2/tasks") &&
 				!url.includes("/api/v2/users/")
 			) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
@@ -310,7 +310,7 @@ describe("CoderService.delete", () => {
 					}),
 				);
 			}
-			if (method === "DELETE" && url.includes("/api/experimental/tasks")) {
+			if (method === "DELETE" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse(undefined, { status: 204 }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -332,7 +332,7 @@ describe("CoderService.delete", () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
 
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -356,7 +356,7 @@ describe("CoderService.getStatus", () => {
 	test("resolves to null when task missing", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -378,7 +378,7 @@ describe("CoderService.getStatus", () => {
 
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [task1, task2] }));
 			}
 			if (method === "GET" && url.includes(`/api/v2/users/${OWNER_UUID}`)) {
@@ -452,7 +452,7 @@ describe("CoderService status normalization", () => {
 		test(`Coder status="${status}" current_state=${current_state?.state ?? "null"} → TaskStatus="${expected}"`, async () => {
 			const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 				const method = init?.method ?? "GET";
-				if (method === "GET" && url.includes("/api/experimental/tasks")) {
+				if (method === "GET" && url.includes("/api/v2/tasks")) {
 					return Promise.resolve(
 						createMockResponse({
 							tasks: [makeTask({ status, current_state })],
@@ -478,7 +478,7 @@ describe("CoderService Task.url", () => {
 	test("url is composed as coderURL/tasks/owner/taskId", async () => {
 		const fetchFn = vi.fn((url: string, init?: RequestInit) => {
 			const method = init?.method ?? "GET";
-			if (method === "GET" && url.includes("/api/experimental/tasks")) {
+			if (method === "GET" && url.includes("/api/v2/tasks")) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -502,7 +502,7 @@ describe("CoderService Task.url", () => {
 			// findTask (no owner) returns the task
 			if (
 				method === "GET" &&
-				url.includes("/api/experimental/tasks") &&
+				url.includes("/api/v2/tasks") &&
 				!url.includes(`/api/v2/users/`)
 			) {
 				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
@@ -637,14 +637,14 @@ describe("CoderService primitives", () => {
 		});
 	});
 
-	test("sendTaskInput POSTs to /api/experimental/tasks/<owner>/<id>/send", async () => {
+	test("sendTaskInput POSTs to /api/v2/tasks/<owner>/<id>/send", async () => {
 		const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
 		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
 		await svc.sendTaskInput(TaskIdSchema.parse(TASK_ID), "owner", "hello");
 		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
 			.calls[0] as [string, RequestInit];
 		expect(call[0]).toContain(
-			`/api/experimental/tasks/owner/${encodeURIComponent(TASK_ID)}/send`,
+			`/api/v2/tasks/owner/${encodeURIComponent(TASK_ID)}/send`,
 		);
 		expect(call[1].method).toBe("POST");
 		expect(JSON.parse(call[1].body as string)).toEqual({ input: "hello" });

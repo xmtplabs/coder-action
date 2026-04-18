@@ -17,7 +17,7 @@ If a task with the same name + owner already exists, `create` returns the existi
 
 ## `delete` is idempotent — no teardown
 
-`delete` issues a single `DELETE /api/experimental/tasks/<owner>/<id>` and returns `{ deleted: true }` when removed or `{ deleted: false }` when the task didn't exist (no-op). Never stops the workspace separately, never waits, never deletes the workspace. The experimental tasks endpoint handles lifecycle on its own; don't interleave workspace-level operations.
+`delete` issues a single `DELETE /api/v2/tasks/<owner>/<id>` and returns `{ deleted: true }` when removed or `{ deleted: false }` when the task didn't exist (no-op). Never stops the workspace separately, never waits, never deletes the workspace. The tasks endpoint handles lifecycle on its own; don't interleave workspace-level operations.
 
 ## `findTaskByName` vs `getStatus` — different shapes
 

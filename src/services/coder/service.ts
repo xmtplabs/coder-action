@@ -192,7 +192,7 @@ export class CoderService implements TaskRunner {
 		taskId: TaskId,
 		owner: string,
 	): Promise<ExperimentalCoderSDKTask> {
-		const endpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`;
+		const endpoint = `/api/v2/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}`;
 		const raw = await this.request<unknown>(endpoint);
 		return ExperimentalCoderSDKTaskSchema.parse(raw);
 	}
@@ -220,7 +220,7 @@ export class CoderService implements TaskRunner {
 		input: string,
 	): Promise<void> {
 		await this.request(
-			`/api/experimental/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`,
+			`/api/v2/tasks/${encodeURIComponent(owner)}/${encodeURIComponent(taskId)}/send`,
 			{
 				method: "POST",
 				body: JSON.stringify({ input }),
@@ -241,8 +241,8 @@ export class CoderService implements TaskRunner {
 	): Promise<ExperimentalCoderSDKTask | null> {
 		try {
 			const endpoint = owner
-				? `/api/experimental/tasks?q=${encodeURIComponent(`owner:${owner}`)}`
-				: `/api/experimental/tasks`;
+				? `/api/v2/tasks?q=${encodeURIComponent(`owner:${owner}`)}`
+				: `/api/v2/tasks`;
 
 			const raw = await this.request<unknown>(endpoint);
 			const parsed = ExperimentalCoderSDKTaskListResponseSchema.parse(raw);
@@ -394,7 +394,7 @@ export class CoderService implements TaskRunner {
 		}
 
 		// 4. POST create
-		const createEndpoint = `/api/experimental/tasks/${encodeURIComponent(owner)}`;
+		const createEndpoint = `/api/v2/tasks/${encodeURIComponent(owner)}`;
 		const body: Record<string, unknown> = {
 			name: taskName,
 			template_version_id: templateVersionId,
@@ -452,7 +452,7 @@ export class CoderService implements TaskRunner {
 		const resolvedOwner =
 			owner ?? (await this.resolveOwnerUsername(raw.owner_id));
 		await this.request(
-			`/api/experimental/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(raw.id)}`,
+			`/api/v2/tasks/${encodeURIComponent(resolvedOwner)}/${encodeURIComponent(raw.id)}`,
 			{ method: "DELETE" },
 		);
 		return { deleted: true };

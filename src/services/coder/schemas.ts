@@ -94,7 +94,7 @@ export type ExperimentalCoderSDKTask = z.infer<
 	typeof ExperimentalCoderSDKTaskSchema
 >;
 
-// ExperimentalCoderSDKTaskListResponseSchema is the schema for GET /api/experimental/tasks.
+// ExperimentalCoderSDKTaskListResponseSchema is the schema for GET /api/v2/tasks.
 export const ExperimentalCoderSDKTaskListResponseSchema = z.object({
 	tasks: z.array(ExperimentalCoderSDKTaskSchema),
 });
