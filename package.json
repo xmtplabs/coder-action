@@ -1,5 +1,5 @@
 {
-	"name": "xmtp-coder-action",
+	"name": "xmtp-task-action",
 	"version": "0.1.0",
 	"description": "GitHub App webhook server for managing Coder AI task lifecycle",
 	"type": "module",

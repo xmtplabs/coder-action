@@ -1,4 +1,4 @@
-# AGENTS.md — coder-action
+# AGENTS.md — task-action
 
 Cloudflare Worker + single Cloudflare Workflow that drives Coder AI task lifecycle from GitHub webhooks. The Worker signature-verifies and classifies each webhook, then enqueues a `CoderTaskWorkflow` instance that talks to the Coder and GitHub APIs durably (step-level retries, replay across isolate evictions).
 
