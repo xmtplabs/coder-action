@@ -133,7 +133,7 @@ export class CoderService implements TaskRunner {
 			"Coder-Session-Token": options.apiToken,
 			"Content-Type": "application/json",
 		};
-		this.fetchFn = options.fetchFn ?? globalThis.fetch;
+		this.fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
 		this.config = options.config;
 		this.logger = options.logger ?? noopLogger;
 	}
