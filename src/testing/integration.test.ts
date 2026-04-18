@@ -41,8 +41,7 @@ function makeEnv(workflowCreate?: (args: unknown) => Promise<unknown>) {
 		...baseEnv,
 		CODER_TASK_WORKFLOW: {
 			create:
-				workflowCreate ??
-				((_args: unknown) => Promise.resolve({ id: "stub" })),
+				workflowCreate ?? ((_args: unknown) => Promise.resolve({ id: "stub" })),
 		},
 	} as unknown as Parameters<typeof worker.fetch>[1];
 }

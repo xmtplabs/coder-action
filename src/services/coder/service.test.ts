@@ -254,9 +254,7 @@ describe("CoderService.sendInput (no polling)", () => {
 			const method = init?.method ?? "GET";
 			// Resolve task by name
 			if (method === "GET" && url.includes("/api/experimental/tasks/")) {
-				return Promise.resolve(
-					createMockResponse({ tasks: [makeTask()] }),
-				);
+				return Promise.resolve(createMockResponse({ tasks: [makeTask()] }));
 			}
 			// Send endpoint
 			if (method === "POST" && url.includes("/send")) {
@@ -628,11 +626,12 @@ describe("CoderService primitives", () => {
 
 	test("findTaskByName returns the matching task when found", async () => {
 		const matching = makeTask({ name: "tname" });
-		const fetchFn = vi.fn(async () =>
-			new Response(JSON.stringify({ tasks: [matching], count: 1 }), {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			}),
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ tasks: [matching], count: 1 }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
 		);
 		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
 		const result = await svc.findTaskByName(
@@ -653,25 +652,20 @@ describe("CoderService primitives", () => {
 
 	test("getTaskById returns the parsed task on 200", async () => {
 		const raw = makeTask();
-		const fetchFn = vi.fn(async () =>
-			new Response(JSON.stringify(raw), {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			}),
+		const fetchFn = vi.fn(
+			async () =>
+				new Response(JSON.stringify(raw), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
 		);
 		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
-		const parsed = await svc.getTaskById(
-			TaskIdSchema.parse(TASK_ID),
-			"owner",
-		);
+		const parsed = await svc.getTaskById(TaskIdSchema.parse(TASK_ID), "owner");
 		expect(parsed.id).toBe(TASK_ID);
 	});
 
 	test("resumeWorkspace POSTs to /api/v2/workspaces/<id>/builds with transition start", async () => {
-		const fetchFn = vi.fn(
-			async () =>
-				new Response(null, { status: 204 }),
-		);
+		const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
 		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
 		await svc.resumeWorkspace("ws-123");
 		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
@@ -684,16 +678,9 @@ describe("CoderService primitives", () => {
 	});
 
 	test("sendTaskInput POSTs to /api/experimental/tasks/<owner>/<id>/send", async () => {
-		const fetchFn = vi.fn(
-			async () =>
-				new Response(null, { status: 204 }),
-		);
+		const fetchFn = vi.fn(async () => new Response(null, { status: 204 }));
 		const svc = makeMinimalService(fetchFn as unknown as typeof fetch);
-		await svc.sendTaskInput(
-			TaskIdSchema.parse(TASK_ID),
-			"owner",
-			"hello",
-		);
+		await svc.sendTaskInput(TaskIdSchema.parse(TASK_ID), "owner", "hello");
 		const call = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
 			.calls[0] as [string, RequestInit];
 		expect(call[0]).toContain(

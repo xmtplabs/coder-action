@@ -114,9 +114,9 @@ describe("isDuplicateInstanceError", () => {
 		);
 	});
 	test("true case-insensitive", () => {
-		expect(
-			isDuplicateInstanceError(new Error("ALREADY EXISTS: foo")),
-		).toBe(true);
+		expect(isDuplicateInstanceError(new Error("ALREADY EXISTS: foo"))).toBe(
+			true,
+		);
 	});
 	test("false for unrelated error", () => {
 		expect(isDuplicateInstanceError(new Error("network down"))).toBe(false);

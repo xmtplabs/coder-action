@@ -28,10 +28,7 @@ export function createLogger(options?: CreateLoggerOptions): Logger {
 	return makeLogger({}, json);
 }
 
-function makeLogger(
-	bindings: Record<string, unknown>,
-	json: boolean,
-): Logger {
+function makeLogger(bindings: Record<string, unknown>, json: boolean): Logger {
 	const emit = (
 		level: "debug" | "info" | "warn" | "error",
 		msg: string,
@@ -44,9 +41,8 @@ function makeLogger(
 		}
 		// Pretty local-dev line: "[level] msg <json-fields-if-any>"
 		const merged = { ...bindings, ...(fields ?? {}) };
-		const fieldStr = Object.keys(merged).length > 0
-			? ` ${JSON.stringify(merged)}`
-			: "";
+		const fieldStr =
+			Object.keys(merged).length > 0 ? ` ${JSON.stringify(merged)}` : "";
 		const prefix = `[${level}] ${msg}${fieldStr}`;
 		if (level === "error") console.error(prefix);
 		else if (level === "warn") console.warn(prefix);

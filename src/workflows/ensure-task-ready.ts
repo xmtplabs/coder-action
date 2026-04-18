@@ -1,4 +1,4 @@
-import type { WorkflowStep } from "cloudflare:workers";
+import type { WorkflowStep, WorkflowStepConfig } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import type { CoderService } from "../services/coder/service";
 import type { TaskId } from "../services/task-runner";
@@ -11,11 +11,11 @@ import type { TaskId } from "../services/task-runner";
  * keeps individual step failures from bubbling to the instance on transient
  * network blips.
  */
-const STATUS_RETRY = {
+const STATUS_RETRY: WorkflowStepConfig = {
 	retries: {
 		limit: 3,
 		delay: "2 seconds",
-		backoff: "exponential" as const,
+		backoff: "exponential",
 	},
 };
 

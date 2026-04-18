@@ -54,7 +54,9 @@ export class CoderTaskWorkflow extends WorkflowEntrypoint<
 > {
 	async run(event: WorkflowEvent<Event>, step: WorkflowStep): Promise<void> {
 		const payload = event.payload;
-		const config = loadConfig(this.env as Record<string, string | undefined>);
+		const config = loadConfig(
+			this.env as unknown as Record<string, string | undefined>,
+		);
 		const logger = createLogger({ logFormat: this.env.LOG_FORMAT });
 
 		const octokit = new Octokit({

@@ -39,7 +39,9 @@ function createMockOctokit(overrides: Record<string, unknown> = {}) {
 				...(overrides.actions as Record<string, unknown>),
 			},
 			reactions: {
-				createForIssueComment: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
+				createForIssueComment: vi.fn(() =>
+					Promise.resolve({ data: { id: 1 } }),
+				),
 				...(overrides.reactions as Record<string, unknown>),
 			},
 		},

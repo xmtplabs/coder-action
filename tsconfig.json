@@ -13,6 +13,11 @@
 		"isolatedModules": true,
 		"noEmit": true
 	},
-	"include": ["src/**/*", "tests/**/*", "vitest.config.ts", "worker-configuration.d.ts"],
+	"include": [
+		"src/**/*",
+		"tests/**/*",
+		"vitest.config.ts",
+		"worker-configuration.d.ts"
+	],
 	"exclude": ["node_modules", "dist"]
 }

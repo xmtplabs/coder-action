@@ -98,7 +98,11 @@ describe("createLogger(json mode)", () => {
 			const arg = spy.mock.calls[0]?.[0];
 			expect(typeof arg).toBe("string");
 			const parsed = JSON.parse(arg as string);
-			expect(parsed).toMatchObject({ level: "info", msg: "hello", user_id: 42 });
+			expect(parsed).toMatchObject({
+				level: "info",
+				msg: "hello",
+				user_id: 42,
+			});
 		} finally {
 			spy.mockRestore();
 		}
@@ -115,8 +119,7 @@ describe("createLogger(json mode)", () => {
 				logger.warn("boom");
 				// warn in json mode still uses console.log (all levels go to console.log in JSON)
 				// we allow either — check whichever spy received the payload.
-				const call =
-					spy.mock.calls[0]?.[0] ?? warnSpy.mock.calls[0]?.[0];
+				const call = spy.mock.calls[0]?.[0] ?? warnSpy.mock.calls[0]?.[0];
 				expect(call).toBeTruthy();
 				const parsed = JSON.parse(call as string);
 				expect(parsed).toMatchObject({

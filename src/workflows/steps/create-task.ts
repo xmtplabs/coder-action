@@ -40,14 +40,12 @@ export async function runCreateTask(ctx: RunCreateTaskContext): Promise<void> {
 		}),
 	);
 
-	const hasPermission = await step.do(
-		"check-github-permission",
-		async () =>
-			github.checkActorPermission(
-				event.repository.owner,
-				event.repository.name,
-				event.requester.login,
-			),
+	const hasPermission = await step.do("check-github-permission", async () =>
+		github.checkActorPermission(
+			event.repository.owner,
+			event.repository.name,
+			event.requester.login,
+		),
 	);
 
 	if (!hasPermission) {

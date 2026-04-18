@@ -74,7 +74,10 @@ describe("runCreateTask", () => {
 			config,
 			event,
 		});
-		expect(step.calls).toEqual(["lookup-coder-user", "check-github-permission"]);
+		expect(step.calls).toEqual([
+			"lookup-coder-user",
+			"check-github-permission",
+		]);
 		expect(github.commentOnIssue).not.toHaveBeenCalled();
 	});
 
@@ -103,8 +106,10 @@ describe("runCreateTask", () => {
 		const createIdx = step.do.mock.calls.findIndex(
 			(c: unknown[]) => c[0] === "create-coder-task",
 		);
-		const result = (await step.do.mock.results[createIdx]
-			?.value) as Record<string, unknown>;
+		const result = (await step.do.mock.results[createIdx]?.value) as Record<
+			string,
+			unknown
+		>;
 		expect(result).toHaveProperty("taskName");
 		expect(result).toHaveProperty("owner");
 		expect(result).toHaveProperty("url");

@@ -4,7 +4,10 @@ import { verify } from "@octokit/webhooks-methods";
 import { loadConfig } from "./config/app-config";
 import { createLogger } from "./infra/logger";
 import { WebhookRouter } from "./webhooks/github/router";
-import { buildInstanceId, isDuplicateInstanceError } from "./workflows/instance-id";
+import {
+	buildInstanceId,
+	isDuplicateInstanceError,
+} from "./workflows/instance-id";
 import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
 
 export { CoderTaskWorkflow } from "./workflows/coder-task-workflow";
@@ -73,7 +76,9 @@ async function handleWebhook(
 	request: Request,
 	env: CoderTaskWorkflowEnv,
 ): Promise<Response> {
-	const config = loadConfig(env as unknown as Record<string, string | undefined>);
+	const config = loadConfig(
+		env as unknown as Record<string, string | undefined>,
+	);
 	const logger = createLogger({ logFormat: env.LOG_FORMAT });
 	const started = Date.now();
 

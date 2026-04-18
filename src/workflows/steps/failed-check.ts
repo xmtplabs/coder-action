@@ -1,5 +1,8 @@
 import type { WorkflowStep } from "cloudflare:workers";
-import { MAX_FAILED_JOBS, formatFailedCheckMessage } from "../../actions/messages";
+import {
+	MAX_FAILED_JOBS,
+	formatFailedCheckMessage,
+} from "../../actions/messages";
 import { generateTaskName } from "../../actions/task-naming";
 import type { AppConfig } from "../../config/app-config";
 import type { CheckFailedEvent } from "../../events/types";
