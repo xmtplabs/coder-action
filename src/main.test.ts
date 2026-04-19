@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import worker, { __setAppBotLoginForTests } from "./main";
 import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 import { computeSignature } from "./testing/workflow-test-helpers";
@@ -86,7 +86,8 @@ async function captureWebhookReceivedLog(
 	try {
 		await worker.fetch(req, makeTracingEnv(), {} as ExecutionContext);
 	} finally {
-		// leave cleanup to `afterEach` via mockRestore below
+		// Spy cleanup is handled by `afterEach(vi.restoreAllMocks)` in the
+		// enclosing describe block.
 	}
 	const entries: Record<string, unknown>[] = [];
 	for (const call of spy.mock.calls) {
@@ -98,7 +99,6 @@ async function captureWebhookReceivedLog(
 			// non-JSON console.log output — ignore.
 		}
 	}
-	spy.mockRestore();
 	const match = entries.find((e) => e.msg === "Webhook received");
 	if (!match) {
 		throw new Error(
@@ -109,6 +109,10 @@ async function captureWebhookReceivedLog(
 }
 
 describe("Worker tracing bindings", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	beforeEach(() => {
 		__setAppBotLoginForTests("xmtp-coder-tasks[bot]");
 	});
