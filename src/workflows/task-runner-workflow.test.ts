@@ -49,11 +49,18 @@ describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 				{
 					taskName: "gh-repo-1",
 					owner: "coder-user",
+					taskId: "11111111-1111-4111-8111-111111111111",
 					url: "https://coder.example.com/tasks/coder-user/abc",
 					status: "ready",
 				},
 			);
 			await m.mockStepResult({ name: "comment-on-issue" }, {});
+			// waitForTaskActive pre-poll hits 'active' → fast-path, no loop steps.
+			await m.mockStepResult(
+				{ name: "wait-lookup-task" },
+				{ status: "active" },
+			);
+			await m.mockStepResult({ name: "update-status-comment" }, {});
 		});
 
 		const params: TaskRequestedEvent = {
@@ -141,8 +148,8 @@ describe("TaskRunnerWorkflow dispatch — comment_posted", () => {
 				{ name: "lookup-task" },
 				{ status: "active", state: "idle", workspaceId: "ws-1" },
 			);
-			await m.mockStepResult({ name: "send-task-input" }, {});
 			await m.mockStepResult({ name: "react-to-comment" }, {});
+			await m.mockStepResult({ name: "send-task-input" }, {});
 		});
 
 		const params: CommentPostedEvent = {
@@ -183,8 +190,8 @@ describe("TaskRunnerWorkflow dispatch — comment_posted", () => {
 				{ name: "lookup-task" },
 				{ status: "active", state: "idle", workspaceId: "ws-2" },
 			);
-			await m.mockStepResult({ name: "send-task-input" }, {});
 			await m.mockStepResult({ name: "react-to-comment" }, {});
+			await m.mockStepResult({ name: "send-task-input" }, {});
 		});
 
 		const params: CommentPostedEvent = {
@@ -234,8 +241,8 @@ describe("TaskRunnerWorkflow dispatch — comment_posted", () => {
 				{ name: "check-status-1" },
 				{ status: "active", state: "idle" },
 			);
-			await m.mockStepResult({ name: "send-task-input" }, {});
 			await m.mockStepResult({ name: "react-to-comment" }, {});
+			await m.mockStepResult({ name: "send-task-input" }, {});
 		});
 
 		const params: CommentPostedEvent = {

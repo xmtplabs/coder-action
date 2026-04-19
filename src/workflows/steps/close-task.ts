@@ -4,6 +4,10 @@ import type { AppConfig } from "../../config/app-config";
 import type { TaskClosedEvent } from "../../events/types";
 import type { CoderService } from "../../services/coder/service";
 import type { GitHubClient } from "../../services/github/client";
+import {
+	TASK_STATUS_COMMENT_MARKER,
+	buildTaskStatusCommentBody,
+} from "../task-status-comment";
 
 export interface RunCloseTaskContext {
 	step: WorkflowStep;
@@ -43,8 +47,8 @@ export async function runCloseTask(ctx: RunCloseTaskContext): Promise<void> {
 			event.repository.owner,
 			event.repository.name,
 			event.issue.number,
-			"Task completed.",
-			"Task created:",
+			buildTaskStatusCommentBody("Task completed."),
+			TASK_STATUS_COMMENT_MARKER,
 		);
 	});
 }

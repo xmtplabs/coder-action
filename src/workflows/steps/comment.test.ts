@@ -100,7 +100,7 @@ function commentEvent(
 // ── Step sequencing + reaction routing ───────────────────────────────────────
 
 describe("runComment — step order + reaction routing", () => {
-	test("PR comment: find-linked-issues → locate-task → ensureReady → send → react", async () => {
+	test("PR comment: find-linked-issues → locate-task → react → ensureReady → send", async () => {
 		const step = makeStep();
 		const coder = makeCoder();
 		const github = makeGithub();
@@ -114,16 +114,24 @@ describe("runComment — step order + reaction routing", () => {
 		});
 
 		// PR-kind comments resolve the linked issue FIRST, then locate the task.
+		// react-to-comment fires BEFORE ensureTaskReady so users see the eyes
+		// reaction without waiting on poll latency.
 		expect(step.calls[0]).toBe("find-linked-issues");
 		expect(step.calls[1]).toBe("locate-task");
+		expect(step.calls[2]).toBe("react-to-comment");
 		expect(step.calls).toContain("lookup-task"); // ensureTaskReady
 		expect(step.calls).toContain("send-task-input");
-		expect(step.calls).toContain("react-to-comment");
+		// react must appear BEFORE ensureTaskReady's lookup-task.
+		const reactIdx = step.calls.indexOf("react-to-comment");
+		const readyIdx = step.calls.indexOf("lookup-task");
+		const sendIdx = step.calls.indexOf("send-task-input");
+		expect(reactIdx).toBeLessThan(readyIdx);
+		expect(readyIdx).toBeLessThan(sendIdx);
 		expect(github.addReactionToComment).toHaveBeenCalled();
 		expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
 	});
 
-	test("issue comment: locate-task is the FIRST step (no find-linked-issues)", async () => {
+	test("issue comment: locate-task is the FIRST step (no find-linked-issues), then react → ensureReady → send", async () => {
 		const step = makeStep();
 		const coder = makeCoder();
 		const github = makeGithub();
@@ -140,9 +148,15 @@ describe("runComment — step order + reaction routing", () => {
 		// no linked-issue lookup needed, and calling findLinkedIssues for a
 		// non-PR number would 404 on GitHub.
 		expect(step.calls[0]).toBe("locate-task");
+		expect(step.calls[1]).toBe("react-to-comment");
 		expect(step.calls).not.toContain("find-linked-issues");
 		expect(github.findLinkedIssues).not.toHaveBeenCalled();
 		expect(step.calls).toContain("send-task-input");
+		const reactIdx = step.calls.indexOf("react-to-comment");
+		const readyIdx = step.calls.indexOf("lookup-task");
+		const sendIdx = step.calls.indexOf("send-task-input");
+		expect(reactIdx).toBeLessThan(readyIdx);
+		expect(readyIdx).toBeLessThan(sendIdx);
 	});
 
 	test("PR review comment uses review-comment reaction endpoint", async () => {
