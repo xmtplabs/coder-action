@@ -7,20 +7,20 @@ import type {
 	TaskClosedEvent,
 	TaskRequestedEvent,
 } from "../events/types";
-import { CoderTaskWorkflow } from "./coder-task-workflow";
+import { TaskRunnerWorkflow } from "./task-runner-workflow";
 
 // ── Smoke: binding shape ─────────────────────────────────────────────────────
 
-describe("CoderTaskWorkflow", () => {
+describe("TaskRunnerWorkflow", () => {
 	test("class is exported and its name matches wrangler.toml class_name", () => {
 		// A rename would orphan in-flight instances — this guards against that.
-		expect(typeof CoderTaskWorkflow).toBe("function");
-		expect(CoderTaskWorkflow.name).toBe("CoderTaskWorkflow");
+		expect(typeof TaskRunnerWorkflow).toBe("function");
+		expect(TaskRunnerWorkflow.name).toBe("TaskRunnerWorkflow");
 	});
 
-	test("env.CODER_TASK_WORKFLOW binding exists and is callable", () => {
-		expect(env.CODER_TASK_WORKFLOW).toBeDefined();
-		expect(typeof env.CODER_TASK_WORKFLOW.create).toBe("function");
+	test("env.TASK_RUNNER_WORKFLOW binding exists and is callable", () => {
+		expect(env.TASK_RUNNER_WORKFLOW).toBeDefined();
+		expect(typeof env.TASK_RUNNER_WORKFLOW.create).toBe("function");
 	});
 });
 
@@ -33,11 +33,11 @@ describe("CoderTaskWorkflow", () => {
 //   3. Creates the workflow instance with a representative `Event` payload.
 //   4. Asserts the instance reaches the `complete` status.
 
-describe("CoderTaskWorkflow dispatch — task_requested", () => {
+describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 	test("executes lookup → permission → create → comment and completes", async () => {
 		const instanceId = "task_requested-repo-1-test-delivery";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -63,7 +63,7 @@ describe("CoderTaskWorkflow dispatch — task_requested", () => {
 			issue: { number: 1, url: "https://github.com/acme/repo/issues/1" },
 			requester: { login: "alice", externalId: 42 },
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 
@@ -76,11 +76,11 @@ describe("CoderTaskWorkflow dispatch — task_requested", () => {
 	// not a defect in our workflow logic.
 });
 
-describe("CoderTaskWorkflow dispatch — task_closed", () => {
+describe("TaskRunnerWorkflow dispatch — task_closed", () => {
 	test("executes delete → comment and completes", async () => {
 		const instanceId = "task_closed-repo-1-test-delivery";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -95,14 +95,14 @@ describe("CoderTaskWorkflow dispatch — task_closed", () => {
 			repository: { owner: "acme", name: "repo" },
 			issue: { number: 1 },
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 
 	test("no-op when task not found (deleted: false) — comment step is skipped", async () => {
 		const instanceId = "task_closed-repo-2-noop";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -118,16 +118,16 @@ describe("CoderTaskWorkflow dispatch — task_closed", () => {
 			repository: { owner: "acme", name: "repo" },
 			issue: { number: 2 },
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 });
 
-describe("CoderTaskWorkflow dispatch — comment_posted", () => {
+describe("TaskRunnerWorkflow dispatch — comment_posted", () => {
 	test("issue-kind comment: locate → ensureReady → send → react completes", async () => {
 		const instanceId = "comment_posted-repo-1-issue";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -160,14 +160,14 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 				isReviewSubmission: false,
 			},
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 
 	test("pr-kind review comment dispatches react-to-review-comment variant", async () => {
 		const instanceId = "comment_posted-repo-2-pr-review";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -208,14 +208,14 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 				lineNumber: 5,
 			},
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 
 	test("paused task triggers resume step in ensureTaskReady pre-poll dispatch", async () => {
 		const instanceId = "comment_posted-repo-3-paused-resume";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -253,16 +253,16 @@ describe("CoderTaskWorkflow dispatch — comment_posted", () => {
 				isReviewSubmission: false,
 			},
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 });
 
-describe("CoderTaskWorkflow dispatch — check_failed", () => {
+describe("TaskRunnerWorkflow dispatch — check_failed", () => {
 	test("fetches PR → linked issues → locate task → logs → send, completes", async () => {
 		const instanceId = "check_failed-repo-1-test-delivery";
 		await using instance = await introspectWorkflowInstance(
-			env.CODER_TASK_WORKFLOW,
+			env.TASK_RUNNER_WORKFLOW,
 			instanceId,
 		);
 		await instance.modify(async (m) => {
@@ -307,7 +307,7 @@ describe("CoderTaskWorkflow dispatch — check_failed", () => {
 			},
 			pullRequestNumbers: [42],
 		};
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
 	});
 

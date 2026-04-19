@@ -13,7 +13,7 @@ declare namespace Cloudflare {
 		CODER_TEMPLATE_NAME_CODEX: "task-template-codex";
 		CODER_ORGANIZATION: "default";
 		LOG_FORMAT: "json";
-		CODER_TASK_WORKFLOW: Workflow<Parameters<import("./src/main").CoderTaskWorkflow['run']>[0]['payload']>;
+		TASK_RUNNER_WORKFLOW: Workflow<Parameters<import("./src/main").TaskRunnerWorkflow['run']>[0]['payload']>;
 	}
 }
 interface Env extends Cloudflare.Env {}

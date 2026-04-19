@@ -9,13 +9,13 @@ import {
 } from "./http/parse-webhook-request";
 import { createLogger } from "./utils/logger";
 import { WebhookRouter } from "./webhooks/github/router";
-import type { CoderTaskWorkflowEnv } from "./workflows/coder-task-workflow";
+import type { TaskRunnerWorkflowEnv } from "./workflows/task-runner-workflow";
 import {
 	buildInstanceId,
 	isDuplicateInstanceError,
 } from "./workflows/instance-id";
 
-export { CoderTaskWorkflow } from "./workflows/coder-task-workflow";
+export { TaskRunnerWorkflow } from "./workflows/task-runner-workflow";
 export { __setAppBotLoginForTests };
 
 // ── Worker entrypoint ────────────────────────────────────────────────────────
@@ -23,22 +23,22 @@ export { __setAppBotLoginForTests };
 export default {
 	async fetch(
 		request: Request,
-		env: CoderTaskWorkflowEnv,
+		env: TaskRunnerWorkflowEnv,
 		_ctx: ExecutionContext,
 	): Promise<Response> {
 		const url = new URL(request.url);
 
-		if (request.method === "POST" && url.pathname === "/api/webhooks") {
-			return handleWebhook(request, env);
+		if (request.method === "POST" && url.pathname === "/webhooks/github") {
+			return handleGithubWebhook(request, env);
 		}
 
 		return new Response("Not Found", { status: 404 });
 	},
-} satisfies ExportedHandler<CoderTaskWorkflowEnv>;
+} satisfies ExportedHandler<TaskRunnerWorkflowEnv>;
 
-async function handleWebhook(
+async function handleGithubWebhook(
 	request: Request,
-	env: CoderTaskWorkflowEnv,
+	env: TaskRunnerWorkflowEnv,
 ): Promise<Response> {
 	const config = loadConfig(
 		env as unknown as Record<string, string | undefined>,
@@ -69,7 +69,11 @@ async function handleWebhook(
 		appBotLogin,
 		logger: reqLogger,
 	});
-	const result = await router.handleWebhook(eventName, deliveryId, payload);
+	const result = await router.handleGithubWebhook(
+		eventName,
+		deliveryId,
+		payload,
+	);
 	if ("dispatched" in result) {
 		const status = result.validationError === true ? 400 : 200;
 		reqLogger.info("Webhook skipped", {
@@ -83,7 +87,7 @@ async function handleWebhook(
 	// Stage 3: dispatch to Workflow (fire-and-return-202).
 	const instanceId = buildInstanceId(result, deliveryId);
 	try {
-		await env.CODER_TASK_WORKFLOW.create({ id: instanceId, params: result });
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params: result });
 		reqLogger.info("Webhook processed", {
 			handler: result.type,
 			instanceId,

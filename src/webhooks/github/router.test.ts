@@ -60,7 +60,7 @@ describe("WebhookRouter", () => {
 	// ── issues.assigned ────────────────────────────────────────────────────────
 
 	test("issues.assigned with matching agent login → task_requested event", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issues",
 			"delivery-001",
 			issuesAssigned,
@@ -89,7 +89,7 @@ describe("WebhookRouter", () => {
 			...issuesAssigned,
 			assignee: { login: "other-user", id: 99 },
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issues",
 			"delivery-002",
 			payload,
@@ -103,7 +103,7 @@ describe("WebhookRouter", () => {
 	// ── issues.closed ──────────────────────────────────────────────────────────
 
 	test("issues.closed → task_closed event", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issues",
 			"delivery-003",
 			issuesClosed,
@@ -131,7 +131,7 @@ describe("WebhookRouter", () => {
 				user: { login: APP_BOT_LOGIN },
 			},
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-004",
 			payload,
@@ -150,7 +150,7 @@ describe("WebhookRouter", () => {
 				user: { login: AGENT_USER_LOGIN },
 			},
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-005",
 			payload,
@@ -164,7 +164,7 @@ describe("WebhookRouter", () => {
 	// ── issue_comment.created — dispatch ──────────────────────────────────────
 
 	test("issue_comment.created on issue from human → comment_posted event (kind: issue)", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-006",
 			issueCommentOnIssue,
@@ -199,7 +199,7 @@ describe("WebhookRouter", () => {
 				user: { login: "some-other-user" },
 			},
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-007a",
 			payload,
@@ -214,7 +214,7 @@ describe("WebhookRouter", () => {
 
 	test("issue_comment.edited on issue from human → comment_posted event (kind: issue)", async () => {
 		const payload = { ...issueCommentOnIssue, action: "edited" };
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-006a",
 			payload,
@@ -232,7 +232,7 @@ describe("WebhookRouter", () => {
 
 	test("issue_comment.edited on PR from human → comment_posted event (kind: pull_request)", async () => {
 		const payload = { ...issueCommentOnPr, action: "edited" };
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-006b",
 			payload,
@@ -253,7 +253,7 @@ describe("WebhookRouter", () => {
 			...issueCommentOnIssue,
 			action: "deleted",
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-006c",
 			payload,
@@ -266,7 +266,7 @@ describe("WebhookRouter", () => {
 	});
 
 	test("issue_comment.created on PR from human → comment_posted event (kind: pull_request)", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issue_comment",
 			"delivery-007",
 			issueCommentOnPr,
@@ -291,7 +291,7 @@ describe("WebhookRouter", () => {
 	// ── pull_request_review_comment.created ───────────────────────────────────
 
 	test("pull_request_review_comment.created, PR by agent, comment by human → comment_posted with isReviewComment", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review_comment",
 			"delivery-008",
 			prReviewComment,
@@ -314,7 +314,7 @@ describe("WebhookRouter", () => {
 	});
 
 	test("pull_request_review_comment.created populates comment.filePath and comment.lineNumber from payload", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review_comment",
 			"delivery-008b",
 			prReviewComment,
@@ -331,7 +331,7 @@ describe("WebhookRouter", () => {
 
 	test("pull_request_review_comment.edited, PR by agent, comment by human → comment_posted event", async () => {
 		const payload = { ...prReviewComment, action: "edited" };
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review_comment",
 			"delivery-008a",
 			payload,
@@ -352,7 +352,7 @@ describe("WebhookRouter", () => {
 			...prReviewComment,
 			comment: { ...prReviewComment.comment, user: { login: APP_BOT_LOGIN } },
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review_comment",
 			"delivery-009",
 			payload,
@@ -371,7 +371,7 @@ describe("WebhookRouter", () => {
 				user: { login: "other-user" },
 			},
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review_comment",
 			"delivery-010",
 			payload,
@@ -385,7 +385,7 @@ describe("WebhookRouter", () => {
 	// ── pull_request_review.submitted ─────────────────────────────────────────
 
 	test("pull_request_review.submitted with body, PR by agent, reviewer is human → comment_posted with isReviewSubmission", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review",
 			"delivery-011",
 			prReviewSubmitted,
@@ -415,7 +415,7 @@ describe("WebhookRouter", () => {
 				user: { login: AGENT_USER_LOGIN },
 			},
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review",
 			"delivery-012",
 			payload,
@@ -427,7 +427,7 @@ describe("WebhookRouter", () => {
 	});
 
 	test("pull_request_review.submitted with empty body → skipped", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"pull_request_review",
 			"delivery-013",
 			prReviewSubmittedEmpty,
@@ -441,7 +441,7 @@ describe("WebhookRouter", () => {
 	// ── workflow_run.completed ─────────────────────────────────────────────────
 
 	test("workflow_run.completed failure → check_failed event", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"workflow_run",
 			"delivery-014",
 			workflowRunFailure,
@@ -462,7 +462,7 @@ describe("WebhookRouter", () => {
 	});
 
 	test("workflow_run.completed success → skipped", async () => {
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"workflow_run",
 			"delivery-015",
 			workflowRunSuccess,
@@ -476,7 +476,7 @@ describe("WebhookRouter", () => {
 	// ── unknown event ─────────────────────────────────────────────────────────
 
 	test("unknown event → skipped", async () => {
-		const result = await router.handleWebhook("push", "delivery-016", {
+		const result = await router.handleGithubWebhook("push", "delivery-016", {
 			ref: "refs/heads/main",
 		});
 
@@ -492,7 +492,7 @@ describe("WebhookRouter", () => {
 			...issuesAssigned,
 			installation: { id: 77777 },
 		};
-		const result = await router.handleWebhook(
+		const result = await router.handleGithubWebhook(
 			"issues",
 			"delivery-017",
 			payload,

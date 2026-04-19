@@ -41,7 +41,7 @@ export async function buildSignedWebhookRequest(
 ): Promise<Request> {
 	const signature =
 		opts.signature ?? (await computeSignature(opts.secret, opts.body));
-	return new Request("https://example.com/api/webhooks", {
+	return new Request("https://example.com/webhooks/github", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",

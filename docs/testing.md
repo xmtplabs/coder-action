@@ -13,7 +13,7 @@ npm run test:watch   # hot reload
 |---|---|---|
 | **Unit** | Colocated `*.test.ts` next to source | Pure helpers, step factories with fake `step`, parsers, guards, routers. Fast. No workflow engine. |
 | **HTTP integration** | `src/testing/integration.test.ts` | Full worker fetch handler with the workflow binding stubbed. Exercises every HTTP status code path (200/202/400/401/404/500). |
-| **End-to-end** | `src/testing/e2e.test.ts` | Signed webhook → real `env.CODER_TASK_WORKFLOW` → introspected instance → `waitForStatus("complete")`. The only tests that drive a real workflow instance from the fetch handler. |
+| **End-to-end** | `src/testing/e2e.test.ts` | Signed webhook → real `env.TASK_RUNNER_WORKFLOW` → introspected instance → `waitForStatus("complete")`. The only tests that drive a real workflow instance from the fetch handler. |
 
 ## Workflow introspection pattern
 
@@ -25,7 +25,7 @@ import { env, introspectWorkflowInstance } from "cloudflare:test";
 test("task_requested runs to completion", async () => {
   // 1. Register the introspector BEFORE creating the instance.
   await using instance = await introspectWorkflowInstance(
-    env.CODER_TASK_WORKFLOW,
+    env.TASK_RUNNER_WORKFLOW,
     "my-instance-id",
   );
 
@@ -42,7 +42,7 @@ test("task_requested runs to completion", async () => {
   });
 
   // 3. Create the instance.
-  await env.CODER_TASK_WORKFLOW.create({ id: "my-instance-id", params: {...} });
+  await env.TASK_RUNNER_WORKFLOW.create({ id: "my-instance-id", params: {...} });
 
   // 4. Assert terminal status.
   await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
@@ -55,7 +55,7 @@ test("task_requested runs to completion", async () => {
 
 **For void returns use `{}`, not `null` or `undefined`.** Miniflare treats falsy values as "no mock set" — see [gotchas.md](gotchas.md#mockstepresult-with-falsy-values-is-treated-as-no-mock-set).
 
-**For tests where instance IDs are unknown ahead of time** (e.g. the webhook handler creates them with a composite ID), use `introspectWorkflow(env.CODER_TASK_WORKFLOW)` instead and call `introspector.modifyAll(...)`. See `src/testing/e2e.test.ts`.
+**For tests where instance IDs are unknown ahead of time** (e.g. the webhook handler creates them with a composite ID), use `introspectWorkflow(env.TASK_RUNNER_WORKFLOW)` instead and call `introspector.modifyAll(...)`. See `src/testing/e2e.test.ts`.
 
 ## Fake `WorkflowStep` for step-factory unit tests
 
@@ -116,7 +116,7 @@ For tests with shared mock-client boilerplate (e.g. `comment.test.ts` has four r
 
 ## Integration vs. e2e env
 
-- Integration tests (`src/testing/integration.test.ts`) use a **stub** `env.CODER_TASK_WORKFLOW` — a plain object with a `create` method. This lets each test control the workflow-create outcome (resolve with id, reject with "already exists", reject with generic error) to exercise response-status paths.
+- Integration tests (`src/testing/integration.test.ts`) use a **stub** `env.TASK_RUNNER_WORKFLOW` — a plain object with a `create` method. This lets each test control the workflow-create outcome (resolve with id, reject with "already exists", reject with generic error) to exercise response-status paths.
 
 - E2E tests (`src/testing/e2e.test.ts`) use the **real** `env` from `cloudflare:test`, which includes the actual Workflow binding. Paired with `introspectWorkflow`, this drives the real workflow through to completion.
 

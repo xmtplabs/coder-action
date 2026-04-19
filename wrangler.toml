@@ -5,9 +5,9 @@ compatibility_date = "2026-04-18"
 compatibility_flags = ["nodejs_compat"]
 
 [[workflows]]
-name = "coder-task-workflow"
-binding = "CODER_TASK_WORKFLOW"
-class_name = "CoderTaskWorkflow"
+name = "task-runner-workflow"
+binding = "TASK_RUNNER_WORKFLOW"
+class_name = "TaskRunnerWorkflow"
 
 [limits]
 cpu_ms = 30000
