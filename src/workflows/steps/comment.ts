@@ -116,13 +116,8 @@ export async function runComment(ctx: RunCommentContext): Promise<void> {
 
 	const taskId = TaskIdSchema.parse(located.taskId);
 
-	await ensureTaskReady({ step, coder, taskId, owner: located.owner });
-
-	const message = buildCommentMessage(event);
-	await step.do("send-task-input", async () => {
-		await coder.sendTaskInput(taskId, located.owner, message);
-	});
-
+	// React immediately after locating the task so the user sees the eyes
+	// reaction without waiting on readiness-poll latency.
 	await step.do("react-to-comment", async () => {
 		if (event.comment.isReviewComment) {
 			await github.addReactionToReviewComment(
@@ -137,5 +132,12 @@ export async function runComment(ctx: RunCommentContext): Promise<void> {
 				event.comment.id,
 			);
 		}
+	});
+
+	await ensureTaskReady({ step, coder, taskId, owner: located.owner });
+
+	const message = buildCommentMessage(event);
+	await step.do("send-task-input", async () => {
+		await coder.sendTaskInput(taskId, located.owner, message);
 	});
 }

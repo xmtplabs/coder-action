@@ -53,11 +53,18 @@ describe("e2e: signed webhook → worker → workflow completion", () => {
 				{
 					taskName: "gh-coder-action-65",
 					owner: "coder-user",
+					taskId: "11111111-1111-4111-8111-111111111111",
 					url: "https://coder.example.com/tasks/coder-user/abc",
 					status: "ready",
 				},
 			);
 			await m.mockStepResult({ name: "comment-on-issue" }, {});
+			// waitForTaskActive pre-poll fast-path.
+			await m.mockStepResult(
+				{ name: "wait-lookup-task" },
+				{ status: "active" },
+			);
+			await m.mockStepResult({ name: "update-status-comment" }, {});
 		});
 
 		const req = await buildSignedWebhookRequest({
