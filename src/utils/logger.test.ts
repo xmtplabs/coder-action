@@ -216,4 +216,83 @@ describe("parseTraceparent", () => {
 			spanId: "b7ad6b7169203331",
 		});
 	});
+
+	test("returns null for empty string", () => {
+		expect(parseTraceparent("")).toBeNull();
+	});
+
+	test("returns null for whitespace-only header", () => {
+		expect(parseTraceparent("   ")).toBeNull();
+	});
+
+	test("returns null for lone dashes", () => {
+		expect(parseTraceparent("---")).toBeNull();
+	});
+
+	test("returns null for trailing hyphen (5 segments)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01-",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for uppercase hex in trace-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0AF7651916CD43DD8448EB211C80319C-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for uppercase hex in span-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-B7AD6B7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("accepts all-zero span-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01",
+			),
+		).toEqual({
+			traceId: "0af7651916cd43dd8448eb211c80319c",
+			spanId: "0000000000000000",
+		});
+	});
+
+	test("returns null for malformed flags (non-hex)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-zz",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for malformed flags (wrong length)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-012",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for too-long trace-id (33 hex chars)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c0-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for too-long span-id (17 hex chars)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b71692033310-01",
+			),
+		).toBeNull();
+	});
 });
