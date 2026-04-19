@@ -5,14 +5,14 @@ A Cloudflare Worker that receives GitHub webhooks and drives the lifecycle of [C
 ## How It Works
 
 ```
-GitHub ──POST /api/webhooks──▶  Worker (fetch handler)
+GitHub ──POST /webhooks/github──▶  Worker (fetch handler)
                                   │  verify signature
                                   │  parse + route
                                   ▼
-                            CODER_TASK_WORKFLOW.create(…)
+                            TASK_RUNNER_WORKFLOW.create(…)
                                   │
                                   ▼
-                        CoderTaskWorkflow (durable)
+                        TaskRunnerWorkflow (durable)
                                   │  step.do / step.sleep
                                   ▼
                         Coder API  +  GitHub API

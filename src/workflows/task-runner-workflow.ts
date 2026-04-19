@@ -20,7 +20,7 @@ import { runFailedCheck } from "./steps/failed-check";
  * `wrangler secret put` in production and `.dev.vars` locally; `[vars]`
  * entries in `wrangler.toml` supply non-secret config.
  */
-export interface CoderTaskWorkflowEnv {
+export interface TaskRunnerWorkflowEnv {
 	APP_ID: string;
 	PRIVATE_KEY: string;
 	WEBHOOK_SECRET: string;
@@ -33,11 +33,11 @@ export interface CoderTaskWorkflowEnv {
 	CODER_TEMPLATE_PRESET?: string;
 	CODER_ORGANIZATION: string;
 	LOG_FORMAT?: string;
-	CODER_TASK_WORKFLOW: Workflow;
+	TASK_RUNNER_WORKFLOW: Workflow;
 }
 
 /**
- * `CoderTaskWorkflow` runs one instance per GitHub delivery that our webhook
+ * `TaskRunnerWorkflow` runs one instance per GitHub delivery that our webhook
  * router accepts. It dispatches on `event.payload.type` to the appropriate
  * step factory, each of which wraps external side-effects in `step.do` calls
  * so they can be retried, cached across replays, and inspected via
@@ -48,8 +48,8 @@ export interface CoderTaskWorkflowEnv {
  * callback — class instances are not structured-cloneable and the workflow
  * engine throws on attempted persistence. See src/workflows/AGENTS.md.
  */
-export class CoderTaskWorkflow extends WorkflowEntrypoint<
-	CoderTaskWorkflowEnv,
+export class TaskRunnerWorkflow extends WorkflowEntrypoint<
+	TaskRunnerWorkflowEnv,
 	Event
 > {
 	async run(event: WorkflowEvent<Event>, step: WorkflowStep): Promise<void> {

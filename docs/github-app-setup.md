@@ -28,7 +28,7 @@ Both identities' comments are suppressed during webhook processing to prevent in
    |-------|-------|
    | **GitHub App name** | `xmtp-coder-app` (or your preferred name) |
    | **Homepage URL** | `https://github.com/your-org/coder-action` |
-   | **Webhook URL** | `https://your-server/api/webhooks` |
+   | **Webhook URL** | `https://your-server/webhooks/github` |
    | **Webhook secret** | A strong random string (save this — you will need it for `WEBHOOK_SECRET`) |
 
 3. Leave **"Expire user authorization tokens"** checked (default).

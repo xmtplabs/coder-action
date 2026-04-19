@@ -4,7 +4,7 @@ Converts raw GitHub webhook payloads into the app's `Event` discriminated union 
 
 ## Output is always `Event` or `SkipResult`
 
-`WebhookRouter.handleWebhook()` returns one of two shapes:
+`WebhookRouter.handleGithubWebhook()` returns one of two shapes:
 
 - **`Event`** — the webhook is actionable; Worker creates a Workflow instance.
 - **`SkipResult`** — deliberately not actionable (self-comment, non-assignee, success workflow_run, …). Worker returns 200 with no Workflow.

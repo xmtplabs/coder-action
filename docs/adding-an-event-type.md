@@ -26,11 +26,11 @@ Every field must be plain JSON-serializable (Workflow event payloads are structu
 
 ## 2. Webhook routing — `src/webhooks/github/router.ts`
 
-Add a `case` to the switch in `handleWebhook` that extracts the fields you need from the GitHub payload and returns the new `Event` variant (or a `SkipResult`). Follow the pattern of `routeIssuesAssigned` / `routePRReviewSubmitted` — cast the payload to the narrow `*Payload` type, run any applicable guards from `src/webhooks/github/guards.ts`, then return.
+Add a `case` to the switch in `handleGithubWebhook` that extracts the fields you need from the GitHub payload and returns the new `Event` variant (or a `SkipResult`). Follow the pattern of `routeIssuesAssigned` / `routePRReviewSubmitted` — cast the payload to the narrow `*Payload` type, run any applicable guards from `src/webhooks/github/guards.ts`, then return.
 
 If you need a new guard (e.g. "PR author is the agent"), add it to `guards.ts` and unit-test in `guards.test.ts`.
 
-## 3. Workflow dispatch — `src/workflows/coder-task-workflow.ts`
+## 3. Workflow dispatch — `src/workflows/task-runner-workflow.ts`
 
 Add a `case` to the `switch (payload.type)` in `run()` that calls a new step factory:
 
@@ -90,7 +90,7 @@ Three tests, in this order:
 
 ### Router test (`src/webhooks/github/router.test.ts`)
 
-Post a fixture payload through `router.handleWebhook` and assert the returned `Event` shape. Include self-comment / ignored-login / opt-out skip paths if applicable.
+Post a fixture payload through `router.handleGithubWebhook` and assert the returned `Event` shape. Include self-comment / ignored-login / opt-out skip paths if applicable.
 
 ### Step factory unit test (`src/workflows/steps/my-new-event.test.ts`)
 
@@ -104,11 +104,11 @@ Use the fake-`WorkflowStep` pattern (`makeStep()` in existing step tests). Asser
 
 See [testing.md § fake WorkflowStep](testing.md#fake-workflowstep-for-step-factory-unit-tests).
 
-### Workflow-level introspection test (`src/workflows/coder-task-workflow.test.ts`)
+### Workflow-level introspection test (`src/workflows/task-runner-workflow.test.ts`)
 
 Add a test in the appropriate `describe` block that:
 
-1. Acquires `introspectWorkflowInstance(env.CODER_TASK_WORKFLOW, id)` with `await using`.
+1. Acquires `introspectWorkflowInstance(env.TASK_RUNNER_WORKFLOW, id)` with `await using`.
 2. Calls `instance.modify(async (m) => { await m.disableSleeps(); await m.mockStepResult({ name: "..." }, ...); })` for every step your factory emits.
 3. Creates the instance with a representative `Event` payload.
 4. Asserts `waitForStatus("complete")`.

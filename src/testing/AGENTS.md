@@ -6,10 +6,10 @@ Shared test utilities + integration/e2e test suites.
 
 ```ts
 // ✅ await using disposes automatically at scope end
-await using introspector = await introspectWorkflow(env.CODER_TASK_WORKFLOW);
+await using introspector = await introspectWorkflow(env.TASK_RUNNER_WORKFLOW);
 
 // ✅ Explicit dispose also works
-const introspector = await introspectWorkflow(env.CODER_TASK_WORKFLOW);
+const introspector = await introspectWorkflow(env.TASK_RUNNER_WORKFLOW);
 try { /* ... */ } finally { await introspector.dispose(); }
 ```
 
@@ -21,8 +21,8 @@ Miniflare's `mockStepResult` treats falsy values as "no mock set" — the real c
 
 ## Integration vs. e2e tests
 
-- **`integration.test.ts`** — stubs `env.CODER_TASK_WORKFLOW` to assert HTTP status paths (200/202/400/401/404/500). Workflow never actually runs.
-- **`e2e.test.ts`** — uses the real `env.CODER_TASK_WORKFLOW` binding + `introspectWorkflow` to drive a full signed-webhook → completed-workflow pipeline. Exactly one test per event type; happy paths only.
+- **`integration.test.ts`** — stubs `env.TASK_RUNNER_WORKFLOW` to assert HTTP status paths (200/202/400/401/404/500). Workflow never actually runs.
+- **`e2e.test.ts`** — uses the real `env.TASK_RUNNER_WORKFLOW` binding + `introspectWorkflow` to drive a full signed-webhook → completed-workflow pipeline. Exactly one test per event type; happy paths only.
 
 Pick integration for status-code coverage, e2e for "does the full pipeline actually wire up."
 

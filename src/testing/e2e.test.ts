@@ -24,13 +24,13 @@ const testEnv = env as TestEnv;
 type WorkerEnv = Parameters<typeof worker.fetch>[1];
 
 /**
- * End-to-end signed-webhook → worker fetch handler → real env.CODER_TASK_WORKFLOW
+ * End-to-end signed-webhook → worker fetch handler → real env.TASK_RUNNER_WORKFLOW
  * → introspected workflow completion. Only test in the suite exercising the
  * full pipeline including:
  *
  *   • HMAC signature verification
  *   • WebhookRouter classification
- *   • `env.CODER_TASK_WORKFLOW.create({ id, params })` on the real binding
+ *   • `env.TASK_RUNNER_WORKFLOW.create({ id, params })` on the real binding
  *   • Workflow `run()` dispatch to the correct step factory
  *   • Introspection-driven step-result mocks
  *   • `waitForStatus("complete")` confirming the instance ran to completion
@@ -42,7 +42,7 @@ type WorkerEnv = Parameters<typeof worker.fetch>[1];
 describe("e2e: signed webhook → worker → workflow completion", () => {
 	test("task_requested webhook runs the full pipeline to instance completion", async () => {
 		await using introspector = await introspectWorkflow(
-			testEnv.CODER_TASK_WORKFLOW,
+			testEnv.TASK_RUNNER_WORKFLOW,
 		);
 		await introspector.modifyAll(async (m) => {
 			await m.disableSleeps();
@@ -86,7 +86,7 @@ describe("e2e: signed webhook → worker → workflow completion", () => {
 
 	test("task_closed webhook runs delete → comment to completion", async () => {
 		await using introspector = await introspectWorkflow(
-			testEnv.CODER_TASK_WORKFLOW,
+			testEnv.TASK_RUNNER_WORKFLOW,
 		);
 		await introspector.modifyAll(async (m) => {
 			await m.disableSleeps();

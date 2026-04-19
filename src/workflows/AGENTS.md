@@ -69,7 +69,7 @@ export interface RunFooContext {
 export async function runFoo(ctx: RunFooContext): Promise<void> { /* ... */ }
 ```
 
-`CoderTaskWorkflow.run()` constructs `coder` and `github` once at the top and passes them through. That's the DI seam — tests pass fakes directly without patching module-level imports. Adding a new factory? Mirror the shape exactly; the workflow dispatch relies on it.
+`TaskRunnerWorkflow.run()` constructs `coder` and `github` once at the top and passes them through. That's the DI seam — tests pass fakes directly without patching module-level imports. Adding a new factory? Mirror the shape exactly; the workflow dispatch relies on it.
 
 ## Paused tasks: resume only in pre-poll dispatch
 

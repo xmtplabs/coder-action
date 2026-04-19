@@ -25,7 +25,7 @@ async function signedReq(opts: {
 	};
 	if (opts.eventName) headers["X-GitHub-Event"] = opts.eventName;
 	if (opts.deliveryId) headers["X-GitHub-Delivery"] = opts.deliveryId;
-	return new Request("https://w/api/webhooks", {
+	return new Request("https://w/webhooks/github", {
 		method: "POST",
 		headers,
 		body: opts.body,
@@ -58,7 +58,7 @@ describe("parseWebhookRequest — happy path", () => {
 describe("parseWebhookRequest — typed errors", () => {
 	test("missing X-Hub-Signature-256 → MissingSignatureError (401)", async () => {
 		const body = "{}";
-		const req = new Request("https://w/api/webhooks", {
+		const req = new Request("https://w/webhooks/github", {
 			method: "POST",
 			headers: { "X-GitHub-Event": "issues" },
 			body,
@@ -139,7 +139,7 @@ describe("parseWebhookRequest — typed errors", () => {
 		// JSON stage (400). Proves the parser doesn't leak information about
 		// the body shape to unauthenticated callers.
 		const body = "not { json";
-		const req = new Request("https://w/api/webhooks", {
+		const req = new Request("https://w/webhooks/github", {
 			method: "POST",
 			headers: { "X-GitHub-Event": "issues" },
 			body,

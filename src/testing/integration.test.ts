@@ -15,7 +15,7 @@ beforeEach(() => {
 
 // ── Env fixture ──────────────────────────────────────────────────────────────
 //
-// Minimum env shape the Worker's `handleWebhook` expects. `CODER_TASK_WORKFLOW`
+// Minimum env shape the Worker's `handleGithubWebhook` expects. `TASK_RUNNER_WORKFLOW`
 // is stubbed so `.create()` can succeed without a real workflow binding — we
 // only assert the HTTP response status in these tests, not workflow behavior.
 // (End-to-end coverage with the real binding + `introspectWorkflow` lives in
@@ -51,7 +51,7 @@ function makeEnv(
 ) {
 	return {
 		...baseEnv,
-		CODER_TASK_WORKFLOW: {
+		TASK_RUNNER_WORKFLOW: {
 			create:
 				workflowCreate ??
 				((args: WorkflowCreateArgs) => Promise.resolve({ id: args.id })),
@@ -149,7 +149,7 @@ describe("Worker fetch handler — HTTP status surface", () => {
 		const body = JSON.stringify(issuesAssigned);
 		// Hand-build the request so we can omit the event-name header.
 		const signature = await computeSignature(TEST_SECRET, body);
-		const req = new Request("https://w/api/webhooks", {
+		const req = new Request("https://w/webhooks/github", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -216,7 +216,7 @@ describe("Worker fetch handler — HTTP status surface", () => {
 			return Promise.resolve({ id: "x" });
 		});
 		const body = JSON.stringify(issuesAssigned);
-		const req = new Request("https://w/api/webhooks", {
+		const req = new Request("https://w/webhooks/github", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -260,9 +260,9 @@ describe("Worker fetch handler — HTTP status surface", () => {
 		expect(res.status).toBe(404);
 	});
 
-	test("GET /api/webhooks → 404 (only POST is a route)", async () => {
+	test("GET /webhooks/github → 404 (only POST is a route)", async () => {
 		const res = await worker.fetch(
-			new Request("https://w/api/webhooks", { method: "GET" }),
+			new Request("https://w/webhooks/github", { method: "GET" }),
 			makeEnv(),
 			{} as ExecutionContext,
 		);

@@ -73,7 +73,7 @@ export class WebhookRouter {
 	 * event name and action. Each event.action pair maps directly to a
 	 * strongly-typed octokit payload type via type assertion.
 	 */
-	async handleWebhook(
+	async handleGithubWebhook(
 		eventName: string,
 		deliveryId: string,
 		payload: unknown,

@@ -13,11 +13,11 @@ describe("wrangler.toml", () => {
 		expect(content).toMatch(/compatibility_flags\s*=\s*\[\s*"nodejs_compat"\s*\]/);
 	});
 
-	test("declares the CODER_TASK_WORKFLOW binding", () => {
+	test("declares the TASK_RUNNER_WORKFLOW binding", () => {
 		expect(content).toMatch(
-			/\[\[workflows\]\][\s\S]*binding\s*=\s*"CODER_TASK_WORKFLOW"/,
+			/\[\[workflows\]\][\s\S]*binding\s*=\s*"TASK_RUNNER_WORKFLOW"/,
 		);
-		expect(content).toMatch(/class_name\s*=\s*"CoderTaskWorkflow"/);
+		expect(content).toMatch(/class_name\s*=\s*"TaskRunnerWorkflow"/);
 	});
 
 	test("enables observability for Workers Logs", () => {

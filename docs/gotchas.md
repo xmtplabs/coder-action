@@ -113,7 +113,7 @@ GitHub webhooks can be ~25 MB in extreme cases (huge commit lists, large diffs).
 
 ## Workflow binding rename orphans in-flight instances
 
-If you ever rename `CODER_TASK_WORKFLOW` in `wrangler.toml`, in-flight instances bound to the old name are orphaned. Use [`migrateWorkflowBinding()`](https://developers.cloudflare.com/agents/api-reference/run-workflows/) in a dedicated migration step — don't bundle with other changes. (We don't currently plan to rename; this is a footgun for the future.)
+If you ever rename `TASK_RUNNER_WORKFLOW` in `wrangler.toml`, in-flight instances bound to the old name are orphaned. Use [`migrateWorkflowBinding()`](https://developers.cloudflare.com/agents/api-reference/run-workflows/) in a dedicated migration step — don't bundle with other changes. (We don't currently plan to rename; this is a footgun for the future.)
 
 ## Uncaught errors in `run()` → `errored` state (intentional)
 
@@ -131,11 +131,11 @@ Workflow introspectors hold storage handles. Forgetting `await using` (or explic
 
 ```ts
 // ✅
-await using instance = await introspectWorkflowInstance(env.CODER_TASK_WORKFLOW, id);
+await using instance = await introspectWorkflowInstance(env.TASK_RUNNER_WORKFLOW, id);
 
 // ❌ state persists across tests; instance that completed in this test will
 // already be marked complete in the next
-const instance = await introspectWorkflowInstance(env.CODER_TASK_WORKFLOW, id);
+const instance = await introspectWorkflowInstance(env.TASK_RUNNER_WORKFLOW, id);
 ```
 
 See [testing.md](testing.md#workflow-introspection-pattern) for the full pattern.

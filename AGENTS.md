@@ -1,6 +1,6 @@
 # AGENTS.md — task-action
 
-Cloudflare Worker + single Cloudflare Workflow that drives Coder AI task lifecycle from GitHub webhooks. The Worker signature-verifies and classifies each webhook, then enqueues a `CoderTaskWorkflow` instance that talks to the Coder and GitHub APIs durably (step-level retries, replay across isolate evictions).
+Cloudflare Worker + single Cloudflare Workflow that drives Coder AI task lifecycle from GitHub webhooks. The Worker signature-verifies and classifies each webhook, then enqueues a `TaskRunnerWorkflow` instance that talks to the Coder and GitHub APIs durably (step-level retries, replay across isolate evictions).
 
 **Tech stack:** Cloudflare Workers · Cloudflare Workflows · TypeScript (strict) · Zod · Biome · `@octokit/rest` · `@octokit/auth-app` · `@octokit/webhooks-methods` · `@cloudflare/vitest-pool-workers`
 
@@ -19,16 +19,16 @@ After changing `wrangler.toml`, regenerate binding types: `npx wrangler types`.
 ## Architecture
 
 ```
-GitHub  ───POST /api/webhooks───▶  Worker (src/main.ts)
+GitHub  ───POST /webhooks/github───▶  Worker (src/main.ts)
                                       │ parseWebhookRequest → verify sig + parse
                                       │   (401 bad sig · 400 missing header/JSON)
                                       │ WebhookRouter → classify + guards
                                       │   (200 skip for self-comments, workflow_run success, …)
                                       ▼
-                           env.CODER_TASK_WORKFLOW.create({ id, params })
+                           env.TASK_RUNNER_WORKFLOW.create({ id, params })
                                       │  202 Accepted
                                       ▼
-                       CoderTaskWorkflow (src/workflows/coder-task-workflow.ts)
+                       TaskRunnerWorkflow (src/workflows/task-runner-workflow.ts)
                                       │  dispatch on event.type
                                       ▼
                          src/workflows/steps/{create-task, close-task,
@@ -69,7 +69,7 @@ src/
     router.ts                         Event classification + guards → Event | SkipResult
     guards.ts                         Self-comment suppression, author checks, …
   workflows/
-    coder-task-workflow.ts            WorkflowEntrypoint — dispatches on event.type
+    task-runner-workflow.ts            WorkflowEntrypoint — dispatches on event.type
     instance-id.ts                    buildInstanceId + isDuplicateInstanceError
     ensure-task-ready.ts              step.sleep-based wait-for-idle loop
     steps/{create-task,close-task,comment,failed-check}.ts
