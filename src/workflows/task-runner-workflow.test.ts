@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { introspectWorkflowInstance } from "cloudflare:test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type {
 	CheckFailedEvent,
 	CommentPostedEvent,
@@ -81,6 +81,65 @@ describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 	// workflow engine treats as "no mock set" — the real callback then runs and
 	// hits the live GitHub API. This is a pool-workers/miniflare limitation,
 	// not a defect in our workflow logic.
+
+	test("run() binds instanceId onto logger so step emissions carry it", async () => {
+		const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+		try {
+			const instanceId = "task_requested-repo-1-trace-delivery";
+			await using instance = await introspectWorkflowInstance(
+				env.TASK_RUNNER_WORKFLOW,
+				instanceId,
+			);
+			await instance.modify(async (m) => {
+				await m.disableSleeps();
+				await m.mockStepResult({ name: "lookup-coder-user" }, "coder-user");
+				await m.mockStepResult({ name: "check-github-permission" }, true);
+				await m.mockStepResult(
+					{ name: "create-coder-task" },
+					{
+						taskName: "gh-repo-1",
+						owner: "coder-user",
+						taskId: "11111111-1111-4111-8111-111111111111",
+						url: "https://coder.example.com/tasks/coder-user/abc",
+						status: "ready",
+					},
+				);
+				await m.mockStepResult({ name: "comment-on-issue" }, {});
+				await m.mockStepResult(
+					{ name: "wait-lookup-task" },
+					{ status: "active" },
+				);
+				await m.mockStepResult({ name: "update-status-comment" }, {});
+			});
+
+			const params: TaskRequestedEvent = {
+				type: "task_requested",
+				source: { type: "github", installationId: 1 },
+				repository: { owner: "acme", name: "repo" },
+				issue: { number: 1, url: "https://github.com/acme/repo/issues/1" },
+				requester: { login: "alice", externalId: 42 },
+			};
+			await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
+			await instance.waitForStatus("complete");
+
+			const withInstanceId = spy.mock.calls
+				.map((c) => c[0])
+				.filter((s): s is string => typeof s === "string")
+				.map((s) => {
+					try {
+						return JSON.parse(s);
+					} catch {
+						return null;
+					}
+				})
+				.filter((o): o is Record<string, unknown> => o !== null)
+				.filter((o) => o.instanceId === instanceId);
+
+			expect(withInstanceId.length).toBeGreaterThan(0);
+		} finally {
+			spy.mockRestore();
+		}
+	});
 });
 
 describe("TaskRunnerWorkflow dispatch — task_closed", () => {

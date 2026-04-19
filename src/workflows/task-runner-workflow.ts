@@ -57,7 +57,14 @@ export class TaskRunnerWorkflow extends WorkflowEntrypoint<
 		const config = loadConfig(
 			this.env as unknown as Record<string, string | undefined>,
 		);
-		const logger = createLogger({ logFormat: this.env.LOG_FORMAT });
+		const logger = createLogger({ logFormat: this.env.LOG_FORMAT }).child({
+			instanceId: event.instanceId,
+		});
+		// Replay-safe breadcrumb: emits an `instanceId`-tagged line on every
+		// replay so Workers Logs can correlate the run even when all downstream
+		// side-effects are cached in `step.do` results. `payload.type` is the
+		// only payload field logged here — anything sensitive stays out.
+		logger.info("Workflow run started", { type: payload.type });
 
 		const octokit = new Octokit({
 			authStrategy: createAppAuth,
