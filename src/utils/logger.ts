@@ -57,6 +57,32 @@ function makeLogger(bindings: Record<string, unknown>, json: boolean): Logger {
 	};
 }
 
+// ── W3C traceparent ─────────────────────────────────────────────────────────
+
+const HEX_RE = /^[0-9a-f]+$/;
+const ZERO_TRACE_ID = "00000000000000000000000000000000";
+
+export function parseTraceparent(
+	header: string | null,
+): { traceId: string; spanId: string } | null {
+	if (header == null) return null;
+	const segments = header.split("-");
+	if (segments.length !== 4) return null;
+	const [version, traceId, spanId, flags] = segments as [
+		string,
+		string,
+		string,
+		string,
+	];
+	if (version.length !== 2 || !HEX_RE.test(version)) return null;
+	if (version === "ff") return null;
+	if (traceId.length !== 32 || !HEX_RE.test(traceId)) return null;
+	if (traceId === ZERO_TRACE_ID) return null;
+	if (spanId.length !== 16 || !HEX_RE.test(spanId)) return null;
+	if (flags.length !== 2 || !HEX_RE.test(flags)) return null;
+	return { traceId, spanId };
+}
+
 // ── Test logger ─────────────────────────────────────────────────────────────
 
 interface LogEntry {
