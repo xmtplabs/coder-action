@@ -18,5 +18,6 @@ export type PRReviewCommentEditedPayload =
 	WebhookEventDefinition<"pull-request-review-comment-edited">;
 export type PRReviewSubmittedPayload =
 	WebhookEventDefinition<"pull-request-review-submitted">;
+export type PushPayload = WebhookEventDefinition<"push">;
 export type WorkflowRunCompletedPayload =
 	WebhookEventDefinition<"workflow-run-completed">;
