@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import worker, { __setAppBotLoginForTests } from "./main";
+import issuesAssigned from "./testing/fixtures/issues-assigned.json";
 import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 import { computeSignature } from "./testing/workflow-test-helpers";
 
@@ -155,5 +156,104 @@ describe("Worker tracing bindings", () => {
 		expect(log.rayId).toBe("9zz-IAD");
 		expect("traceId" in log).toBe(false);
 		expect("spanId" in log).toBe(false);
+	});
+});
+
+// ── Worker → Workflow trace context propagation ──────────────────────────────
+
+async function buildDispatchingWebhook(
+	headers: Record<string, string>,
+): Promise<Request> {
+	const body = JSON.stringify(issuesAssigned);
+	const signature = await computeSignature(TEST_SECRET, body);
+	return new Request("https://example.com/webhooks/github", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			"X-Hub-Signature-256": signature,
+			"X-GitHub-Event": "issues",
+			"X-GitHub-Delivery": "trace-propagation-1",
+			...headers,
+		},
+		body,
+	});
+}
+
+function makeCapturingEnv(captured: { params?: unknown }) {
+	return {
+		...baseEnv,
+		TASK_RUNNER_WORKFLOW: {
+			create: (args: { id: string; params: unknown }) => {
+				captured.params = args.params;
+				return Promise.resolve({ id: args.id });
+			},
+		},
+	} as unknown as Parameters<typeof worker.fetch>[1];
+}
+
+describe("Worker → Workflow trace context propagation", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	beforeEach(() => {
+		__setAppBotLoginForTests("xmtp-coder-tasks[bot]");
+	});
+
+	test("rayId + valid traceparent are merged onto source.trace in workflow params", async () => {
+		vi.spyOn(console, "log").mockImplementation(() => {});
+		const captured: { params?: unknown } = {};
+		const req = await buildDispatchingWebhook({
+			"cf-ray": "8a1-SJC",
+			traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+		});
+		const res = await worker.fetch(
+			req,
+			makeCapturingEnv(captured),
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(202);
+		const params = captured.params as {
+			source: {
+				trace?: { rayId?: string; traceId?: string; spanId?: string };
+			};
+		};
+		expect(params.source.trace).toEqual({
+			rayId: "8a1-SJC",
+			traceId: "0af7651916cd43dd8448eb211c80319c",
+			spanId: "b7ad6b7169203331",
+		});
+	});
+
+	test("no tracing headers → source.trace is not set", async () => {
+		vi.spyOn(console, "log").mockImplementation(() => {});
+		const captured: { params?: unknown } = {};
+		const req = await buildDispatchingWebhook({});
+		const res = await worker.fetch(
+			req,
+			makeCapturingEnv(captured),
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(202);
+		const params = captured.params as { source: { trace?: unknown } };
+		expect(params.source.trace).toBeUndefined();
+	});
+
+	test("cf-ray only → source.trace carries rayId but no trace/span ids", async () => {
+		vi.spyOn(console, "log").mockImplementation(() => {});
+		const captured: { params?: unknown } = {};
+		const req = await buildDispatchingWebhook({ "cf-ray": "9zz-IAD" });
+		const res = await worker.fetch(
+			req,
+			makeCapturingEnv(captured),
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(202);
+		const params = captured.params as {
+			source: {
+				trace?: { rayId?: string; traceId?: string; spanId?: string };
+			};
+		};
+		expect(params.source.trace).toEqual({ rayId: "9zz-IAD" });
 	});
 });
