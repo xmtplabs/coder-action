@@ -161,6 +161,37 @@ export class GitHubClient {
 			}));
 	}
 
+	async getRepoContentFile(
+		owner: string,
+		repo: string,
+		path: string,
+		ref: string,
+	): Promise<{ contentBase64: string } | null> {
+		try {
+			const res = await this.octokit.rest.repos.getContent({
+				owner,
+				repo,
+				path,
+				ref,
+			});
+			const data = res.data as
+				| Array<unknown>
+				| {
+						type?: string;
+						encoding?: string;
+						content?: string;
+				  };
+			if (Array.isArray(data)) return null;
+			if (data.type !== "file") return null;
+			if (data.encoding !== "base64") return null;
+			if (typeof data.content !== "string") return null;
+			return { contentBase64: data.content };
+		} catch (err: unknown) {
+			if ((err as { status?: number })?.status === 404) return null;
+			throw err;
+		}
+	}
+
 	async getJobLogs(
 		owner: string,
 		repo: string,

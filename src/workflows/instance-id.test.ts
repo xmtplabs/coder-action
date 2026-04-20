@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Event } from "../events/types";
+import type { ConfigPushEvent, Event } from "../events/types";
 import { buildInstanceId, isDuplicateInstanceError } from "./instance-id";
 
 describe("buildInstanceId", () => {
@@ -105,6 +105,44 @@ describe("buildInstanceId", () => {
 		};
 		const id = buildInstanceId(event, "d");
 		expect(id.length).toBeLessThanOrEqual(64);
+	});
+});
+
+const baseConfigPush: ConfigPushEvent = {
+	type: "config_push",
+	source: { type: "github", installationId: 1 },
+	repository: {
+		id: 1,
+		owner: "acme",
+		name: "repo",
+		fullName: "acme/repo",
+		defaultBranch: "main",
+	},
+	head: {
+		sha: "abcdef1234567890abcdef1234567890",
+		ref: "refs/heads/main",
+	},
+};
+
+describe("buildInstanceId — config_push", () => {
+	test("composite includes event type, repo name, head SHA, delivery ID", () => {
+		const id = buildInstanceId(baseConfigPush, "delivery-xyz");
+		expect(id.startsWith("config_push-repo-")).toBe(true);
+		expect(id).toContain("abcdef1234567890");
+		expect(id).toContain("delivery-xyz");
+	});
+	test("length is <= 64 after sanitize + truncate", () => {
+		const id = buildInstanceId(baseConfigPush, "delivery-xyz");
+		expect(id.length).toBeLessThanOrEqual(64);
+	});
+	test("output charset is [a-zA-Z0-9_-]", () => {
+		const id = buildInstanceId(baseConfigPush, "delivery/with.dots");
+		expect(/^[a-zA-Z0-9_-]+$/.test(id)).toBe(true);
+	});
+	test("identical delivery IDs collide (dedupe anchor)", () => {
+		const a = buildInstanceId(baseConfigPush, "same-delivery");
+		const b = buildInstanceId(baseConfigPush, "same-delivery");
+		expect(a).toBe(b);
 	});
 });
 

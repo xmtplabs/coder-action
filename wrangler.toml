@@ -9,6 +9,19 @@ name = "task-runner-workflow"
 binding = "TASK_RUNNER_WORKFLOW"
 class_name = "TaskRunnerWorkflow"
 
+[[workflows]]
+name = "repo-config-workflow"
+binding = "REPO_CONFIG_WORKFLOW"
+class_name = "RepoConfigWorkflow"
+
+[[durable_objects.bindings]]
+name = "REPO_CONFIG_DO"
+class_name = "RepoConfigDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RepoConfigDO"]
+
 [limits]
 cpu_ms = 30000
 

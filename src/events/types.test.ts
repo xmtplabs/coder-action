@@ -2,14 +2,15 @@ import { describe, expect, test } from "vitest";
 import type { Event, EventSource } from "./types";
 
 describe("Event union", () => {
-	test("has four variants", () => {
+	test("has five variants", () => {
 		const variants: Event["type"][] = [
 			"task_requested",
 			"task_closed",
 			"comment_posted",
 			"check_failed",
+			"config_push",
 		];
-		expect(variants).toHaveLength(4);
+		expect(variants).toHaveLength(5);
 	});
 
 	test("EventSource supports github variant", () => {

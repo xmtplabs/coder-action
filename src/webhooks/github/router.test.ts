@@ -6,6 +6,7 @@ import type {
 	TaskClosedEvent,
 	CommentPostedEvent,
 	CheckFailedEvent,
+	ConfigPushEvent,
 	Event,
 } from "../../events/types";
 import type { Logger } from "../../utils/logger";
@@ -17,6 +18,7 @@ import issueCommentOnPr from "../../testing/fixtures/issue-comment-on-pr.json";
 import prReviewComment from "../../testing/fixtures/pr-review-comment.json";
 import prReviewSubmitted from "../../testing/fixtures/pr-review-submitted.json";
 import prReviewSubmittedEmpty from "../../testing/fixtures/pr-review-submitted-empty.json";
+import pushDefaultBranch from "../../testing/fixtures/push-default-branch.json";
 import workflowRunFailure from "../../testing/fixtures/workflow-run-failure.json";
 import workflowRunSuccess from "../../testing/fixtures/workflow-run-success.json";
 
@@ -476,13 +478,54 @@ describe("WebhookRouter", () => {
 	// ── unknown event ─────────────────────────────────────────────────────────
 
 	test("unknown event → skipped", async () => {
-		const result = await router.handleGithubWebhook("push", "delivery-016", {
+		const result = await router.handleGithubWebhook("fork", "delivery-016", {
 			ref: "refs/heads/main",
 		});
 
 		expect(isSkip(result)).toBe(true);
 		if (!isSkip(result)) throw new Error("expected skipped");
 		expect(result.reason).toMatch(/unhandled/i);
+	});
+
+	// ── push event routing ────────────────────────────────────────────────────
+
+	describe("push event routing", () => {
+		test("push to default branch → config_push event", async () => {
+			const result = await router.handleGithubWebhook(
+				"push",
+				"delivery-push-1",
+				pushDefaultBranch,
+			);
+			expect(isEvent(result)).toBe(true);
+			if (!isEvent(result)) throw new Error("expected event");
+			const evt = result as ConfigPushEvent;
+			expect(evt.type).toBe("config_push");
+			expect(evt.source.installationId).toBe(INSTALLATION_ID);
+			expect(evt.repository.id).toBe(1185202430);
+			expect(evt.repository.owner).toBe("xmtplabs");
+			expect(evt.repository.name).toBe("coder-action");
+			expect(evt.repository.fullName).toBe("xmtplabs/coder-action");
+			expect(evt.repository.defaultBranch).toBe("main");
+			expect(evt.head.sha).toBe("abcdef1234567890abcdef1234567890abcdef12");
+			expect(evt.head.ref).toBe("refs/heads/main");
+		});
+
+		test("push to non-default branch → skipped", async () => {
+			const payload = { ...pushDefaultBranch, ref: "refs/heads/feature" };
+			const result = await router.handleGithubWebhook("push", "d2", payload);
+			expect(isSkip(result)).toBe(true);
+			if (!isSkip(result)) throw new Error("expected skip");
+			expect(result.reason).toMatch(/ref/i);
+			expect(result.reason).toContain("feature");
+		});
+
+		test("push with deleted default-branch after-sha still emits event", async () => {
+			const payload = { ...pushDefaultBranch, after: "0".repeat(40) };
+			const result = await router.handleGithubWebhook("push", "d3", payload);
+			expect(isEvent(result)).toBe(true);
+			if (!isEvent(result)) throw new Error("expected event");
+			expect((result as ConfigPushEvent).head.sha).toBe("0".repeat(40));
+		});
 	});
 
 	// ── installationId extraction ─────────────────────────────────────────────

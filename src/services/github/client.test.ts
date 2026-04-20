@@ -300,4 +300,130 @@ describe("GitHubClient", () => {
 			expect(lines[0]).toBe("line 101");
 		});
 	});
+
+	describe("getRepoContentFile", () => {
+		test("returns { contentBase64 } for a file with base64 encoding", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => ({
+							data: {
+								type: "file",
+								encoding: "base64",
+								content: "aGVsbG8=",
+							},
+						}),
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", ".code-factory/config.toml", "sha"),
+			).resolves.toEqual({ contentBase64: "aGVsbG8=" });
+		});
+
+		test("returns null on 404", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => {
+							const err = new Error("Not Found") as Error & {
+								status?: number;
+							};
+							err.status = 404;
+							throw err;
+						},
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).resolves.toBeNull();
+		});
+
+		test("returns null when response is an array (directory listing)", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => ({ data: [] }),
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).resolves.toBeNull();
+		});
+
+		test("returns null for submodule or symlink", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => ({
+							data: { type: "symlink", target: "../elsewhere" },
+						}),
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).resolves.toBeNull();
+		});
+
+		test("returns null when encoding is not base64 (e.g., 'none' for >1MB files)", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => ({
+							data: { type: "file", encoding: "none", size: 2_000_000 },
+						}),
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).resolves.toBeNull();
+		});
+
+		test("re-throws non-404 status codes", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => {
+							const err = new Error("Server Error") as Error & {
+								status?: number;
+							};
+							err.status = 500;
+							throw err;
+						},
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).rejects.toThrow(/Server Error/);
+		});
+	});
 });

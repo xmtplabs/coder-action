@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import worker, { __setAppBotLoginForTests } from "../main";
 import issuesAssigned from "./fixtures/issues-assigned.json";
 import issuesClosed from "./fixtures/issues-closed.json";
+import pushDefaultBranch from "./fixtures/push-default-branch.json";
 import { buildSignedWebhookRequest } from "./workflow-test-helpers";
 
 // Pre-seed the bot-login cache so the handler doesn't call `GET /app`.
@@ -119,5 +120,67 @@ describe("e2e: signed webhook → worker → workflow completion", () => {
 		for (const inst of instances) {
 			await expect(inst.waitForStatus("complete")).resolves.not.toThrow();
 		}
+	});
+
+	test("push to default branch runs RepoConfigWorkflow to completion", async () => {
+		await using introspector = await introspectWorkflow(
+			testEnv.REPO_CONFIG_WORKFLOW,
+		);
+		await introspector.modifyAll(async (m) => {
+			await m.disableSleeps();
+			await m.mockStepResult(
+				{ name: "fetch-config-file" },
+				{ present: true, contentBase64: "" },
+			);
+			await m.mockStepResult({ name: "parse-and-validate" }, { settings: {} });
+			await m.mockStepResult({ name: "store-repo-config" }, { ok: true });
+		});
+
+		const req = await buildSignedWebhookRequest({
+			secret: testEnv.WEBHOOK_SECRET,
+			body: JSON.stringify(pushDefaultBranch),
+			eventName: "push",
+			deliveryId: "e2e-push-default-1",
+		});
+		const res = await worker.fetch(
+			req,
+			testEnv as WorkerEnv,
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(202);
+
+		const instances = introspector.get();
+		expect(instances.length).toBeGreaterThanOrEqual(1);
+		for (const inst of instances) {
+			await expect(inst.waitForStatus("complete")).resolves.not.toThrow();
+		}
+	});
+
+	test("push to non-default branch is skipped (no workflow instance)", async () => {
+		await using repoCfgIntrospector = await introspectWorkflow(
+			testEnv.REPO_CONFIG_WORKFLOW,
+		);
+		await using taskIntrospector = await introspectWorkflow(
+			testEnv.TASK_RUNNER_WORKFLOW,
+		);
+
+		const nonDefaultPush = {
+			...pushDefaultBranch,
+			ref: "refs/heads/feature",
+		};
+		const req = await buildSignedWebhookRequest({
+			secret: testEnv.WEBHOOK_SECRET,
+			body: JSON.stringify(nonDefaultPush),
+			eventName: "push",
+			deliveryId: "e2e-push-feature-1",
+		});
+		const res = await worker.fetch(
+			req,
+			testEnv as WorkerEnv,
+			{} as ExecutionContext,
+		);
+		expect(res.status).toBe(200);
+		expect(repoCfgIntrospector.get()).toHaveLength(0);
+		expect(taskIntrospector.get()).toHaveLength(0);
 	});
 });

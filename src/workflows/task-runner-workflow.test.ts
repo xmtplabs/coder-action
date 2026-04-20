@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import type {
 	CheckFailedEvent,
 	CommentPostedEvent,
+	ConfigPushEvent,
 	TaskClosedEvent,
 	TaskRequestedEvent,
 } from "../events/types";
@@ -516,4 +517,31 @@ describe("TaskRunnerWorkflow dispatch — check_failed", () => {
 	// `src/workflows/steps/failed-check.test.ts` (unit test). Omitting the
 	// workflow-introspection variant for the same reason as task_requested
 	// above: miniflare's `mockStepResult` treats `null` as "no mock set".
+});
+
+describe("TaskRunnerWorkflow guards — config_push", () => {
+	test("config_push payload is rejected by TaskRunnerWorkflow (wrong workflow)", async () => {
+		const instanceId = "config_push-wrongly-dispatched";
+		await using instance = await introspectWorkflowInstance(
+			env.TASK_RUNNER_WORKFLOW,
+			instanceId,
+		);
+		await instance.modify(async (m) => {
+			await m.disableSleeps();
+		});
+		const params: ConfigPushEvent = {
+			type: "config_push",
+			source: { type: "github", installationId: 1 },
+			repository: {
+				id: 1,
+				owner: "a",
+				name: "r",
+				fullName: "a/r",
+				defaultBranch: "main",
+			},
+			head: { sha: "abc", ref: "refs/heads/main" },
+		};
+		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
+		await expect(instance.waitForStatus("errored")).resolves.not.toThrow();
+	});
 });

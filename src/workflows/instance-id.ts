@@ -29,6 +29,8 @@ export function buildInstanceId(event: Event, deliveryId: string): string {
 					? `${event.type}-${event.repository.name}-${n}-${deliveryId}`
 					: `${event.type}-${event.run.id}-${deliveryId}`;
 			}
+			case "config_push":
+				return `${event.type}-${event.repository.name}-${event.head.sha}-${deliveryId}`;
 		}
 	})();
 	return raw.replace(SANITIZE, "-").slice(0, MAX_LEN);
