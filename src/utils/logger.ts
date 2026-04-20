@@ -58,6 +58,14 @@ function makeLogger(bindings: Record<string, unknown>, json: boolean): Logger {
 }
 
 // ── W3C traceparent ─────────────────────────────────────────────────────────
+//
+// Rolled inline instead of taking a library dep: Cloudflare does not expose
+// the parsed traceparent to request-path user code (the `SpanContext` type
+// in @cloudflare/workers-types is Tail-Worker-only), `@opentelemetry/core`
+// requires a Context/TextMapGetter dance just to read two hex strings,
+// `tctx` has <3k weekly DL + single maintainer, and `elastic/traceparent`
+// is inactive. Rules below are W3C Trace Context §3.2.
+// https://www.w3.org/TR/trace-context/#traceparent-header
 
 const HEX_RE = /^[0-9a-f]+$/;
 const ZERO_TRACE_ID = "00000000000000000000000000000000";
