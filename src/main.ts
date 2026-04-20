@@ -16,6 +16,7 @@ import {
 import type { TaskRunnerWorkflowEnv } from "./workflows/task-runner-workflow";
 
 export { TaskRunnerWorkflow } from "./workflows/task-runner-workflow";
+export { RepoConfigDO } from "./durable-objects/repo-config-do";
 export { __setAppBotLoginForTests };
 
 // ── Worker entrypoint ────────────────────────────────────────────────────────
