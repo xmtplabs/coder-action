@@ -7,9 +7,9 @@ import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "../config/app-config";
 import type { Event } from "../events/types";
-import { createLogger } from "../utils/logger";
 import { CoderService } from "../services/coder/service";
 import { GitHubClient } from "../services/github/client";
+import { createLogger } from "../utils/logger";
 import { runCloseTask } from "./steps/close-task";
 import { runComment } from "./steps/comment";
 import { runCreateTask } from "./steps/create-task";
@@ -57,7 +57,18 @@ export class TaskRunnerWorkflow extends WorkflowEntrypoint<
 		const config = loadConfig(
 			this.env as unknown as Record<string, string | undefined>,
 		);
-		const logger = createLogger({ logFormat: this.env.LOG_FORMAT });
+		const sourceTrace = payload.source.trace ?? {};
+		const logger = createLogger({ logFormat: this.env.LOG_FORMAT }).child({
+			instanceId: event.instanceId,
+			...(sourceTrace.rayId ? { rayId: sourceTrace.rayId } : {}),
+			...(sourceTrace.traceId ? { traceId: sourceTrace.traceId } : {}),
+			...(sourceTrace.spanId ? { spanId: sourceTrace.spanId } : {}),
+		});
+		// Replay-safe breadcrumb: emits an `instanceId`-tagged line on every
+		// replay so Workers Logs can correlate the run even when all downstream
+		// side-effects are cached in `step.do` results. `payload.type` is the
+		// only payload field logged here — anything sensitive stays out.
+		logger.info("Workflow run started", { type: payload.type });
 
 		const octokit = new Octokit({
 			authStrategy: createAppAuth,

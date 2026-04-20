@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createLogger, TestLogger } from "./logger";
+import { createLogger, parseTraceparent, TestLogger } from "./logger";
 
 describe("TestLogger", () => {
 	test("captures info messages", () => {
@@ -133,5 +133,166 @@ describe("createLogger(json mode)", () => {
 		} finally {
 			spy.mockRestore();
 		}
+	});
+});
+
+describe("parseTraceparent", () => {
+	test("parses a valid W3C traceparent header", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+			),
+		).toEqual({
+			traceId: "0af7651916cd43dd8448eb211c80319c",
+			spanId: "b7ad6b7169203331",
+		});
+	});
+
+	test("returns null for a null header", () => {
+		expect(parseTraceparent(null)).toBeNull();
+	});
+
+	test("returns null when there are too few segments", () => {
+		expect(
+			parseTraceparent("00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331"),
+		).toBeNull();
+	});
+
+	test("returns null when there are too many segments", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01-extra",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for non-hex characters", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319z-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null when trace-id is too short", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null when span-id is too short", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b716920333-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null when trace-id is all zeros", () => {
+		expect(
+			parseTraceparent(
+				"00-00000000000000000000000000000000-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for version ff", () => {
+		expect(
+			parseTraceparent(
+				"ff-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("accepts forward-compatible versions like 01", () => {
+		expect(
+			parseTraceparent(
+				"01-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+			),
+		).toEqual({
+			traceId: "0af7651916cd43dd8448eb211c80319c",
+			spanId: "b7ad6b7169203331",
+		});
+	});
+
+	test("returns null for empty string", () => {
+		expect(parseTraceparent("")).toBeNull();
+	});
+
+	test("returns null for whitespace-only header", () => {
+		expect(parseTraceparent("   ")).toBeNull();
+	});
+
+	test("returns null for lone dashes", () => {
+		expect(parseTraceparent("---")).toBeNull();
+	});
+
+	test("returns null for trailing hyphen (5 segments)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01-",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for uppercase hex in trace-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0AF7651916CD43DD8448EB211C80319C-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for uppercase hex in span-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-B7AD6B7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("accepts all-zero span-id", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-0000000000000000-01",
+			),
+		).toEqual({
+			traceId: "0af7651916cd43dd8448eb211c80319c",
+			spanId: "0000000000000000",
+		});
+	});
+
+	test("returns null for malformed flags (non-hex)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-zz",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for malformed flags (wrong length)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-012",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for too-long trace-id (33 hex chars)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c0-b7ad6b7169203331-01",
+			),
+		).toBeNull();
+	});
+
+	test("returns null for too-long span-id (17 hex chars)", () => {
+		expect(
+			parseTraceparent(
+				"00-0af7651916cd43dd8448eb211c80319c-b7ad6b71692033310-01",
+			),
+		).toBeNull();
 	});
 });

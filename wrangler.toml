@@ -14,6 +14,14 @@ cpu_ms = 30000
 
 [observability]
 enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
 
 [vars]
 AGENT_GITHUB_USERNAME = "xmtp-coder-agent"

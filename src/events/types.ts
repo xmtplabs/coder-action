@@ -1,4 +1,14 @@
-export type EventSource = { type: "github"; installationId: number };
+export type TraceContext = {
+	rayId?: string;
+	traceId?: string;
+	spanId?: string;
+};
+
+export type EventSource = {
+	type: "github";
+	installationId: number;
+	trace?: TraceContext;
+};
 
 export type TaskRequestedEvent = {
 	type: "task_requested";

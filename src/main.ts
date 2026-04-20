@@ -7,13 +7,13 @@ import {
 	parseWebhookRequest,
 	WebhookRequestError,
 } from "./http/parse-webhook-request";
-import { createLogger } from "./utils/logger";
+import { createLogger, parseTraceparent } from "./utils/logger";
 import { WebhookRouter } from "./webhooks/github/router";
-import type { TaskRunnerWorkflowEnv } from "./workflows/task-runner-workflow";
 import {
 	buildInstanceId,
 	isDuplicateInstanceError,
 } from "./workflows/instance-id";
+import type { TaskRunnerWorkflowEnv } from "./workflows/task-runner-workflow";
 
 export { TaskRunnerWorkflow } from "./workflows/task-runner-workflow";
 export { __setAppBotLoginForTests };
@@ -59,7 +59,14 @@ async function handleGithubWebhook(
 	}
 
 	const { eventName, deliveryId, payload } = parsed;
-	const reqLogger = logger.child({ deliveryId, eventName });
+	const rayId = request.headers.get("cf-ray");
+	const trace = parseTraceparent(request.headers.get("traceparent"));
+	const reqLogger = logger.child({
+		deliveryId,
+		eventName,
+		...(rayId ? { rayId } : {}),
+		...(trace ? { traceId: trace.traceId, spanId: trace.spanId } : {}),
+	});
 	reqLogger.info("Webhook received");
 
 	// Stage 2: route via WebhookRouter.
@@ -85,6 +92,13 @@ async function handleGithubWebhook(
 	}
 
 	// Stage 3: dispatch to Workflow (fire-and-return-202).
+	const sourceTrace = {
+		...(rayId ? { rayId } : {}),
+		...(trace ? { traceId: trace.traceId, spanId: trace.spanId } : {}),
+	};
+	if (Object.keys(sourceTrace).length > 0) {
+		result.source.trace = sourceTrace;
+	}
 	const instanceId = buildInstanceId(result, deliveryId);
 	try {
 		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params: result });
