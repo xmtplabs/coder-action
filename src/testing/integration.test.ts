@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import worker, { __setAppBotLoginForTests } from "../main";
 import issueCommentOnIssue from "./fixtures/issue-comment-on-issue.json";
 import issuesAssigned from "./fixtures/issues-assigned.json";
+import pushDefaultBranch from "./fixtures/push-default-branch.json";
 import workflowRunSuccess from "./fixtures/workflow-run-success.json";
 import {
 	buildSignedWebhookRequest,
@@ -48,6 +49,7 @@ interface WorkflowCreateArgs {
 
 function makeEnv(
 	workflowCreate?: (args: WorkflowCreateArgs) => Promise<unknown>,
+	repoConfigCreate?: (args: WorkflowCreateArgs) => Promise<unknown>,
 ) {
 	return {
 		...baseEnv,
@@ -55,6 +57,18 @@ function makeEnv(
 			create:
 				workflowCreate ??
 				((args: WorkflowCreateArgs) => Promise.resolve({ id: args.id })),
+		},
+		REPO_CONFIG_WORKFLOW: {
+			create:
+				repoConfigCreate ??
+				((args: WorkflowCreateArgs) => Promise.resolve({ id: args.id })),
+		},
+		REPO_CONFIG_DO: {
+			idFromName: () => "stub-id",
+			get: () => ({
+				setRepoConfig: async () => {},
+				getRepoConfig: async () => null,
+			}),
 		},
 	} as unknown as Parameters<typeof worker.fetch>[1];
 }
@@ -283,5 +297,124 @@ describe("Worker fetch handler — HTTP status surface", () => {
 		});
 		const res = await worker.fetch(req, env, {} as ExecutionContext);
 		expect(res.status).toBe(500);
+	});
+});
+
+// ── Push event dispatch surface ──────────────────────────────────────────────
+//
+// The Worker fans `push` deliveries out to two distinct workflow bindings:
+// default-branch pushes become `config_push` events routed to
+// `REPO_CONFIG_WORKFLOW`, and non-default pushes become a SkipResult with no
+// workflow created at all. These tests pin the HTTP surface and exercise the
+// REPO_CONFIG_WORKFLOW.create path end-to-end (without replaying inside the
+// workflow — that's covered in e2e.test.ts).
+
+describe("Worker fetch handler — push event dispatch", () => {
+	test("push to default branch → 202 and REPO_CONFIG_WORKFLOW.create called", async () => {
+		const taskCalls: WorkflowCreateArgs[] = [];
+		const repoCfgCalls: WorkflowCreateArgs[] = [];
+		const env = makeEnv(
+			async (args) => {
+				taskCalls.push(args);
+				return { id: args.id };
+			},
+			async (args) => {
+				repoCfgCalls.push(args);
+				return { id: args.id };
+			},
+		);
+		const req = await buildSignedWebhookRequest({
+			secret: TEST_SECRET,
+			body: JSON.stringify(pushDefaultBranch),
+			eventName: "push",
+			deliveryId: "push-default-1",
+		});
+		const res = await worker.fetch(req, env, {} as ExecutionContext);
+		expect(res.status).toBe(202);
+		expect(repoCfgCalls).toHaveLength(1);
+		expect(repoCfgCalls[0]?.id).toMatch(/^config_push-/);
+		// `buildInstanceId` caps the charset-sanitized output at 64 chars, so
+		// the deliveryId tail may be truncated — assert the shape, not the tail.
+		expect(repoCfgCalls[0]?.id.length).toBeLessThanOrEqual(64);
+		expect(taskCalls).toHaveLength(0);
+	});
+
+	test("push to non-default branch → 200, no workflow created (skip)", async () => {
+		const taskCalls: WorkflowCreateArgs[] = [];
+		const repoCfgCalls: WorkflowCreateArgs[] = [];
+		const env = makeEnv(
+			async (args) => {
+				taskCalls.push(args);
+				return { id: args.id };
+			},
+			async (args) => {
+				repoCfgCalls.push(args);
+				return { id: args.id };
+			},
+		);
+		const nonDefaultPush = {
+			...pushDefaultBranch,
+			ref: "refs/heads/feature",
+		};
+		const req = await buildSignedWebhookRequest({
+			secret: TEST_SECRET,
+			body: JSON.stringify(nonDefaultPush),
+			eventName: "push",
+			deliveryId: "push-feature-1",
+		});
+		const res = await worker.fetch(req, env, {} as ExecutionContext);
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe("ok");
+		expect(repoCfgCalls).toHaveLength(0);
+		expect(taskCalls).toHaveLength(0);
+	});
+
+	test("push duplicate delivery → 200 on second call", async () => {
+		let repoCfgCalled = 0;
+		const env = makeEnv(undefined, async (args) => {
+			repoCfgCalled += 1;
+			if (repoCfgCalled === 1) return { id: args.id };
+			throw new Error(`instance "${args.id}" already exists`);
+		});
+		const req1 = await buildSignedWebhookRequest({
+			secret: TEST_SECRET,
+			body: JSON.stringify(pushDefaultBranch),
+			eventName: "push",
+			deliveryId: "push-dup-1",
+		});
+		const res1 = await worker.fetch(req1, env, {} as ExecutionContext);
+		expect(res1.status).toBe(202);
+
+		const req2 = await buildSignedWebhookRequest({
+			secret: TEST_SECRET,
+			body: JSON.stringify(pushDefaultBranch),
+			eventName: "push",
+			deliveryId: "push-dup-1",
+		});
+		const res2 = await worker.fetch(req2, env, {} as ExecutionContext);
+		expect(res2.status).toBe(200);
+		expect(repoCfgCalled).toBe(2);
+	});
+
+	test("unsigned push request → 401 before routing", async () => {
+		let repoCfgCalled = false;
+		const env = makeEnv(undefined, () => {
+			repoCfgCalled = true;
+			return Promise.resolve({ id: "x" });
+		});
+		const body = JSON.stringify(pushDefaultBranch);
+		const req = new Request("https://w/webhooks/github", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-GitHub-Event": "push",
+				"X-GitHub-Delivery": "push-unsigned-1",
+			},
+			body,
+		});
+		const res = await worker.fetch(req, env, {} as ExecutionContext);
+		expect(res.status).toBe(401);
+		expect(await res.text()).toMatch(/missing signature/);
+		expect(repoCfgCalled).toBe(false);
 	});
 });
