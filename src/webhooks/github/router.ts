@@ -7,6 +7,7 @@ import type {
 	PRReviewCommentCreatedPayload,
 	PRReviewCommentEditedPayload,
 	PRReviewSubmittedPayload,
+	PushPayload,
 	WorkflowRunCompletedPayload,
 } from "./payload-types";
 import {
@@ -22,6 +23,7 @@ import type {
 	TaskClosedEvent,
 	CommentPostedEvent,
 	CheckFailedEvent,
+	ConfigPushEvent,
 } from "../../events/types";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -129,6 +131,9 @@ export class WebhookRouter {
 					payload as WorkflowRunCompletedPayload,
 					instId,
 				);
+
+			case "push":
+				return this.routePush(payload as unknown as PushPayload, instId);
 
 			default:
 				return {
@@ -419,6 +424,41 @@ export class WebhookRouter {
 			pullRequestNumbers: payload.workflow_run.pull_requests
 				.filter((pr): pr is NonNullable<typeof pr> => pr !== null)
 				.map((pr) => pr.number),
+		};
+		return event;
+	}
+
+	private routePush(
+		payload: PushPayload,
+		instId: number,
+	): ConfigPushEvent | SkipResult {
+		const defaultBranch = payload.repository.default_branch;
+		const expectedRef = `refs/heads/${defaultBranch}`;
+		if (payload.ref !== expectedRef) {
+			return {
+				dispatched: false,
+				reason: `Skipping push: ref "${payload.ref}" is not default branch "${expectedRef}"`,
+			};
+		}
+		const owner = payload.repository.owner;
+		const ownerLogin =
+			(owner != null && "login" in owner ? owner.login : undefined) ??
+			(owner != null && "name" in owner ? owner.name : undefined) ??
+			"";
+		const event: ConfigPushEvent = {
+			type: "config_push",
+			source: { type: "github", installationId: instId },
+			repository: {
+				id: payload.repository.id,
+				owner: ownerLogin,
+				name: payload.repository.name,
+				fullName: payload.repository.full_name,
+				defaultBranch,
+			},
+			head: {
+				sha: payload.after,
+				ref: payload.ref,
+			},
 		};
 		return event;
 	}

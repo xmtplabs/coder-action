@@ -1,0 +1,18 @@
+{
+	"ref": "refs/heads/main",
+	"before": "0000000000000000000000000000000000000000",
+	"after": "abcdef1234567890abcdef1234567890abcdef12",
+	"repository": {
+		"id": 1185202430,
+		"name": "coder-action",
+		"full_name": "xmtplabs/coder-action",
+		"default_branch": "main",
+		"owner": {
+			"login": "xmtplabs",
+			"id": 1
+		}
+	},
+	"installation": {
+		"id": 118770088
+	}
+}
