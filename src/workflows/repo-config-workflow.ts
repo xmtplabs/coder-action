@@ -5,26 +5,12 @@ import {
 } from "cloudflare:workers";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
-import type { RepoConfigDO } from "../durable-objects/repo-config-do";
+import { loadConfig } from "../config/app-config";
 import type { ConfigPushEvent } from "../events/types";
 import { GitHubClient } from "../services/github/client";
 import { createLogger } from "../utils/logger";
 import { runSyncRepoConfig } from "./steps/sync-repo-config";
-
-/**
- * Environment bindings required by the repo-config workflow. A superset of the
- * task-runner env is not needed — this workflow only authenticates as the
- * GitHub App (to fetch the config file at a SHA) and writes to the per-repo
- * `RepoConfigDO`. `REPO_CONFIG_WORKFLOW` is included so the binding type on
- * `this.env` matches Wrangler's own resolution.
- */
-export interface RepoConfigWorkflowEnv {
-	APP_ID: string;
-	PRIVATE_KEY: string;
-	LOG_FORMAT?: string;
-	REPO_CONFIG_WORKFLOW: Workflow;
-	REPO_CONFIG_DO: DurableObjectNamespace<RepoConfigDO>;
-}
+import type { TaskRunnerWorkflowEnv } from "./task-runner-workflow";
 
 /**
  * `RepoConfigWorkflow` runs one instance per accepted `config_push` delivery
@@ -36,9 +22,14 @@ export interface RepoConfigWorkflowEnv {
  * per replay. They must NOT be returned from any `step.do` callback — class
  * instances are not structured-cloneable and the workflow engine throws on
  * attempted persistence.
+ *
+ * The env type is shared with `TaskRunnerWorkflow`: the Worker entry's `env`
+ * is a single object dispatched to both workflows, so divergent env interfaces
+ * would drift as new bindings are added. Sharing `TaskRunnerWorkflowEnv`
+ * keeps the contract centralized even if this workflow only reads a subset.
  */
 export class RepoConfigWorkflow extends WorkflowEntrypoint<
-	RepoConfigWorkflowEnv,
+	TaskRunnerWorkflowEnv,
 	ConfigPushEvent
 > {
 	async run(
@@ -46,6 +37,9 @@ export class RepoConfigWorkflow extends WorkflowEntrypoint<
 		step: WorkflowStep,
 	): Promise<void> {
 		const payload = event.payload;
+		const config = loadConfig(
+			this.env as unknown as Record<string, string | undefined>,
+		);
 		const sourceTrace = payload.source.trace ?? {};
 		const logger = createLogger({ logFormat: this.env.LOG_FORMAT }).child({
 			instanceId: event.instanceId,
@@ -63,8 +57,8 @@ export class RepoConfigWorkflow extends WorkflowEntrypoint<
 		const octokit = new Octokit({
 			authStrategy: createAppAuth,
 			auth: {
-				appId: this.env.APP_ID,
-				privateKey: this.env.PRIVATE_KEY,
+				appId: config.appId,
+				privateKey: config.privateKey,
 				installationId: payload.source.installationId,
 			},
 		});

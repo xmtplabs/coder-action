@@ -523,6 +523,8 @@ describe("WebhookRouter", () => {
 			const payload = { ...pushDefaultBranch, after: "0".repeat(40) };
 			const result = await router.handleGithubWebhook("push", "d3", payload);
 			expect(isEvent(result)).toBe(true);
+			if (!isEvent(result)) throw new Error("expected event");
+			expect((result as ConfigPushEvent).head.sha).toBe("0".repeat(40));
 		});
 	});
 

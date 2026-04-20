@@ -119,7 +119,7 @@ const baseConfigPush: ConfigPushEvent = {
 		defaultBranch: "main",
 	},
 	head: {
-		sha: "abcdef1234567890abcdef1234567890abcdef12",
+		sha: "abcdef1234567890abcdef1234567890",
 		ref: "refs/heads/main",
 	},
 };
@@ -129,6 +129,7 @@ describe("buildInstanceId — config_push", () => {
 		const id = buildInstanceId(baseConfigPush, "delivery-xyz");
 		expect(id.startsWith("config_push-repo-")).toBe(true);
 		expect(id).toContain("abcdef1234567890");
+		expect(id).toContain("delivery-xyz");
 	});
 	test("length is <= 64 after sanitize + truncate", () => {
 		const id = buildInstanceId(baseConfigPush, "delivery-xyz");

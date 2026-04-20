@@ -384,6 +384,25 @@ describe("GitHubClient", () => {
 			).resolves.toBeNull();
 		});
 
+		test("returns null when encoding is not base64 (e.g., 'none' for >1MB files)", async () => {
+			const octokit = {
+				rest: {
+					repos: {
+						getContent: async () => ({
+							data: { type: "file", encoding: "none", size: 2_000_000 },
+						}),
+					},
+				},
+			};
+			const client = new GitHubClient(
+				octokit as unknown as import("./client").Octokit,
+				new TestLogger(),
+			);
+			await expect(
+				client.getRepoContentFile("a", "r", "x", "sha"),
+			).resolves.toBeNull();
+		});
+
 		test("re-throws non-404 status codes", async () => {
 			const octokit = {
 				rest: {
