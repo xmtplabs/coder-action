@@ -16,6 +16,7 @@ import {
 import type { TaskRunnerWorkflowEnv } from "./workflows/task-runner-workflow";
 
 export { TaskRunnerWorkflow } from "./workflows/task-runner-workflow";
+export { RepoConfigWorkflow } from "./workflows/repo-config-workflow";
 export { RepoConfigDO } from "./durable-objects/repo-config-do";
 export { __setAppBotLoginForTests };
 
@@ -102,7 +103,17 @@ async function handleGithubWebhook(
 	}
 	const instanceId = buildInstanceId(result, deliveryId);
 	try {
-		await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params: result });
+		if (result.type === "config_push") {
+			await env.REPO_CONFIG_WORKFLOW.create({
+				id: instanceId,
+				params: result,
+			});
+		} else {
+			await env.TASK_RUNNER_WORKFLOW.create({
+				id: instanceId,
+				params: result,
+			});
+		}
 		reqLogger.info("Webhook processed", {
 			handler: result.type,
 			instanceId,

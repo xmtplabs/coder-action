@@ -7,6 +7,7 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "../config/app-config";
+import type { RepoConfigDO } from "../durable-objects/repo-config-do";
 import type { Event } from "../events/types";
 import { CoderService } from "../services/coder/service";
 import { GitHubClient } from "../services/github/client";
@@ -35,6 +36,8 @@ export interface TaskRunnerWorkflowEnv {
 	CODER_ORGANIZATION: string;
 	LOG_FORMAT?: string;
 	TASK_RUNNER_WORKFLOW: Workflow;
+	REPO_CONFIG_WORKFLOW: Workflow;
+	REPO_CONFIG_DO: DurableObjectNamespace<RepoConfigDO>;
 }
 
 /**
