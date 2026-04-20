@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env, runInDurableObject } from "cloudflare:test";
 import { describe, expect, test } from "vitest";
 import type { StoredRepoConfig } from "../config/repo-config-schema";
 import { RepoConfigDO } from "./repo-config-do";
@@ -88,6 +88,25 @@ describe("RepoConfigDO — get/set round-trip", () => {
 		expect(read?.settings.sandbox.volumes).toEqual([
 			{ path: "/data", size: "10gb" },
 		]);
+	});
+
+	test("setRepoConfig writes identity fields and settings to separate KV keys", async () => {
+		const id = env.REPO_CONFIG_DO.idFromName("acme/key-layout");
+		const stub = env.REPO_CONFIG_DO.get(id);
+		await stub.setRepoConfig({
+			repositoryId: 42,
+			repositoryFullName: "acme/key-layout",
+			installationId: 999,
+			settings: { sandbox: { size: "small" } },
+		});
+		await runInDurableObject(stub, async (_instance, ctx) => {
+			expect(ctx.storage.kv.get("repositoryId")).toBe(42);
+			expect(ctx.storage.kv.get("repositoryFullName")).toBe("acme/key-layout");
+			expect(ctx.storage.kv.get("installationId")).toBe(999);
+			expect(ctx.storage.kv.get("config")).toEqual({
+				sandbox: { size: "small" },
+			});
+		});
 	});
 
 	test("distinct fullNames route to distinct DO instances", async () => {
