@@ -61,8 +61,25 @@ export type CheckFailedEvent = {
 	pullRequestNumbers: number[];
 };
 
+export type ConfigPushEvent = {
+	type: "config_push";
+	source: EventSource;
+	repository: {
+		id: number;
+		owner: string;
+		name: string;
+		fullName: string;
+		defaultBranch: string;
+	};
+	head: {
+		sha: string;
+		ref: string;
+	};
+};
+
 export type Event =
 	| TaskRequestedEvent
 	| TaskClosedEvent
 	| CommentPostedEvent
-	| CheckFailedEvent;
+	| CheckFailedEvent
+	| ConfigPushEvent;
