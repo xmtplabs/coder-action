@@ -3,6 +3,7 @@ import {
 	type WorkflowEvent,
 	type WorkflowStep,
 } from "cloudflare:workers";
+import { NonRetryableError } from "cloudflare:workflows";
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
 import { loadConfig } from "../config/app-config";
@@ -103,6 +104,10 @@ export class TaskRunnerWorkflow extends WorkflowEntrypoint<
 			case "check_failed":
 				await runFailedCheck({ step, coder, github, config, event: payload });
 				break;
+			case "config_push":
+				throw new NonRetryableError(
+					"config_push events must be dispatched to RepoConfigWorkflow",
+				);
 		}
 	}
 }
