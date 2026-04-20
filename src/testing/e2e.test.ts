@@ -132,10 +132,7 @@ describe("e2e: signed webhook → worker → workflow completion", () => {
 				{ name: "fetch-config-file" },
 				{ present: true, contentBase64: "" },
 			);
-			await m.mockStepResult(
-				{ name: "parse-and-validate" },
-				{ settings: {} },
-			);
+			await m.mockStepResult({ name: "parse-and-validate" }, { settings: {} });
 			await m.mockStepResult({ name: "store-repo-config" }, { ok: true });
 		});
 

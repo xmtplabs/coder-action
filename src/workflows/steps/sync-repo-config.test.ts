@@ -79,7 +79,9 @@ describe("runSyncRepoConfig", () => {
 			"",
 		].join("\n");
 		const github = {
-			getRepoContentFile: vi.fn(async () => ({ contentBase64: toBase64(toml) })),
+			getRepoContentFile: vi.fn(async () => ({
+				contentBase64: toBase64(toml),
+			})),
 		} as unknown as GitHubClient;
 		const event = makeEvent();
 
@@ -163,7 +165,9 @@ describe("runSyncRepoConfig", () => {
 		const { REPO_CONFIG_DO, setRepoConfig } = makeDO();
 		const toml = ["[sandbox]", 'size = "huge"', ""].join("\n");
 		const github = {
-			getRepoContentFile: vi.fn(async () => ({ contentBase64: toBase64(toml) })),
+			getRepoContentFile: vi.fn(async () => ({
+				contentBase64: toBase64(toml),
+			})),
 		} as unknown as GitHubClient;
 		const event = makeEvent();
 
@@ -189,7 +193,9 @@ describe("runSyncRepoConfig", () => {
 		const { REPO_CONFIG_DO, setRepoConfig } = makeDO();
 		const toml = ["[sandbox]", "docker = true", ""].join("\n");
 		const github = {
-			getRepoContentFile: vi.fn(async () => ({ contentBase64: toBase64(toml) })),
+			getRepoContentFile: vi.fn(async () => ({
+				contentBase64: toBase64(toml),
+			})),
 		} as unknown as GitHubClient;
 		const event = makeEvent();
 

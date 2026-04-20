@@ -63,10 +63,7 @@ describe("RepoConfigWorkflow dispatch — file absent", () => {
 			instanceId,
 		);
 		await instance.modify(async (m) => {
-			await m.mockStepResult(
-				{ name: "fetch-config-file" },
-				{ present: false },
-			);
+			await m.mockStepResult({ name: "fetch-config-file" }, { present: false });
 			// parse-and-validate / store-repo-config intentionally NOT mocked — if
 			// the workflow tried to run them unmocked it would fail, exposing a
 			// regression in the early-exit branch.

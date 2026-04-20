@@ -58,7 +58,9 @@ export async function runSyncRepoConfig(
 	}
 
 	const parseResult = await step.do("parse-and-validate", async () => {
-		const raw = Buffer.from(fileResult.contentBase64, "base64").toString("utf8");
+		const raw = Buffer.from(fileResult.contentBase64, "base64").toString(
+			"utf8",
+		);
 		const settings = parseRepoConfigToml(raw);
 		return { settings };
 	});
