@@ -3,17 +3,12 @@
 	"image": "mcr.microsoft.com/devcontainers/typescript-node:24",
 	"features": {
 		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/terraform:1": {
-			"version": "1.9.8",
-			"tflint": "0.53.0"
-		}
 	},
 	"postCreateCommand": "npm install",
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"biomejs.biome",
-				"hashicorp.terraform"
 			],
 			"settings": {
 				"editor.defaultFormatter": "biomejs.biome",
@@ -22,15 +17,6 @@
 				"[typescript]": {
 					"editor.defaultFormatter": "biomejs.biome"
 				},
-				"[terraform]": {
-					"editor.defaultFormatter": "hashicorp.terraform",
-					"editor.formatOnSave": true,
-					"editor.tabSize": 2
-				},
-				"[terraform-vars]": {
-					"editor.defaultFormatter": "hashicorp.terraform",
-					"editor.formatOnSave": true
-				}
 			}
 		}
 	}

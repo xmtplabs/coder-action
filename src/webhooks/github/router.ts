@@ -164,6 +164,7 @@ export class WebhookRouter {
 				name: payload.repository.name,
 			},
 			issue: {
+				id: payload.issue.id,
 				number: payload.issue.number,
 				url: payload.issue.html_url,
 			},

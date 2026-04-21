@@ -78,6 +78,7 @@ describe("WebhookRouter", () => {
 		expect(event.repository.owner).toBe("xmtplabs");
 		expect(event.repository.name).toBe("coder-action");
 		expect(event.issue.number).toBe(65);
+		expect(event.issue.id).toBe(4132709157);
 		expect(event.issue.url).toBe(
 			"https://github.com/xmtplabs/coder-action/issues/65",
 		);

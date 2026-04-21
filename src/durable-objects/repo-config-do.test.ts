@@ -48,7 +48,7 @@ describe("RepoConfigDO — get/set round-trip", () => {
 		expect(read?.settings.sandbox.size).toBe("medium");
 		expect(read?.settings.sandbox.docker).toBe(false);
 		expect(read?.settings.sandbox.volumes).toEqual([]);
-		expect(read?.settings.harness.provider).toBe("claude");
+		expect(read?.settings.harness.provider).toBe("claude_code");
 		expect(read?.settings.scheduled_jobs).toEqual([]);
 	});
 
@@ -86,7 +86,7 @@ describe("RepoConfigDO — get/set round-trip", () => {
 		});
 		const read = await stub.getRepoConfig();
 		expect(read?.settings.sandbox.volumes).toEqual([
-			{ path: "/data", size: "10gb" },
+			{ path: "/data", size: "10Gi" },
 		]);
 	});
 

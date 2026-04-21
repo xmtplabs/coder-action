@@ -96,7 +96,14 @@ export class TaskRunnerWorkflow extends WorkflowEntrypoint<
 
 		switch (payload.type) {
 			case "task_requested":
-				await runCreateTask({ step, coder, github, config, event: payload });
+				await runCreateTask({
+					step,
+					coder,
+					github,
+					config,
+					event: payload,
+					env: { REPO_CONFIG_DO: this.env.REPO_CONFIG_DO },
+				});
 				break;
 			case "task_closed":
 				await runCloseTask({ step, coder, github, config, event: payload });

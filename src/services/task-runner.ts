@@ -47,11 +47,13 @@ export interface TaskRunner {
 
 	/**
 	 * Create a task. Returns the existing one if `(taskName, owner)` collides.
+	 * `templateName` overrides the runner-configured default when provided.
 	 */
 	create(params: {
 		taskName: TaskName;
 		owner: string;
 		input: string;
+		templateName?: string;
 	}): Promise<Task>;
 
 	/**
