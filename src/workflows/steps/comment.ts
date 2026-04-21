@@ -70,9 +70,9 @@ async function resolveIssueNumber(
  * Workflow step factory for `comment_posted` (both PR and issue kinds).
  *
  * Flow: [find-linked-issues for PR comments] → locate-task → ensureTaskReady
- * → send-task-input → react-to-comment. Throws `NonRetryableError` if the
- * task doesn't exist — there's nothing to send to, and retrying won't create
- * it.
+ * → send-task-input → react-to-comment. Silently short-circuits when no task
+ * exists for the issue — a comment on an unassigned issue/PR is benign and
+ * shouldn't surface the workflow instance as `errored`.
  *
  * The task input is wrapped in the same `[INSTRUCTIONS]` / `[COMMENT]` template
  * the pre-migration action classes used (`formatPRCommentMessage` /
@@ -96,23 +96,31 @@ export async function runComment(ctx: RunCommentContext): Promise<void> {
 		issueNumber,
 	);
 
-	const located = await step.do("locate-task", async () => {
-		const raw = await coder.findTaskByName(taskName);
-		if (!raw) {
-			throw new NonRetryableError(`task ${taskName} not found`);
-		}
-		// `findTaskByName` returns `ExperimentalCoderSDKTask | null` (narrowed via
-		// Zod inside CoderService). Validate the scalar fields we depend on before
-		// projecting into the step return — defensive against upstream SDK shape
-		// changes.
-		const task = raw as unknown as { id?: unknown; owner_id?: unknown };
-		if (typeof task.id !== "string" || typeof task.owner_id !== "string") {
-			throw new NonRetryableError(
-				`locate-task: task ${taskName} missing id/owner_id scalars`,
-			);
-		}
-		return { taskId: task.id, owner: task.owner_id };
-	});
+	const located = await step.do<{ taskId: string; owner: string } | null>(
+		"locate-task",
+		async () => {
+			const raw = await coder.findTaskByName(taskName);
+			// No task exists for this issue/PR — a comment without an associated
+			// Coder task is benign (e.g. a comment on an issue that was never
+			// assigned to the agent). Short-circuit silently, matching
+			// `failed-check.ts`'s behavior for the same case.
+			if (!raw) {
+				return null;
+			}
+			// `findTaskByName` returns `ExperimentalCoderSDKTask | null` (narrowed via
+			// Zod inside CoderService). Validate the scalar fields we depend on before
+			// projecting into the step return — defensive against upstream SDK shape
+			// changes.
+			const task = raw as unknown as { id?: unknown; owner_id?: unknown };
+			if (typeof task.id !== "string" || typeof task.owner_id !== "string") {
+				throw new NonRetryableError(
+					`locate-task: task ${taskName} missing id/owner_id scalars`,
+				);
+			}
+			return { taskId: task.id, owner: task.owner_id };
+		},
+	);
+	if (located == null) return;
 
 	const taskId = TaskIdSchema.parse(located.taskId);
 
