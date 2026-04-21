@@ -56,7 +56,7 @@ describe("RepoConfigWorkflow dispatch — happy path", () => {
 });
 
 describe("RepoConfigWorkflow dispatch — file absent", () => {
-	test("present=false → early return, no DO write, complete", async () => {
+	test("present=false → skips parse, still writes empty settings, complete", async () => {
 		const instanceId = "config_push-repo-missing-delivery-2";
 		await using instance = await introspectWorkflowInstance(
 			env.REPO_CONFIG_WORKFLOW,
@@ -64,9 +64,10 @@ describe("RepoConfigWorkflow dispatch — file absent", () => {
 		);
 		await instance.modify(async (m) => {
 			await m.mockStepResult({ name: "fetch-config-file" }, { present: false });
-			// parse-and-validate / store-repo-config intentionally NOT mocked — if
-			// the workflow tried to run them unmocked it would fail, exposing a
-			// regression in the early-exit branch.
+			// parse-and-validate intentionally NOT mocked — if the workflow tried
+			// to run it when the file is absent, the unmocked step would fail and
+			// expose a regression in the skip-parse branch.
+			await m.mockStepResult({ name: "store-repo-config" }, { ok: true });
 		});
 		await env.REPO_CONFIG_WORKFLOW.create({ id: instanceId, params: base });
 		await expect(instance.waitForStatus("complete")).resolves.not.toThrow();
