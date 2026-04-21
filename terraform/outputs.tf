@@ -16,3 +16,11 @@ output "task_metadata" {
     json_valid    = try(local.json_valid, false)
   }
 }
+
+output "dev_resources" {
+  value = try(local.dev_resources, null)
+}
+
+output "dind_resources" {
+  value = try(local.dind_resources, null)
+}
