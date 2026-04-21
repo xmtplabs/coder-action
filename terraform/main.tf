@@ -100,6 +100,8 @@ locals {
   }
 
   # ── Extra volumes mapped to workspace-pod module shape ─────────────────────
+  # PVC name is derived as `replace(trim(path, "/"), "/", "-")` — e.g.,
+  # "/home/runner/cache" → "home-runner-cache", "/cache" → "cache".
   mapped_extra_volumes = [
     for v in local.extra_volumes : {
       name       = replace(trim(v.path, "/"), "/", "-")

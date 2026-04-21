@@ -626,6 +626,44 @@ run "extra_volumes_mapped_to_module_shape" {
     condition     = output.mapped_extra_volumes[0].name == "home-runner-cache"
     error_message = "PVC name must be input path with leading slash trimmed and remaining slashes replaced with dashes"
   }
+  assert {
+    condition     = output.mapped_extra_volumes[0].count == 1
+    error_message = "mapped extra volume must have count=1"
+  }
+}
+
+run "multiple_extra_volumes_mapped" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000023"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\",\"extra_volumes\":[{\"path\":\"/a\",\"size\":\"1Gi\"},{\"path\":\"/b/c\",\"size\":\"2Gi\"}]}"
+    }
+  }
+
+  # Two entries should produce two independent module volumes.
+  assert {
+    condition     = length(output.mapped_extra_volumes) == 2
+    error_message = "two extra_volumes entries must produce two module volumes (EARS-13)"
+  }
+  assert {
+    condition     = length([for v in output.mapped_extra_volumes : v if v.name == "a" && v.mount_path == "/a" && v.size == "1Gi"]) == 1
+    error_message = "single-segment path /a must map to name=a, mount_path=/a, size=1Gi"
+  }
+  assert {
+    condition     = length([for v in output.mapped_extra_volumes : v if v.name == "b-c" && v.mount_path == "/b/c" && v.size == "2Gi"]) == 1
+    error_message = "multi-segment path /b/c must map to name=b-c, mount_path=/b/c, size=2Gi"
+  }
 }
 
 run "extra_volumes_default_empty" {
@@ -724,5 +762,39 @@ run "docker_cache_volume_absent_when_docker_false" {
   assert {
     condition     = length([for v in output.all_volumes : v if v.name == "cache"]) == 1
     error_message = "extra_volumes must still be mapped into all_volumes when docker=false"
+  }
+}
+
+run "docker_true_plus_extra_volumes" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000024"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\",\"docker\":true,\"extra_volumes\":[{\"path\":\"/data\",\"size\":\"4Gi\"}]}"
+    }
+  }
+
+  # docker=true should produce docker-cache + one mapped extra volume = 2 total.
+  assert {
+    condition     = length(output.all_volumes) == 2
+    error_message = "docker=true + 1 extra_volume must yield 2 total volumes (EARS-12 + EARS-13)"
+  }
+  assert {
+    condition     = length([for v in output.all_volumes : v if v.name == "docker-cache"]) == 1
+    error_message = "docker-cache must be present when docker=true, even with extra_volumes"
+  }
+  assert {
+    condition     = length([for v in output.all_volumes : v if v.name == "data"]) == 1
+    error_message = "extra_volume must still be mapped when docker=true"
   }
 }
