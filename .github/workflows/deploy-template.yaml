@@ -1,0 +1,41 @@
+name: Deploy Coder Template
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/deploy-template.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-template
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: coder
+    env:
+      CODER_URL: ${{ secrets.CODER_URL }}
+      CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
+      TEMPLATE_NAME: task-beta
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Coder CLI
+        run: curl -fsSL https://coder.com/install.sh | sh -s -- --version 2.18.2
+
+      - name: Verify Coder auth
+        run: coder users show me
+
+      - name: Push template
+        run: |
+          coder templates push "$TEMPLATE_NAME" \
+            --directory ./terraform \
+            --yes \
+            --name "run-${GITHUB_RUN_ID}" \
+            --message "Deploy from ${GITHUB_SHA::7}"
