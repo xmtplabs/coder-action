@@ -292,7 +292,6 @@ module "workspace" {
   restart_policy                   = "Never"
   termination_grace_period_seconds = 30
   do_not_disrupt                   = true
-  docker_enabled                   = local.docker
   git_url                          = local.git_url
   workspace_size                   = "30Gi"
   app_name                         = "coder-task"
