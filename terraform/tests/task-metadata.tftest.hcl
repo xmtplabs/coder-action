@@ -733,6 +733,10 @@ run "docker_cache_volume_present_when_docker_true" {
     condition     = [for v in output.all_volumes : v if v.name == "docker-cache"][0].mount_path == "/var/lib/docker"
     error_message = "docker-cache mount_path must be /var/lib/docker"
   }
+  assert {
+    condition     = [for v in output.all_volumes : v if v.name == "docker-cache"][0].size == "10Gi"
+    error_message = "docker-cache size must be 10Gi (EARS-12)"
+  }
 }
 
 run "docker_cache_volume_absent_when_docker_false" {
