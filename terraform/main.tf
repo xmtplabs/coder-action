@@ -73,6 +73,29 @@ locals {
   # ── Derived ────────────────────────────────────────────────────────────
   work_dir = "/workspaces/${local.repo_name}"
   git_url  = local.base_branch == "" ? local.repo_url : "${local.repo_url}#refs/heads/${local.base_branch}"
+
+  # ── Resource profiles (dev container) ────────────────────────────────────
+  size_profiles = {
+    small = {
+      requests = { cpu = "1", memory = "4Gi", "ephemeral-storage" = "10Gi" }
+      limits   = { cpu = "4", memory = "8Gi", "ephemeral-storage" = "20Gi" }
+    }
+    medium = {
+      requests = { cpu = "1", memory = "4Gi", "ephemeral-storage" = "20Gi" }
+      limits   = { cpu = "8", memory = "12Gi", "ephemeral-storage" = "30Gi" }
+    }
+    large = {
+      requests = { cpu = "2", memory = "8Gi", "ephemeral-storage" = "30Gi" }
+      limits   = { cpu = "8", memory = "24Gi", "ephemeral-storage" = "50Gi" }
+    }
+  }
+  dev_resources = try(local.size_profiles[local.size], local.size_profiles["large"])
+
+  # ── dind resources (constant across sizes) ───────────────────────────────
+  dind_resources = {
+    requests = { cpu = "250m", memory = "1Gi", "ephemeral-storage" = "5Gi" }
+    limits   = { cpu = "2", memory = "4Gi", "ephemeral-storage" = "20Gi" }
+  }
 }
 
 # ─── Coder Agent ─────────────────────────────────────────────────────────────
@@ -101,6 +124,10 @@ resource "coder_agent" "dev" {
     precondition {
       condition     = local.ai_prompt != ""
       error_message = "TaskMetadata.ai_prompt is required and must be non-blank"
+    }
+    precondition {
+      condition     = contains(["small", "medium", "large"], local.size)
+      error_message = "TaskMetadata.size must be one of 'small', 'medium', 'large'"
     }
     precondition {
       condition     = !local.use_claude || var.claude_code_oauth_token != ""
@@ -268,15 +295,8 @@ module "workspace" {
   app_name                         = "coder-task"
   name_prefix                      = "task"
 
-  dev_resources = {
-    requests = { cpu = "2", memory = "8Gi", "ephemeral-storage" = "30Gi" }
-    limits   = { cpu = "8", memory = "24Gi", "ephemeral-storage" = "50Gi" }
-  }
-
-  dind_resources = {
-    requests = { cpu = "250m", memory = "1Gi", "ephemeral-storage" = "5Gi" }
-    limits   = { cpu = "2", memory = "4Gi", "ephemeral-storage" = "20Gi" }
-  }
+  dev_resources  = local.dev_resources
+  dind_resources = local.dind_resources
 
   volumes = [
     { name = "docker-cache", size = "10Gi", mount_path = "/var/lib/docker", persistent = false, containers = "dind" },
