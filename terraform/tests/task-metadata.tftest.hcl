@@ -89,6 +89,29 @@ run "invalid_json_fails_precondition" {
   expect_failures = [resource.coder_agent.dev]
 }
 
+run "non_object_json_fails_precondition" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000008"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = { prompt = "[1,2,3]" }
+  }
+
+  # Valid JSON but not a TaskMetadata object. json_valid must be false so
+  # EARS-1 trips (not EARS-2 via try() returning ""). Guards the can()-based
+  # tightening of local.json_valid in terraform/main.tf against regression.
+  expect_failures = [resource.coder_agent.dev]
+}
+
 run "blank_repo_url_fails_precondition" {
   command = plan
 
