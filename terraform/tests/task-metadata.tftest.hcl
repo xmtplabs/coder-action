@@ -482,6 +482,14 @@ run "size_invalid_fails_precondition" {
   expect_failures = [resource.coder_agent.dev]
 }
 
+# COVERAGE NOTE: the three docker-gating runs below all exercise
+# var.deployment_type == "pod" (the root template's default). The
+# workspace-pod module also gates dind/DOCKER_HOST inside a mirrored
+# kubernetes_deployment_v1 branch that is NOT exercised by these tests.
+# If the template ever enables `deployment_type = "deployment"`, add a
+# module-level tftest under terraform/modules/workspace-pod/tests/ that
+# asserts the same invariants with deployment_type="deployment".
+
 # ─── Docker sidecar gating ──────────────────────────────────────────────────
 
 run "docker_false_by_default" {
