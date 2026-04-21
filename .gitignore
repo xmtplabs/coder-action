@@ -8,3 +8,4 @@ docs/plans/
 !.dev.vars.example
 .wrangler/
 .claude/
+.terraform/
