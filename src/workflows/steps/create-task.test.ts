@@ -362,7 +362,7 @@ describe("runCreateTask", () => {
 				"ISSUE_URL: https://github.com/acme/repo/issues/42",
 				"REPO_OWNER: acme",
 				"REPO_NAME: repo",
-				"ISSUE_ID: 987654",
+				"ISSUE_NUMBER: 42",
 				"",
 				"Use the /coder-task skill to resolve the issue",
 				"",
