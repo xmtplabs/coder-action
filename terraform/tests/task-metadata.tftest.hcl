@@ -35,6 +35,15 @@ run "golden_path_parses" {
   command = plan
 
   override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000000"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
     target = data.coder_task.me
     values = {
       prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"Do the thing\"}"
@@ -52,6 +61,13 @@ run "golden_path_parses" {
 }
 
 # ─── Precondition firing ─────────────────────────────────────────────────────
+#
+# Each fixture below violates EXACTLY ONE precondition. Other required fields
+# remain non-blank and the JSON remains structurally valid so the NAMED
+# precondition is the one that trips — not a sibling. When adding new
+# preconditions or reordering the `lifecycle.precondition` list in
+# terraform/main.tf, update these fixtures in lockstep; otherwise
+# `expect_failures` may pass for the wrong reason.
 
 run "invalid_json_fails_precondition" {
   command = plan
@@ -139,6 +155,15 @@ run "defaults_applied_when_optionals_absent" {
   command = plan
 
   override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000005"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
     target = data.coder_task.me
     values = {
       prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"Do the thing\"}"
@@ -175,6 +200,15 @@ run "base_branch_composes_git_url_suffix" {
   command = plan
 
   override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000006"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
     target = data.coder_task.me
     values = {
       prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"Do the thing\",\"base_branch\":\"feature-x\"}"
@@ -191,6 +225,15 @@ run "ai_prompt_passthrough_no_wrapping" {
   command = plan
 
   override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000007"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
     target = data.coder_task.me
     values = {
       prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"LITERAL_PROMPT_TOKEN\"}"
@@ -200,5 +243,32 @@ run "ai_prompt_passthrough_no_wrapping" {
   assert {
     condition     = output.task_metadata.ai_prompt == "LITERAL_PROMPT_TOKEN"
     error_message = "ai_prompt must be passed through verbatim, no template wrapping (EARS-15)"
+  }
+}
+
+# ─── Dashboard metadata ──────────────────────────────────────────────────────
+
+run "coder_metadata_exposes_repo_url" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000017"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"Do the thing\"}"
+    }
+  }
+
+  assert {
+    condition     = length([for i in coder_metadata.task_info[0].item : i if i.key == "repo" && i.value == "https://github.com/acme/widget"]) == 1
+    error_message = "coder_metadata.task_info must expose repo_url via a 'repo' item (EARS-17)"
   }
 }

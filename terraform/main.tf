@@ -56,7 +56,7 @@ locals {
   # ── Prompt decode ──────────────────────────────────────────────────────
   raw_prompt = data.coder_task.me.prompt
   parsed     = try(jsondecode(local.raw_prompt), null)
-  json_valid = local.parsed != null
+  json_valid = can(local.parsed.repo_url) && can(local.parsed.repo_name) && can(local.parsed.ai_prompt)
 
   # ── Required fields (validated in preconditions) ───────────────────────
   repo_url  = try(local.parsed.repo_url, "")
@@ -64,10 +64,11 @@ locals {
   ai_prompt = try(local.parsed.ai_prompt, "")
 
   # ── Optional fields (defaults applied here) ────────────────────────────
-  base_branch   = try(local.parsed.base_branch, "")
-  size          = try(local.parsed.size, "large")
-  docker        = try(local.parsed.docker, false)
-  extra_volumes = try(local.parsed.extra_volumes, [])
+  base_branch_raw = try(local.parsed.base_branch, null)
+  base_branch     = local.base_branch_raw == null ? "" : local.base_branch_raw
+  size            = try(local.parsed.size, "large")
+  docker          = try(local.parsed.docker, false)
+  extra_volumes   = try(local.parsed.extra_volumes, [])
 
   # ── Derived ────────────────────────────────────────────────────────────
   work_dir = "/workspaces/${local.repo_name}"
