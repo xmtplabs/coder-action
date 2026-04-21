@@ -509,7 +509,7 @@ run "docker_false_by_default" {
     error_message = "docker must default to false when absent, and the workspace-pod module must receive docker_enabled=false (EARS-11)"
   }
   assert {
-    condition     = length([for c in kubernetes_pod_v1.workspace[0].spec[0].container : c if c.name == "dind"]) == 0
+    condition     = length([for c in module.workspace.pod_containers : c if c.name == "dind"]) == 0
     error_message = "dind container must not be rendered when docker=false (EARS-11)"
   }
 }
@@ -538,11 +538,11 @@ run "docker_true_enables_sidecar" {
     error_message = "docker=true must propagate to workspace-pod.docker_enabled (EARS-12)"
   }
   assert {
-    condition     = length([for c in kubernetes_pod_v1.workspace[0].spec[0].container : c if c.name == "dind"]) == 1
+    condition     = length([for c in module.workspace.pod_containers : c if c.name == "dind"]) == 1
     error_message = "dind container must be rendered exactly once when docker=true (EARS-12)"
   }
   assert {
-    condition     = length([for c in kubernetes_pod_v1.workspace[0].spec[0].container : c if c.name == "dev" && length([for e in c.env : e if e.name == "DOCKER_HOST"]) > 0]) == 1
+    condition     = length([for c in module.workspace.pod_containers : c if c.name == "dev" && length([for e in c.env : e if e.name == "DOCKER_HOST"]) > 0]) == 1
     error_message = "DOCKER_HOST env must be present on dev container when docker=true (EARS-12)"
   }
 }
@@ -568,7 +568,7 @@ run "docker_false_sets_no_docker_host" {
 
   # EARS-11: when docker=false, DOCKER_HOST must NOT appear on the dev container
   assert {
-    condition     = length([for c in kubernetes_pod_v1.workspace[0].spec[0].container : c if c.name == "dev" && length([for e in c.env : e if e.name == "DOCKER_HOST"]) > 0]) == 0
+    condition     = length([for c in module.workspace.pod_containers : c if c.name == "dev" && length([for e in c.env : e if e.name == "DOCKER_HOST"]) > 0]) == 0
     error_message = "DOCKER_HOST env must not be set on dev container when docker=false (EARS-11)"
   }
 }
