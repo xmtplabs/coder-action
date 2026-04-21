@@ -24,3 +24,7 @@ output "dev_resources" {
 output "dind_resources" {
   value = try(local.dind_resources, null)
 }
+
+output "docker_enabled" {
+  value = try(module.workspace.docker_enabled, null)
+}
