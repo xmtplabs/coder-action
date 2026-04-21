@@ -89,6 +89,8 @@ locals {
       limits   = { cpu = "8", memory = "24Gi", "ephemeral-storage" = "50Gi" }
     }
   }
+  # Fallback keeps the map lookup from erroring before the size precondition
+  # below can fire with a clean error message.
   dev_resources = try(local.size_profiles[local.size], local.size_profiles["large"])
 
   # ── dind resources (constant across sizes) ───────────────────────────────
