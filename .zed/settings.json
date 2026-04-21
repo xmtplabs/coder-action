@@ -26,6 +26,18 @@
 		},
 		"JSONC": {
 			"formatter": { "language_server": { "name": "biome" } }
+		},
+		"Terraform": {
+			"format_on_save": "on",
+			"formatter": "language_server",
+			"language_servers": ["terraform-ls"],
+			"tab_size": 2
+		},
+		"Terraform Vars": {
+			"format_on_save": "on",
+			"formatter": "language_server",
+			"language_servers": ["terraform-ls"],
+			"tab_size": 2
 		}
 	}
 }
