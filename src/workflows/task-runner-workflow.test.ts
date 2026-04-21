@@ -121,10 +121,10 @@ describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 				source: { type: "github", installationId: 1 },
 				repository: { owner: "acme", name: "repo" },
 				issue: {
-				id: 1001,
-				number: 1,
-				url: "https://github.com/acme/repo/issues/1",
-			},
+					id: 1001,
+					number: 1,
+					url: "https://github.com/acme/repo/issues/1",
+				},
 				requester: { login: "alice", externalId: 42 },
 			};
 			await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
@@ -192,10 +192,10 @@ describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 				},
 				repository: { owner: "acme", name: "repo" },
 				issue: {
-				id: 1001,
-				number: 1,
-				url: "https://github.com/acme/repo/issues/1",
-			},
+					id: 1001,
+					number: 1,
+					url: "https://github.com/acme/repo/issues/1",
+				},
 				requester: { login: "alice", externalId: 42 },
 			};
 			await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });
@@ -260,10 +260,10 @@ describe("TaskRunnerWorkflow dispatch — task_requested", () => {
 				source: { type: "github", installationId: 1 },
 				repository: { owner: "acme", name: "repo" },
 				issue: {
-				id: 1001,
-				number: 1,
-				url: "https://github.com/acme/repo/issues/1",
-			},
+					id: 1001,
+					number: 1,
+					url: "https://github.com/acme/repo/issues/1",
+				},
 				requester: { login: "alice", externalId: 42 },
 			};
 			await env.TASK_RUNNER_WORKFLOW.create({ id: instanceId, params });

@@ -150,14 +150,18 @@ describe("volume size normalization → canonical Kubernetes binary-SI form", ()
 		expect(r.sandbox.volumes[0]).toEqual({ path: "/data", size: "20Gi" });
 	});
 
-	test.each(["10", "gb", "10bb", "10.5gb", "10eb", "abc"])(
-		"invalid volume size %s → parse rejects",
-		(input) => {
-			expect(() =>
-				parseRepoConfigToml(
-					`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
-				),
-			).toThrow(/Invalid RepoConfig/);
-		},
-	);
+	test.each([
+		"10",
+		"gb",
+		"10bb",
+		"10.5gb",
+		"10eb",
+		"abc",
+	])("invalid volume size %s → parse rejects", (input) => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
+			),
+		).toThrow(/Invalid RepoConfig/);
+	});
 });
