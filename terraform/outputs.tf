@@ -28,3 +28,11 @@ output "dind_resources" {
 output "docker_enabled" {
   value = try(module.workspace.docker_enabled, null)
 }
+
+output "all_volumes" {
+  value = try(local.all_volumes, [])
+}
+
+output "mapped_extra_volumes" {
+  value = try(local.mapped_extra_volumes, [])
+}

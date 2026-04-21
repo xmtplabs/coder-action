@@ -581,3 +581,148 @@ run "docker_false_sets_no_docker_host" {
   }
 }
 
+# ─── Volume mapping ──────────────────────────────────────────────────────────
+
+run "extra_volumes_mapped_to_module_shape" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000019"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\",\"extra_volumes\":[{\"path\":\"/home/runner/cache\",\"size\":\"5Gi\"}]}"
+    }
+  }
+
+  assert {
+    condition     = length(output.mapped_extra_volumes) == 1
+    error_message = "one extra_volume entry must produce one module volume (EARS-13)"
+  }
+  assert {
+    condition     = output.mapped_extra_volumes[0].mount_path == "/home/runner/cache"
+    error_message = "mount_path must equal input path (EARS-13)"
+  }
+  assert {
+    condition     = output.mapped_extra_volumes[0].persistent == true
+    error_message = "extra volumes must be persistent by default (per user clarification)"
+  }
+  assert {
+    condition     = output.mapped_extra_volumes[0].containers == "dev"
+    error_message = "extra volumes must mount on dev container only"
+  }
+  assert {
+    condition     = output.mapped_extra_volumes[0].size == "5Gi"
+    error_message = "extra volume size must pass through verbatim"
+  }
+  assert {
+    condition     = output.mapped_extra_volumes[0].name == "home-runner-cache"
+    error_message = "PVC name must be input path with leading slash trimmed and remaining slashes replaced with dashes"
+  }
+}
+
+run "extra_volumes_default_empty" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000020"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\"}"
+    }
+  }
+
+  # When extra_volumes is omitted, mapped_extra_volumes must be empty and
+  # all_volumes must be empty (docker is absent => false => no docker-cache).
+  assert {
+    condition     = length(output.mapped_extra_volumes) == 0
+    error_message = "mapped_extra_volumes must be empty when extra_volumes is absent"
+  }
+  assert {
+    condition     = length(output.all_volumes) == 0
+    error_message = "all_volumes must be empty when docker=false and no extra_volumes"
+  }
+}
+
+run "docker_cache_volume_present_when_docker_true" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000021"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\",\"docker\":true}"
+    }
+  }
+
+  # Exactly one volume named "docker-cache" must be present, mounted on dind.
+  assert {
+    condition     = length([for v in output.all_volumes : v if v.name == "docker-cache"]) == 1
+    error_message = "all_volumes must include exactly one docker-cache volume when docker=true (EARS-12)"
+  }
+  assert {
+    condition     = [for v in output.all_volumes : v if v.name == "docker-cache"][0].containers == "dind"
+    error_message = "docker-cache volume must mount on dind container (EARS-12)"
+  }
+  assert {
+    condition     = [for v in output.all_volumes : v if v.name == "docker-cache"][0].persistent == false
+    error_message = "docker-cache volume must be ephemeral (not persistent)"
+  }
+  assert {
+    condition     = [for v in output.all_volumes : v if v.name == "docker-cache"][0].mount_path == "/var/lib/docker"
+    error_message = "docker-cache mount_path must be /var/lib/docker"
+  }
+}
+
+run "docker_cache_volume_absent_when_docker_false" {
+  command = plan
+
+  override_data {
+    target = data.coder_workspace.me
+    values = {
+      start_count = 1
+      name        = "t"
+      id          = "00000000-0000-0000-0000-000000000022"
+      access_url  = "https://example.test"
+    }
+  }
+  override_data {
+    target = data.coder_task.me
+    values = {
+      prompt = "{\"repo_url\":\"https://github.com/acme/widget\",\"repo_name\":\"widget\",\"ai_prompt\":\"x\",\"docker\":false,\"extra_volumes\":[{\"path\":\"/cache\",\"size\":\"2Gi\"}]}"
+    }
+  }
+
+  # docker=false: no docker-cache volume. But extra_volumes still maps.
+  assert {
+    condition     = length([for v in output.all_volumes : v if v.name == "docker-cache"]) == 0
+    error_message = "docker-cache volume must NOT be in all_volumes when docker=false (EARS-11)"
+  }
+  assert {
+    condition     = length([for v in output.all_volumes : v if v.name == "cache"]) == 1
+    error_message = "extra_volumes must still be mapped into all_volumes when docker=false"
+  }
+}
