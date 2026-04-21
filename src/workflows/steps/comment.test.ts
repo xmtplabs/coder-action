@@ -255,24 +255,45 @@ describe("runComment — task-name derivation (regression guard)", () => {
 // ── Task-not-found + structured-message coverage ─────────────────────────────
 
 describe("runComment — error paths + message formatting", () => {
-	test("throws NonRetryableError when task not found (PR path)", async () => {
-		const { NonRetryableError } = await import("cloudflare:workflows");
+	test("PR comment with no matching task → silent short-circuit (no throw, no send)", async () => {
+		// Previously this path threw NonRetryableError, which surfaced the
+		// instance as `errored` in workflow listings even though a comment on
+		// an issue/PR without an associated Coder task is benign.
 		const step = makeStep();
 		const coder = makeCoder({ findTaskByName: vi.fn(async () => null) });
 		const github = makeGithub();
 
-		await expect(
-			runComment({
-				step: step as never,
-				coder: coder as never,
-				github: github as never,
-				config,
-				event: commentEvent("pull_request"),
-			}),
-			// Assert the specific error type so a regression that throws a
-			// generic Error (and thus gets retried by the engine instead of
-			// terminating the instance) fails this test.
-		).rejects.toThrowError(NonRetryableError);
+		await runComment({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: commentEvent("pull_request"),
+		});
+
+		expect(step.calls).toEqual(["find-linked-issues", "locate-task"]);
+		expect(coder.sendTaskInput).not.toHaveBeenCalled();
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
+		expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
+	});
+
+	test("issue comment with no matching task → silent short-circuit (no throw, no send)", async () => {
+		const step = makeStep();
+		const coder = makeCoder({ findTaskByName: vi.fn(async () => null) });
+		const github = makeGithub();
+
+		await runComment({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event: commentEvent("issue"),
+		});
+
+		expect(step.calls).toEqual(["locate-task"]);
+		expect(coder.sendTaskInput).not.toHaveBeenCalled();
+		expect(github.addReactionToComment).not.toHaveBeenCalled();
+		expect(github.addReactionToReviewComment).not.toHaveBeenCalled();
 	});
 
 	test("PR review comment: sendTaskInput receives structured formatPRCommentMessage with file:line", async () => {
