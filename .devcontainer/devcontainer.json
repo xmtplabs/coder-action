@@ -2,13 +2,13 @@
 	"name": "task-action",
 	"image": "mcr.microsoft.com/devcontainers/typescript-node:24",
 	"features": {
-		"ghcr.io/devcontainers/features/github-cli:1": {}
+		"ghcr.io/devcontainers/features/github-cli:1": {},
 	},
 	"postCreateCommand": "npm install",
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"biomejs.biome"
+				"biomejs.biome",
 			],
 			"settings": {
 				"editor.defaultFormatter": "biomejs.biome",
@@ -16,7 +16,7 @@
 				"editor.tabSize": 2,
 				"[typescript]": {
 					"editor.defaultFormatter": "biomejs.biome"
-				}
+				},
 			}
 		}
 	}

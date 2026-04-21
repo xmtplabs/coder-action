@@ -358,8 +358,10 @@ export class CoderService implements TaskRunner {
 		taskName: TaskName;
 		owner: string;
 		input: string;
+		templateName?: string;
 	}): Promise<Task> {
-		const { taskName, owner, input } = params;
+		const { taskName, owner, input, templateName } = params;
+		const resolvedTemplateName = templateName ?? this.config.templateName;
 
 		// 1. Check for an existing task
 		const existing = await this.findTask(taskName, owner);
@@ -373,7 +375,7 @@ export class CoderService implements TaskRunner {
 		}
 
 		// 2. Resolve template
-		const templateEndpoint = `/api/v2/organizations/${encodeURIComponent(this.config.organization)}/templates/${encodeURIComponent(this.config.templateName)}`;
+		const templateEndpoint = `/api/v2/organizations/${encodeURIComponent(this.config.organization)}/templates/${encodeURIComponent(resolvedTemplateName)}`;
 		const rawTemplate = await this.request<unknown>(templateEndpoint);
 		const template = CoderSDKTemplateSchema.parse(rawTemplate);
 		const templateVersionId = template.active_version_id;

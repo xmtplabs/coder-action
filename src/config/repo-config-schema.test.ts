@@ -22,7 +22,7 @@ path = "/data"
 size = "20gb"
 
 [harness]
-provider = "claude"
+provider = "claude_code"
 
 [[scheduled_jobs]]
 name = "nightly"
@@ -35,9 +35,9 @@ prompt = "Do the thing"
 		expect(parsed.sandbox?.docker).toBe(true);
 		expect(parsed.sandbox?.volumes?.[0]).toEqual({
 			path: "/data",
-			size: "20gb",
+			size: "20Gi",
 		});
-		expect(parsed.harness?.provider).toBe("claude");
+		expect(parsed.harness?.provider).toBe("claude_code");
 		expect(parsed.scheduled_jobs?.[0]?.name).toBe("nightly");
 	});
 	test("unknown keys are dropped (write-side loose-parse)", () => {
@@ -94,21 +94,21 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 		expect(r.sandbox.size).toBe("medium");
 		expect(r.sandbox.docker).toBe(false);
 		expect(r.sandbox.volumes).toEqual([]);
-		expect(r.harness.provider).toBe("claude");
+		expect(r.harness.provider).toBe("claude_code");
 		expect(r.scheduled_jobs).toEqual([]);
 	});
 	test("empty object → full defaults", () => {
 		expect(resolveRepoConfigSettings({})).toEqual({
 			sandbox: { size: "medium", docker: false, volumes: [] },
-			harness: { provider: "claude" },
+			harness: { provider: "claude_code" },
 			scheduled_jobs: [],
 		});
 	});
-	test("volume with path-only → size defaulted to '10gb'", () => {
+	test("volume with path-only → size defaulted to '10Gi'", () => {
 		const r = resolveRepoConfigSettings({
 			sandbox: { volumes: [{ path: "/data" }] },
 		});
-		expect(r.sandbox.volumes[0]).toEqual({ path: "/data", size: "10gb" });
+		expect(r.sandbox.volumes[0]).toEqual({ path: "/data", size: "10Gi" });
 	});
 	test("partial override: explicit size beats default", () => {
 		const r = resolveRepoConfigSettings({
@@ -116,5 +116,52 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 		});
 		expect(r.sandbox.size).toBe("large");
 		expect(r.sandbox.docker).toBe(false);
+	});
+});
+
+describe("volume size normalization → canonical Kubernetes binary-SI form", () => {
+	test.each([
+		["10gb", "10Gi"],
+		["10GB", "10Gi"],
+		["10Gb", "10Gi"],
+		["10G", "10Gi"],
+		["10g", "10Gi"],
+		["10gi", "10Gi"],
+		["10Gi", "10Gi"],
+		["500mb", "500Mi"],
+		["500M", "500Mi"],
+		["500Mi", "500Mi"],
+		["2tb", "2Ti"],
+		["64k", "64Ki"],
+		["  20 GB  ", "20Gi"],
+	])("parseRepoConfigToml normalizes %s → %s on write", (input, expected) => {
+		const parsed = parseRepoConfigToml(
+			`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
+		);
+		expect(parsed.sandbox?.volumes?.[0]?.size).toBe(expected);
+	});
+
+	test("resolveRepoConfigSettings normalizes legacy stored values on read", () => {
+		// Simulate a stored record written before the normalization transform
+		// existed — the resolved schema must re-normalize on read.
+		const r = resolveRepoConfigSettings({
+			sandbox: { volumes: [{ path: "/data", size: "20gb" }] },
+		});
+		expect(r.sandbox.volumes[0]).toEqual({ path: "/data", size: "20Gi" });
+	});
+
+	test.each([
+		"10",
+		"gb",
+		"10bb",
+		"10.5gb",
+		"10eb",
+		"abc",
+	])("invalid volume size %s → parse rejects", (input) => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
+			),
+		).toThrow(/Invalid RepoConfig/);
 	});
 });

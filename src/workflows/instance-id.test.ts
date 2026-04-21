@@ -8,7 +8,7 @@ describe("buildInstanceId", () => {
 			type: "task_requested",
 			source: { type: "github", installationId: 1 },
 			repository: { owner: "acme", name: "repo" },
-			issue: { number: 42, url: "u" },
+			issue: { id: 1, number: 42, url: "u" },
 			requester: { login: "u", externalId: 1 },
 		};
 		const id = buildInstanceId(event, "abc-123");
@@ -88,7 +88,7 @@ describe("buildInstanceId", () => {
 			type: "task_requested",
 			source: { type: "github", installationId: 1 },
 			repository: { owner: "ACME", name: "Repo.With.Dots" },
-			issue: { number: 1, url: "u" },
+			issue: { id: 1, number: 1, url: "u" },
 			requester: { login: "u", externalId: 1 },
 		};
 		const id = buildInstanceId(event, "d/e/l");
@@ -100,7 +100,7 @@ describe("buildInstanceId", () => {
 			type: "task_requested",
 			source: { type: "github", installationId: 1 },
 			repository: { owner: "o", name: "a".repeat(100) },
-			issue: { number: 1, url: "u" },
+			issue: { id: 1, number: 1, url: "u" },
 			requester: { login: "u", externalId: 1 },
 		};
 		const id = buildInstanceId(event, "d");

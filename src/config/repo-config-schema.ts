@@ -8,7 +8,35 @@ import { z } from "zod";
 export const SandboxSizeSchema = z.enum(["small", "medium", "large"]);
 
 /** Allowed values for `harness.provider`. */
-export const HarnessProviderSchema = z.enum(["claude", "codex"]);
+export const HarnessProviderSchema = z.enum(["claude_code", "codex"]);
+
+// ── Volume size normalization ────────────────────────────────────────────────
+// Kubernetes PVCs require binary-SI suffixes like `10Gi`. Users routinely
+// write `10gb` / `10GB` / `10G` / `10gi`; we accept those shapes and normalize
+// everything to `<digits><Prefix>i` before the value leaves the write path.
+
+const VOLUME_SIZE_REGEX = /^\s*(\d+)\s*(k|kb|ki|m|mb|mi|g|gb|gi|t|tb|ti)\s*$/i;
+
+function normalizeVolumeSize(input: string): string {
+	const match = VOLUME_SIZE_REGEX.exec(input);
+	if (!match) return input; // unreachable: regex validated before transform
+	const digits = match[1] ?? "";
+	const prefix = (match[2] ?? "").charAt(0).toUpperCase();
+	return `${digits}${prefix}i`;
+}
+
+/**
+ * A Kubernetes-compatible volume size. Accepts common variants (`10gb`,
+ * `10GB`, `10G`, `10gi`, `10Gi`, etc.) and always emits the canonical
+ * binary-SI form (`10Gi`). Supports `K/M/G/T` prefixes.
+ */
+export const VolumeSizeSchema = z
+	.string()
+	.regex(
+		VOLUME_SIZE_REGEX,
+		'expected a size like "10Gi" (K/M/G/T with optional b/i suffix)',
+	)
+	.transform(normalizeVolumeSize);
 
 // ── Sparse (stored) schemas ──────────────────────────────────────────────────
 // Sparse schemas mirror what users actually wrote in TOML. No `.default()`:
@@ -18,7 +46,7 @@ export const HarnessProviderSchema = z.enum(["claude", "codex"]);
 /** Sparse shape for a single sandbox volume entry. `path` is required. */
 export const StoredSandboxVolumeSchema = z.object({
 	path: z.string(),
-	size: z.string().optional(),
+	size: VolumeSizeSchema.optional(),
 });
 
 /** Sparse shape for the `[sandbox]` section. */
@@ -55,10 +83,10 @@ export const StoredRepoConfigSettingsSchema = z.object({
 // Resolved schemas apply defaults on read so every consumer sees a fully
 // populated object without worrying about whether a field was written.
 
-/** Resolved volume: `size` defaults to `"10gb"` when absent. */
+/** Resolved volume: `size` defaults to `"10Gi"` when absent. */
 export const ResolvedSandboxVolumeSchema = z.object({
 	path: z.string(),
-	size: z.string().default("10gb"),
+	size: VolumeSizeSchema.default("10Gi"),
 });
 
 /** Resolved sandbox: size/docker/volumes all have defaults. */
@@ -68,9 +96,9 @@ export const ResolvedSandboxSchema = z.object({
 	volumes: z.array(ResolvedSandboxVolumeSchema).default([]),
 });
 
-/** Resolved harness: provider defaults to `"claude"`. */
+/** Resolved harness: provider defaults to `"claude_code"`. */
 export const ResolvedHarnessSchema = z.object({
-	provider: HarnessProviderSchema.default("claude"),
+	provider: HarnessProviderSchema.default("claude_code"),
 });
 
 /**

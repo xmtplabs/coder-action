@@ -14,7 +14,7 @@ export type TaskRequestedEvent = {
 	type: "task_requested";
 	source: EventSource;
 	repository: { owner: string; name: string };
-	issue: { number: number; url: string };
+	issue: { id: number; number: number; url: string };
 	requester: { login: string; externalId: number };
 };
 

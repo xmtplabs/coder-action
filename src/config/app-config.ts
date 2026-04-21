@@ -12,6 +12,10 @@ const AppConfigSchema = z.object({
 	coderTaskNamePrefix: z.string().min(1).default("gh"),
 	coderTemplateName: z.string().min(1).default("task-template"),
 	coderTemplateNameCodex: z.string().min(1).default("task-template-codex"),
+	// Hardcoded template name used when a repo-level config is present. Not
+	// env-overridable: the field is intentionally omitted from `loadConfig`'s
+	// env→raw mapping so it always falls through to this default.
+	codeFactoryTemplate: z.string().min(1).default("code-factory"),
 	coderTemplatePreset: z.string().min(1).optional(),
 	coderOrganization: z.string().min(1).default("default"),
 	logFormat: z.string().optional(),

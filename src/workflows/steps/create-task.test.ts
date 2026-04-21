@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import type { AppConfig } from "../../config/app-config";
+import type { RepoConfig } from "../../config/repo-config-schema";
 import type { TaskRequestedEvent } from "../../events/types";
 import {
 	TASK_STATUS_COMMENT_MARKER,
@@ -25,13 +26,30 @@ const event: TaskRequestedEvent = {
 	type: "task_requested",
 	source: { type: "github", installationId: 1 },
 	repository: { owner: "acme", name: "repo" },
-	issue: { number: 42, url: "https://github.com/acme/repo/issues/42" },
+	issue: {
+		id: 987654,
+		number: 42,
+		url: "https://github.com/acme/repo/issues/42",
+	},
 	requester: { login: "alice", externalId: 123 },
 };
 
 const config = {
 	coderTaskNamePrefix: "gh",
+	codeFactoryTemplate: "code-factory",
 } as unknown as AppConfig;
+
+function makeEnv(repoConfig: RepoConfig | null = null) {
+	const getRepoConfig = vi.fn(async () => repoConfig);
+	const stub = { getRepoConfig, setRepoConfig: vi.fn(async () => {}) };
+	const env = {
+		REPO_CONFIG_DO: {
+			idFromName: vi.fn(() => "stub-id"),
+			get: vi.fn(() => stub),
+		},
+	} as never;
+	return { env, getRepoConfig };
+}
 
 function makeCoder(overrides: Record<string, unknown> = {}) {
 	return {
@@ -62,7 +80,7 @@ function makeGithub(overrides: Record<string, unknown> = {}) {
 }
 
 describe("runCreateTask", () => {
-	test("emits steps in order: check-github-permission (first), lookup-coder-user, create-coder-task, comment-on-issue, wait-*, update-status-comment", async () => {
+	test("emits steps in order: check-github-permission (first), lookup-coder-user, lookup-repo-config, create-coder-task, comment-on-issue, wait-*, update-status-comment", async () => {
 		const step = makeStep();
 		const coder = makeCoder();
 		const github = makeGithub();
@@ -73,12 +91,14 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 		// With a fast-path `active` observation at pre-poll, waitForTaskActive
 		// emits exactly one step (`wait-lookup-task`).
 		expect(step.calls).toEqual([
 			"check-github-permission",
 			"lookup-coder-user",
+			"lookup-repo-config",
 			"create-coder-task",
 			"comment-on-issue",
 			"wait-lookup-task",
@@ -98,6 +118,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 		// Only the permission check ran.
 		expect(step.calls).toEqual(["check-github-permission"]);
@@ -117,6 +138,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 		const createIdx = step.do.mock.calls.findIndex(
 			(c: unknown[]) => c[0] === "create-coder-task",
@@ -143,6 +165,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 		// First commentOnIssue call — the initial "Task created" comment.
 		const firstCall = github.commentOnIssue.mock.calls[0] as unknown as [
@@ -183,6 +206,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 
 		expect(step.calls).toContain("update-status-comment");
@@ -223,6 +247,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 
 		expect(step.calls).toContain("update-status-comment");
@@ -256,6 +281,7 @@ describe("runCreateTask", () => {
 			github: github as never,
 			config,
 			event,
+			env: makeEnv().env,
 		});
 		expect(github.commentOnIssue).toHaveBeenCalledTimes(2);
 		for (const call of github.commentOnIssue.mock.calls) {
@@ -269,5 +295,82 @@ describe("runCreateTask", () => {
 			expect(matchPrefix).toBe(TASK_STATUS_COMMENT_MARKER);
 			expect(body.startsWith(TASK_STATUS_COMMENT_MARKER)).toBe(true);
 		}
+	});
+
+	test("no repo config → legacy prompt (issue URL) and no templateName override", async () => {
+		const step = makeStep();
+		const coder = makeCoder();
+		const github = makeGithub();
+		await runCreateTask({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event,
+			env: makeEnv(null).env,
+		});
+		expect(coder.create).toHaveBeenCalledTimes(1);
+		const call = coder.create.mock.calls[0] as unknown as [
+			{ taskName: string; owner: string; input: string; templateName?: string },
+		];
+		expect(call[0]).toEqual({
+			taskName: "gh-repo-42",
+			owner: "coder-user",
+			input: "https://github.com/acme/repo/issues/42",
+		});
+	});
+
+	test("repo config present → codeFactoryTemplate and JSON TemplateInputs prompt", async () => {
+		const step = makeStep();
+		const coder = makeCoder();
+		const github = makeGithub();
+		const repoConfig: RepoConfig = {
+			repositoryId: 1,
+			repositoryFullName: "acme/repo",
+			installationId: 99,
+			settings: {
+				sandbox: {
+					size: "large",
+					docker: true,
+					// Resolved RepoConfigSettings always carries the canonical
+					// Kubernetes binary-SI size after schema normalization.
+					volumes: [{ path: "/data", size: "20Gi" }],
+				},
+				harness: { provider: "codex" },
+				scheduled_jobs: [],
+			},
+		};
+		await runCreateTask({
+			step: step as never,
+			coder: coder as never,
+			github: github as never,
+			config,
+			event,
+			env: makeEnv(repoConfig).env,
+		});
+		expect(coder.create).toHaveBeenCalledTimes(1);
+		const call = coder.create.mock.calls[0] as unknown as [
+			{ taskName: string; owner: string; input: string; templateName: string },
+		];
+		const args = call[0];
+		expect(args.templateName).toBe("code-factory");
+		const parsed = JSON.parse(args.input);
+		expect(parsed).toEqual({
+			repo_url: "https://github.com/acme/repo",
+			repo_name: "repo",
+			ai_prompt: [
+				"ISSUE_URL: https://github.com/acme/repo/issues/42",
+				"REPO_OWNER: acme",
+				"REPO_NAME: repo",
+				"ISSUE_ID: 987654",
+				"",
+				"Use the /coder-task skill to resolve the issue",
+				"",
+			].join("\n"),
+			ai_provider: "codex",
+			extra_volumes: [{ path: "/data", size: "20Gi" }],
+			size: "large",
+			docker: true,
+		});
 	});
 });
