@@ -98,6 +98,31 @@ locals {
     requests = { cpu = "250m", memory = "1Gi", "ephemeral-storage" = "5Gi" }
     limits   = { cpu = "2", memory = "4Gi", "ephemeral-storage" = "20Gi" }
   }
+
+  # ── Extra volumes mapped to workspace-pod module shape ─────────────────────
+  mapped_extra_volumes = [
+    for v in local.extra_volumes : {
+      name       = replace(trim(v.path, "/"), "/", "-")
+      size       = v.size
+      mount_path = v.path
+      persistent = true
+      count      = 1
+      containers = "dev"
+    }
+  ]
+
+  # ── Docker cache volume (gated on local.docker) ────────────────────────────
+  docker_cache_volume = local.docker ? [{
+    name       = "docker-cache"
+    size       = "10Gi"
+    mount_path = "/var/lib/docker"
+    persistent = false
+    count      = 1
+    containers = "dind"
+  }] : []
+
+  # ── Composed volumes list passed to workspace-pod ──────────────────────────
+  all_volumes = concat(local.docker_cache_volume, local.mapped_extra_volumes)
 }
 
 # ─── Coder Agent ─────────────────────────────────────────────────────────────
@@ -301,9 +326,7 @@ module "workspace" {
   dev_resources  = local.dev_resources
   dind_resources = local.dind_resources
 
-  volumes = [
-    { name = "docker-cache", size = "10Gi", mount_path = "/var/lib/docker", persistent = false, containers = "dind" },
-  ]
+  volumes = local.all_volumes
 }
 
 # ─── AI Task ───────────────────────────────────────────────────────���─────────
