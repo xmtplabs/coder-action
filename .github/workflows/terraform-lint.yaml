@@ -26,6 +26,12 @@ jobs:
       - name: terraform fmt
         run: terraform fmt -check -recursive -diff
 
+      - name: terraform init
+        run: terraform init -backend=false
+
+      - name: terraform test
+        run: terraform test
+
       - uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.53.0
