@@ -81,7 +81,7 @@ export async function runCreateTask(ctx: RunCreateTaskContext): Promise<void> {
 				prompt: JSON.stringify(
 					buildTemplateInputs({
 						repository: event.repository,
-						issue: { id: event.issue.id, url: event.issue.url },
+						issue: { number: event.issue.number, url: event.issue.url },
 						settings: repoConfig.settings,
 					}),
 				),

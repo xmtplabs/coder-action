@@ -24,7 +24,7 @@ export type TemplateInputs = z.infer<typeof TemplateInputsSchema>;
 
 export interface BuildTemplateInputsParams {
 	repository: { owner: string; name: string };
-	issue: { id: number; url: string };
+	issue: { number: number; url: string };
 	settings: RepoConfigSettings;
 }
 
@@ -37,12 +37,12 @@ function buildAiPrompt(params: {
 	issueUrl: string;
 	repoOwner: string;
 	repoName: string;
-	issueId: number;
+	issueNumber: number;
 }): string {
 	return `ISSUE_URL: ${params.issueUrl}
 REPO_OWNER: ${params.repoOwner}
 REPO_NAME: ${params.repoName}
-ISSUE_ID: ${params.issueId}
+ISSUE_NUMBER: ${params.issueNumber}
 
 Use the /coder-task skill to resolve the issue
 `;
@@ -64,7 +64,7 @@ export function buildTemplateInputs(
 			issueUrl: issue.url,
 			repoOwner: repository.owner,
 			repoName: repository.name,
-			issueId: issue.id,
+			issueNumber: issue.number,
 		}),
 		ai_provider: settings.harness.provider,
 		...(volumes.length > 0 ? { extra_volumes: volumes } : {}),
