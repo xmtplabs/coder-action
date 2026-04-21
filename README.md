@@ -37,6 +37,21 @@ Two GitHub identities work together:
 
 See [docs/github-app-setup.md](docs/github-app-setup.md) for step-by-step instructions: creating the GitHub App, configuring webhook delivery, and installing it on your repositories.
 
+## Coder Template
+
+This repo also ships the Coder template that provisions the ephemeral workspace
+a task runs in. The template lives in [`terraform/`](terraform/README.md) and is
+named **`task-beta`** on the Coder deployment.
+
+- [`terraform-lint.yaml`](.github/workflows/terraform-lint.yaml) gates PRs that
+  touch `terraform/**` on `terraform fmt` and `tflint`.
+- [`deploy-template.yaml`](.github/workflows/deploy-template.yaml) pushes the
+  template to the Coder deployment (via `coder templates push task-beta`) on
+  every merge to `main` that touches `terraform/**`, and on manual dispatch.
+
+See [`terraform/README.md`](terraform/README.md) for what the template
+provisions.
+
 ## Configuration
 
 All non-secret config lives in [`wrangler.toml`](wrangler.toml) under `[vars]`. Secrets are provisioned via `wrangler secret put` in production and `.dev.vars` locally (see [`.dev.vars.example`](.dev.vars.example)).

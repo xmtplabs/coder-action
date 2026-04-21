@@ -103,6 +103,23 @@ Cross-cutting:
 - **[docs/gotchas.md](docs/gotchas.md)** — collected foot-guns with context. Read before non-trivial changes.
 - **[docs/testing.md](docs/testing.md)** — test layers, `introspectWorkflow` patterns, fetch-mocking options.
 
+## Terraform / Coder template
+
+The Coder template lives in [`terraform/`](terraform/) (template name
+`task-beta`). Two workflows guard it:
+
+- [`.github/workflows/terraform-lint.yaml`](.github/workflows/terraform-lint.yaml)
+  — PR gate: `terraform fmt -check` + `tflint --recursive` (config in
+  [`terraform/.tflint.hcl`](terraform/.tflint.hcl)).
+- [`.github/workflows/deploy-template.yaml`](.github/workflows/deploy-template.yaml)
+  — `main` push + manual dispatch: runs
+  `coder templates push task-beta --directory ./terraform`, authenticated with
+  the `CODER_URL` + `CODER_SESSION_TOKEN` repo secrets.
+
+Local: the devcontainer installs `terraform` + `tflint` at the same versions
+CI pins (1.9.8 / 0.53.0). `.terraform/` is gitignored;
+`terraform/.terraform.lock.hcl` is committed.
+
 ## How to extend
 
 - **[docs/adding-an-event-type.md](docs/adding-an-event-type.md)** — checklist for wiring a new GitHub event into the router + a new step factory + tests.
