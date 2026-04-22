@@ -114,6 +114,11 @@ export const ResolvedHarnessSchema = z.object({
 	provider: HarnessProviderSchema.default("claude_code"),
 });
 
+/** Resolved on_event: failed_run defaults to []. */
+export const ResolvedOnEventSchema = z.object({
+	failed_run: z.array(StoredFailedRunEventSchema).default([]),
+});
+
 /**
  * Top-level resolved shape — always fully populated after `.parse()`.
  *
@@ -127,6 +132,7 @@ export const RepoConfigSettingsSchema = z.object({
 	sandbox: ResolvedSandboxSchema.prefault({}),
 	harness: ResolvedHarnessSchema.prefault({}),
 	scheduled_jobs: z.array(ScheduledJobSchema).default([]),
+	on_event: ResolvedOnEventSchema.prefault({}),
 });
 
 // ── Types ────────────────────────────────────────────────────────────────────

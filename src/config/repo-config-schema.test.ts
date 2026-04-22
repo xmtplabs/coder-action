@@ -102,6 +102,7 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 			sandbox: { size: "medium", docker: false, volumes: [] },
 			harness: { provider: "claude_code" },
 			scheduled_jobs: [],
+			on_event: { failed_run: [] },
 		});
 	});
 	test("volume with path-only → size defaulted to '10Gi'", () => {
@@ -116,6 +117,40 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 		});
 		expect(r.sandbox.size).toBe("large");
 		expect(r.sandbox.docker).toBe(false);
+	});
+});
+
+describe("resolveRepoConfigSettings — on_event defaults", () => {
+	test("undefined → on_event.failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings(undefined);
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("empty object → on_event.failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings({});
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("sparse on_event with no failed_run → failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings({ on_event: {} });
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("entries passthrough", () => {
+		const r = resolveRepoConfigSettings({
+			on_event: {
+				failed_run: [
+					{
+						workflows: ["CI"],
+						branches: ["main"],
+						prompt_additions: "fix it",
+					},
+				],
+			},
+		});
+		expect(r.on_event.failed_run).toEqual([
+			{ workflows: ["CI"], branches: ["main"], prompt_additions: "fix it" },
+		]);
 	});
 });
 
