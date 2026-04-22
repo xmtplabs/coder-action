@@ -25,11 +25,12 @@ export type TemplateInputs = z.infer<typeof TemplateInputsSchema>;
 export interface BuildTemplateInputsParams {
 	repository: { owner: string; name: string };
 	issue: { number: number; url: string };
+	requester: { login: string };
 	settings: RepoConfigSettings;
 }
 
 /**
- * Compose the `ai_prompt` block consumed by the `/coder-task` skill. The
+ * Compose the `ai_prompt` block consumed by the `/code-factory-issue` skill. The
  * fields are fixed key/value lines followed by the instruction to invoke the
  * skill, separated by a blank line. Trailing newline is intentional.
  */
@@ -38,13 +39,15 @@ function buildAiPrompt(params: {
 	repoOwner: string;
 	repoName: string;
 	issueNumber: number;
+	requester: string;
 }): string {
 	return `ISSUE_URL: ${params.issueUrl}
 REPO_OWNER: ${params.repoOwner}
 REPO_NAME: ${params.repoName}
 ISSUE_NUMBER: ${params.issueNumber}
+REQUESTER: ${params.requester}
 
-Use the /coder-task skill to resolve the issue
+Use the /code-factory-issue skill to resolve the issue
 `;
 }
 
@@ -55,7 +58,7 @@ Use the /coder-task skill to resolve the issue
 export function buildTemplateInputs(
 	params: BuildTemplateInputsParams,
 ): TemplateInputs {
-	const { repository, issue, settings } = params;
+	const { repository, issue, requester, settings } = params;
 	const volumes = settings.sandbox.volumes;
 	return {
 		repo_url: `https://github.com/${repository.owner}/${repository.name}`,
@@ -65,6 +68,7 @@ export function buildTemplateInputs(
 			repoOwner: repository.owner,
 			repoName: repository.name,
 			issueNumber: issue.number,
+			requester: requester.login,
 		}),
 		ai_provider: settings.harness.provider,
 		...(volumes.length > 0 ? { extra_volumes: volumes } : {}),
