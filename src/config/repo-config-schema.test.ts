@@ -119,6 +119,106 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 	});
 });
 
+describe("parseRepoConfigToml — on_event.failed_run", () => {
+	test("full entry with all fields → parses", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+prompt_additions = "There was a failed run. Fix it"
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+			prompt_additions: "There was a failed run. Fix it",
+		});
+	});
+
+	test("entry without prompt_additions → parses", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+		});
+	});
+
+	test("multiple entries → preserved in order", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+
+[[on_event.failed_run]]
+workflows = ["Deploy"]
+branches = ["release"]
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.map((e) => e.workflows[0])).toEqual([
+			"CI",
+			"Deploy",
+		]);
+	});
+
+	test("unknown keys inside entry are dropped", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+future_field = "ignored"
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+		});
+	});
+
+	test("missing workflows → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(`[[on_event.failed_run]]\nbranches = ["main"]`),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("empty workflows array → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = []\nbranches = ["main"]`,
+			),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("missing branches → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(`[[on_event.failed_run]]\nworkflows = ["CI"]`),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("empty branches array → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = ["CI"]\nbranches = []`,
+			),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("error message does not leak raw workflow/branch values", () => {
+		try {
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = ["SECRET_WORKFLOW"]`,
+				// missing branches — triggers validation error
+			);
+		} catch (err) {
+			expect((err as Error).message).not.toContain("SECRET_WORKFLOW");
+		}
+	});
+});
+
 describe("volume size normalization → canonical Kubernetes binary-SI form", () => {
 	test.each([
 		["10gb", "10Gi"],

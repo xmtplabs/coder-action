@@ -72,11 +72,24 @@ export const ScheduledJobSchema = z.object({
 	prompt: z.string(),
 });
 
+/** Sparse shape for a single `[[on_event.failed_run]]` entry. */
+export const StoredFailedRunEventSchema = z.object({
+	workflows: z.array(z.string()).min(1),
+	branches: z.array(z.string()).min(1),
+	prompt_additions: z.string().optional(),
+});
+
+/** Sparse shape for the `[on_event]` section. */
+export const StoredOnEventSchema = z.object({
+	failed_run: z.array(StoredFailedRunEventSchema).optional(),
+});
+
 /** Top-level sparse shape as stored by the DO. */
 export const StoredRepoConfigSettingsSchema = z.object({
 	sandbox: StoredSandboxSchema.optional(),
 	harness: StoredHarnessSchema.optional(),
 	scheduled_jobs: z.array(ScheduledJobSchema).optional(),
+	on_event: StoredOnEventSchema.optional(),
 });
 
 // ── Resolved (read-side) schemas ─────────────────────────────────────────────
