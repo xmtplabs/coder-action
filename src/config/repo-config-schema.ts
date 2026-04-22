@@ -154,10 +154,19 @@ export const JSON_SCHEMA: Record<string, unknown> = {
 	description: "Schema for .code-factory/config.toml",
 };
 
-// Zod v4.3.6 workaround (Task 3): VolumeSizeSchema has a .transform() which
-// prevents z.toJSONSchema from emitting the `default` keyword for
-// `sandbox.volumes[].size`. Inject it narrowly after the spread.
-((JSON_SCHEMA as any).properties?.sandbox?.properties?.volumes?.items?.properties?.size ?? {}).default = "10Gi";
+// Zod v4.3.6 workaround (Task 3): VolumeSizeSchema uses `.transform()` which
+// causes `z.toJSONSchema` to drop the `default` keyword on `sandbox.volumes[].size`.
+// Inject it explicitly. If the path ever drifts (e.g. after a Zod upgrade),
+// throw loudly at module load rather than silently shipping a schema without
+// the default.
+const volumeSizeNode = (JSON_SCHEMA as any).properties?.sandbox?.properties
+	?.volumes?.items?.properties?.size;
+if (!volumeSizeNode || typeof volumeSizeNode !== "object") {
+	throw new Error(
+		"JSON_SCHEMA shape drift: sandbox.volumes[].size not found — re-check Zod z.toJSONSchema output and remove this workaround if no longer needed",
+	);
+}
+volumeSizeNode.default = "10Gi";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

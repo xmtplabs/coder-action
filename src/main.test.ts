@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import worker, { __setAppBotLoginForTests } from "./main";
+import { JSON_SCHEMA } from "./config/repo-config-schema";
 import issuesAssigned from "./testing/fixtures/issues-assigned.json";
 import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 import { computeSignature } from "./testing/workflow-test-helpers";
@@ -35,13 +36,7 @@ describe("GET /schema.json", () => {
 		});
 		const res = await worker.fetch(req, {} as never, {} as ExecutionContext);
 		const body = await res.json();
-		expect((body as any).$schema).toBe(
-			"https://json-schema.org/draft/2020-12/schema",
-		);
-		expect((body as any).title).toBe("code-factory repo config");
-		expect(
-			(body as any).properties.sandbox.properties.size.default,
-		).toBe("medium");
+		expect(body).toEqual(JSON_SCHEMA);
 	});
 
 	test("non-GET method falls through to 404", async () => {
