@@ -1,4 +1,4 @@
-#:schema https://task-action.xmtp.team/schema.json
+#:schema https://code-factory-action.xmtp.team/schema.json
 
 [sandbox]
 size = "small"

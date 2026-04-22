@@ -4,6 +4,8 @@ main = "src/main.ts"
 compatibility_date = "2026-04-18"
 compatibility_flags = ["nodejs_compat"]
 
+routes = [{ pattern = "code-factory-action.xmtp.team", custom_domain = true }]
+
 [[workflows]]
 name = "task-runner-workflow"
 binding = "TASK_RUNNER_WORKFLOW"
