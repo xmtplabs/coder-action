@@ -183,7 +183,7 @@ branches = ["main"]
 		});
 	});
 
-	test("multiple entries → preserved in order", () => {
+	test("multiple entries → preserved in order with full shape", () => {
 		const toml = `
 [[on_event.failed_run]]
 workflows = ["CI"]
@@ -194,9 +194,9 @@ workflows = ["Deploy"]
 branches = ["release"]
 `;
 		const parsed = parseRepoConfigToml(toml);
-		expect(parsed.on_event?.failed_run?.map((e) => e.workflows[0])).toEqual([
-			"CI",
-			"Deploy",
+		expect(parsed.on_event?.failed_run).toEqual([
+			{ workflows: ["CI"], branches: ["main"] },
+			{ workflows: ["Deploy"], branches: ["release"] },
 		]);
 	});
 
@@ -242,14 +242,19 @@ future_field = "ignored"
 		).toThrow(/Invalid RepoConfig/);
 	});
 
-	test("error message does not leak raw workflow/branch values", () => {
+	test("error message does not leak raw branch values on type mismatch", () => {
+		// Use branches = "not-an-array-SECRET" (type mismatch) so that the raw
+		// string itself becomes issue.input for the failing Zod issue. If the
+		// error builder ever started interpolating issue.input, the secret would
+		// surface in the message.
+		expect.assertions(2);
 		try {
 			parseRepoConfigToml(
-				`[[on_event.failed_run]]\nworkflows = ["SECRET_WORKFLOW"]`,
-				// missing branches — triggers validation error
+				`[[on_event.failed_run]]\nworkflows = ["CI"]\nbranches = "SECRET_BRANCH_VALUE"`,
 			);
 		} catch (err) {
-			expect((err as Error).message).not.toContain("SECRET_WORKFLOW");
+			expect((err as Error).message).not.toContain("SECRET_BRANCH_VALUE");
+			expect((err as Error).message).toMatch(/Invalid RepoConfig/);
 		}
 	});
 });
