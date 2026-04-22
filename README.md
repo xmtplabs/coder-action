@@ -55,6 +55,10 @@ All non-secret config lives in [`wrangler.toml`](wrangler.toml) under `[vars]`. 
 | `CODER_ORGANIZATION` | var | Coder organization (default: `default`) |
 | `LOG_FORMAT` | var | `json` (production) or `pretty` (local dev) |
 
+### Per-repo configuration
+
+Consuming repositories may define a `.code-factory/config.toml` file to customize sandbox sizing, harness selection, scheduled jobs, and event hooks. See [docs/repo-config.md](docs/repo-config.md) for the full reference. A machine-readable JSON Schema is served at `/schema.json` for editor integration (Taplo, VS Code).
+
 ## Running
 
 ```bash
