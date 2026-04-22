@@ -72,11 +72,24 @@ export const ScheduledJobSchema = z.object({
 	prompt: z.string(),
 });
 
+/** Sparse shape for a single `[[on_event.failed_run]]` entry. */
+export const StoredFailedRunEventSchema = z.object({
+	workflows: z.array(z.string()).min(1),
+	branches: z.array(z.string()).min(1),
+	prompt_additions: z.string().optional(),
+});
+
+/** Sparse shape for the `[on_event]` section. */
+export const StoredOnEventSchema = z.object({
+	failed_run: z.array(StoredFailedRunEventSchema).optional(),
+});
+
 /** Top-level sparse shape as stored by the DO. */
 export const StoredRepoConfigSettingsSchema = z.object({
 	sandbox: StoredSandboxSchema.optional(),
 	harness: StoredHarnessSchema.optional(),
 	scheduled_jobs: z.array(ScheduledJobSchema).optional(),
+	on_event: StoredOnEventSchema.optional(),
 });
 
 // ── Resolved (read-side) schemas ─────────────────────────────────────────────
@@ -101,6 +114,11 @@ export const ResolvedHarnessSchema = z.object({
 	provider: HarnessProviderSchema.default("claude_code"),
 });
 
+/** Resolved on_event: failed_run defaults to []. */
+export const ResolvedOnEventSchema = z.object({
+	failed_run: z.array(StoredFailedRunEventSchema).default([]),
+});
+
 /**
  * Top-level resolved shape — always fully populated after `.parse()`.
  *
@@ -114,7 +132,41 @@ export const RepoConfigSettingsSchema = z.object({
 	sandbox: ResolvedSandboxSchema.prefault({}),
 	harness: ResolvedHarnessSchema.prefault({}),
 	scheduled_jobs: z.array(ScheduledJobSchema).default([]),
+	on_event: ResolvedOnEventSchema.prefault({}),
 });
+
+// ── JSON Schema (editor-consumable) ──────────────────────────────────────────
+// Generated from the resolved schema in Zod input mode so optional-with-default
+// fields carry a `default` keyword. Consumed by editors (Taplo, VS Code) via
+// `GET /schema.json` — see `src/main.ts`.
+
+const JSON_SCHEMA_ID = "https://task-action.xmtp.team/schema.json";
+
+export const JSON_SCHEMA: Record<string, unknown> = {
+	...(z.toJSONSchema(RepoConfigSettingsSchema, {
+		io: "input",
+		target: "draft-2020-12",
+	}) as Record<string, unknown>),
+	$schema: "https://json-schema.org/draft/2020-12/schema",
+	$id: JSON_SCHEMA_ID,
+	title: "code-factory repo config",
+	description: "Schema for .code-factory/config.toml",
+};
+
+// Zod v4.3.6 workaround (Task 3): VolumeSizeSchema uses `.transform()` which
+// causes `z.toJSONSchema` to drop the `default` keyword on `sandbox.volumes[].size`.
+// Inject it explicitly. If the path ever drifts (e.g. after a Zod upgrade),
+// throw loudly at module load rather than silently shipping a schema without
+// the default.
+// biome-ignore lint/suspicious/noExplicitAny: traverses Zod's generated JSON Schema, which has a recursive any-ish shape
+const volumeSizeNode = (JSON_SCHEMA as any).properties?.sandbox?.properties
+	?.volumes?.items?.properties?.size;
+if (!volumeSizeNode || typeof volumeSizeNode !== "object") {
+	throw new Error(
+		"JSON_SCHEMA shape drift: sandbox.volumes[].size not found — re-check Zod z.toJSONSchema output and remove this workaround if no longer needed",
+	);
+}
+volumeSizeNode.default = "10Gi";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

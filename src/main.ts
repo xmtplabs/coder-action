@@ -1,4 +1,5 @@
 import { loadConfig } from "./config/app-config";
+import { JSON_SCHEMA } from "./config/repo-config-schema";
 import {
 	__setAppBotLoginForTests,
 	resolveAppBotLogin,
@@ -32,6 +33,16 @@ export default {
 
 		if (request.method === "POST" && url.pathname === "/webhooks/github") {
 			return handleGithubWebhook(request, env);
+		}
+
+		if (request.method === "GET" && url.pathname === "/schema.json") {
+			return new Response(JSON.stringify(JSON_SCHEMA), {
+				status: 200,
+				headers: {
+					"content-type": "application/schema+json; charset=utf-8",
+					"cache-control": "public, max-age=300",
+				},
+			});
 		}
 
 		return new Response("Not Found", { status: 404 });

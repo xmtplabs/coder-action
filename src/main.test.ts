@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import worker, { __setAppBotLoginForTests } from "./main";
+import { JSON_SCHEMA } from "./config/repo-config-schema";
 import issuesAssigned from "./testing/fixtures/issues-assigned.json";
 import workflowRunSuccess from "./testing/fixtures/workflow-run-success.json";
 import { computeSignature } from "./testing/workflow-test-helpers";
@@ -11,6 +12,37 @@ describe("Worker default export", () => {
 
 	test("unknown route returns 404", async () => {
 		const req = new Request("https://example.com/unknown", { method: "GET" });
+		const res = await worker.fetch(req, {} as never, {} as ExecutionContext);
+		expect(res.status).toBe(404);
+	});
+});
+
+describe("GET /schema.json", () => {
+	test("returns 200 with application/schema+json", async () => {
+		const req = new Request("https://example.com/schema.json", {
+			method: "GET",
+		});
+		const res = await worker.fetch(req, {} as never, {} as ExecutionContext);
+		expect(res.status).toBe(200);
+		expect(res.headers.get("content-type")).toBe(
+			"application/schema+json; charset=utf-8",
+		);
+		expect(res.headers.get("cache-control")).toBe("public, max-age=300");
+	});
+
+	test("body is the exported JSON_SCHEMA", async () => {
+		const req = new Request("https://example.com/schema.json", {
+			method: "GET",
+		});
+		const res = await worker.fetch(req, {} as never, {} as ExecutionContext);
+		const body = await res.json();
+		expect(body).toEqual(JSON_SCHEMA);
+	});
+
+	test("non-GET method falls through to 404", async () => {
+		const req = new Request("https://example.com/schema.json", {
+			method: "POST",
+		});
 		const res = await worker.fetch(req, {} as never, {} as ExecutionContext);
 		expect(res.status).toBe(404);
 	});

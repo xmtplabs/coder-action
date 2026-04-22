@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+	JSON_SCHEMA,
 	parseRepoConfigToml,
 	resolveRepoConfigSettings,
 } from "./repo-config-schema";
@@ -102,6 +103,7 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 			sandbox: { size: "medium", docker: false, volumes: [] },
 			harness: { provider: "claude_code" },
 			scheduled_jobs: [],
+			on_event: { failed_run: [] },
 		});
 	});
 	test("volume with path-only → size defaulted to '10Gi'", () => {
@@ -116,6 +118,145 @@ describe("resolveRepoConfigSettings — defaults applied on read", () => {
 		});
 		expect(r.sandbox.size).toBe("large");
 		expect(r.sandbox.docker).toBe(false);
+	});
+});
+
+describe("resolveRepoConfigSettings — on_event defaults", () => {
+	test("undefined → on_event.failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings(undefined);
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("empty object → on_event.failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings({});
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("sparse on_event with no failed_run → failed_run defaults to []", () => {
+		const r = resolveRepoConfigSettings({ on_event: {} });
+		expect(r.on_event.failed_run).toEqual([]);
+	});
+
+	test("entries passthrough", () => {
+		const r = resolveRepoConfigSettings({
+			on_event: {
+				failed_run: [
+					{
+						workflows: ["CI"],
+						branches: ["main"],
+						prompt_additions: "fix it",
+					},
+				],
+			},
+		});
+		expect(r.on_event.failed_run).toEqual([
+			{ workflows: ["CI"], branches: ["main"], prompt_additions: "fix it" },
+		]);
+	});
+});
+
+describe("parseRepoConfigToml — on_event.failed_run", () => {
+	test("full entry with all fields → parses", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+prompt_additions = "There was a failed run. Fix it"
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+			prompt_additions: "There was a failed run. Fix it",
+		});
+	});
+
+	test("entry without prompt_additions → parses", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+		});
+	});
+
+	test("multiple entries → preserved in order with full shape", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+
+[[on_event.failed_run]]
+workflows = ["Deploy"]
+branches = ["release"]
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run).toEqual([
+			{ workflows: ["CI"], branches: ["main"] },
+			{ workflows: ["Deploy"], branches: ["release"] },
+		]);
+	});
+
+	test("unknown keys inside entry are dropped", () => {
+		const toml = `
+[[on_event.failed_run]]
+workflows = ["CI"]
+branches = ["main"]
+future_field = "ignored"
+`;
+		const parsed = parseRepoConfigToml(toml);
+		expect(parsed.on_event?.failed_run?.[0]).toEqual({
+			workflows: ["CI"],
+			branches: ["main"],
+		});
+	});
+
+	test("missing workflows → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(`[[on_event.failed_run]]\nbranches = ["main"]`),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("empty workflows array → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = []\nbranches = ["main"]`,
+			),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("missing branches → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(`[[on_event.failed_run]]\nworkflows = ["CI"]`),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("empty branches array → NonRetryableError", () => {
+		expect(() =>
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = ["CI"]\nbranches = []`,
+			),
+		).toThrow(/Invalid RepoConfig/);
+	});
+
+	test("error message does not leak raw branch values on type mismatch", () => {
+		// Use branches = "not-an-array-SECRET" (type mismatch) so that the raw
+		// string itself becomes issue.input for the failing Zod issue. If the
+		// error builder ever started interpolating issue.input, the secret would
+		// surface in the message.
+		expect.assertions(2);
+		try {
+			parseRepoConfigToml(
+				`[[on_event.failed_run]]\nworkflows = ["CI"]\nbranches = "SECRET_BRANCH_VALUE"`,
+			);
+		} catch (err) {
+			expect((err as Error).message).not.toContain("SECRET_BRANCH_VALUE");
+			expect((err as Error).message).toMatch(/Invalid RepoConfig/);
+		}
 	});
 });
 
@@ -163,5 +304,84 @@ describe("volume size normalization → canonical Kubernetes binary-SI form", ()
 				`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
 			),
 		).toThrow(/Invalid RepoConfig/);
+	});
+});
+
+describe("JSON_SCHEMA export", () => {
+	// biome-ignore lint/suspicious/noExplicitAny: JSON Schema traversal — recursive unknown shape
+	const schemaAny = JSON_SCHEMA as any;
+
+	test("has required top-level metadata", () => {
+		expect(JSON_SCHEMA.$schema).toBe(
+			"https://json-schema.org/draft/2020-12/schema",
+		);
+		expect(JSON_SCHEMA.$id).toBeTypeOf("string");
+		expect(JSON_SCHEMA.title).toBe("code-factory repo config");
+		expect(typeof JSON_SCHEMA.description).toBe("string");
+	});
+
+	test("sandbox.size has default 'medium' and is optional", () => {
+		const s = schemaAny;
+		const sandbox = s.properties.sandbox;
+		expect(sandbox.properties.size.default).toBe("medium");
+		expect(sandbox.required ?? []).not.toContain("size");
+	});
+
+	test("sandbox.volumes[].path is required; size has default '10Gi'", () => {
+		const s = schemaAny;
+		const volItem = s.properties.sandbox.properties.volumes.items;
+		expect(volItem.required).toContain("path");
+		expect(volItem.properties.size.default).toBe("10Gi");
+	});
+
+	test("harness.provider has default 'claude_code' and is optional", () => {
+		const s = schemaAny;
+		const harness = s.properties.harness;
+		expect(harness.properties.provider.default).toBe("claude_code");
+		expect(harness.required ?? []).not.toContain("provider");
+	});
+
+	test("scheduled_jobs default is []", () => {
+		const s = schemaAny;
+		expect(s.properties.scheduled_jobs.default).toEqual([]);
+	});
+
+	test("scheduled_jobs[] requires name, branch, schedule, prompt", () => {
+		const s = schemaAny;
+		const item = s.properties.scheduled_jobs.items;
+		expect(item.required).toEqual(
+			expect.arrayContaining(["name", "branch", "schedule", "prompt"]),
+		);
+	});
+
+	test("on_event.failed_run default is []", () => {
+		const s = schemaAny;
+		const failedRun = s.properties.on_event.properties.failed_run;
+		expect(failedRun.default).toEqual([]);
+	});
+
+	test("on_event.failed_run[].workflows has minItems: 1", () => {
+		const s = schemaAny;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.properties.workflows.minItems).toBe(1);
+	});
+
+	test("on_event.failed_run[].branches has minItems: 1", () => {
+		const s = schemaAny;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.properties.branches.minItems).toBe(1);
+	});
+
+	test("on_event.failed_run[] requires workflows and branches but not prompt_additions", () => {
+		const s = schemaAny;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.required).toEqual(
+			expect.arrayContaining(["workflows", "branches"]),
+		);
+		expect(item.required ?? []).not.toContain("prompt_additions");
+	});
+
+	test("is JSON-serializable", () => {
+		expect(() => JSON.stringify(JSON_SCHEMA)).not.toThrow();
 	});
 });

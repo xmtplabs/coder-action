@@ -338,6 +338,7 @@ describe("runCreateTask", () => {
 				},
 				harness: { provider: "codex" },
 				scheduled_jobs: [],
+				on_event: { failed_run: [] },
 			},
 		};
 		await runCreateTask({

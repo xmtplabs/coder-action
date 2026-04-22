@@ -111,3 +111,4 @@ Cross-cutting:
 
 - [GitHub App setup](docs/github-app-setup.md) — registration, installation, secrets
 - [Coder API endpoints](docs/coder-api.md) — experimental tasks + stable endpoints we consume
+- [Per-repo config format](docs/repo-config.md) — `.code-factory/config.toml` field reference for sandbox, harness, scheduled jobs, and event hooks
