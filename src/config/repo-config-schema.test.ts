@@ -308,6 +308,9 @@ describe("volume size normalization → canonical Kubernetes binary-SI form", ()
 });
 
 describe("JSON_SCHEMA export", () => {
+	// biome-ignore lint/suspicious/noExplicitAny: JSON Schema traversal — recursive unknown shape
+	const schemaAny = JSON_SCHEMA as any;
+
 	test("has required top-level metadata", () => {
 		expect(JSON_SCHEMA.$schema).toBe(
 			"https://json-schema.org/draft/2020-12/schema",
@@ -318,33 +321,33 @@ describe("JSON_SCHEMA export", () => {
 	});
 
 	test("sandbox.size has default 'medium' and is optional", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const sandbox = s.properties.sandbox;
 		expect(sandbox.properties.size.default).toBe("medium");
 		expect(sandbox.required ?? []).not.toContain("size");
 	});
 
 	test("sandbox.volumes[].path is required; size has default '10Gi'", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const volItem = s.properties.sandbox.properties.volumes.items;
 		expect(volItem.required).toContain("path");
 		expect(volItem.properties.size.default).toBe("10Gi");
 	});
 
 	test("harness.provider has default 'claude_code' and is optional", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const harness = s.properties.harness;
 		expect(harness.properties.provider.default).toBe("claude_code");
 		expect(harness.required ?? []).not.toContain("provider");
 	});
 
 	test("scheduled_jobs default is []", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		expect(s.properties.scheduled_jobs.default).toEqual([]);
 	});
 
 	test("scheduled_jobs[] requires name, branch, schedule, prompt", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const item = s.properties.scheduled_jobs.items;
 		expect(item.required).toEqual(
 			expect.arrayContaining(["name", "branch", "schedule", "prompt"]),
@@ -352,25 +355,25 @@ describe("JSON_SCHEMA export", () => {
 	});
 
 	test("on_event.failed_run default is []", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const failedRun = s.properties.on_event.properties.failed_run;
 		expect(failedRun.default).toEqual([]);
 	});
 
 	test("on_event.failed_run[].workflows has minItems: 1", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const item = s.properties.on_event.properties.failed_run.items;
 		expect(item.properties.workflows.minItems).toBe(1);
 	});
 
 	test("on_event.failed_run[].branches has minItems: 1", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const item = s.properties.on_event.properties.failed_run.items;
 		expect(item.properties.branches.minItems).toBe(1);
 	});
 
 	test("on_event.failed_run[] requires workflows and branches but not prompt_additions", () => {
-		const s = JSON_SCHEMA as any;
+		const s = schemaAny;
 		const item = s.properties.on_event.properties.failed_run.items;
 		expect(item.required).toEqual(
 			expect.arrayContaining(["workflows", "branches"]),

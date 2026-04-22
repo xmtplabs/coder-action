@@ -159,6 +159,7 @@ export const JSON_SCHEMA: Record<string, unknown> = {
 // Inject it explicitly. If the path ever drifts (e.g. after a Zod upgrade),
 // throw loudly at module load rather than silently shipping a schema without
 // the default.
+// biome-ignore lint/suspicious/noExplicitAny: traverses Zod's generated JSON Schema, which has a recursive any-ish shape
 const volumeSizeNode = (JSON_SCHEMA as any).properties?.sandbox?.properties
 	?.volumes?.items?.properties?.size;
 if (!volumeSizeNode || typeof volumeSizeNode !== "object") {
