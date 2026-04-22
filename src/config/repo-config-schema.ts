@@ -135,6 +135,30 @@ export const RepoConfigSettingsSchema = z.object({
 	on_event: ResolvedOnEventSchema.prefault({}),
 });
 
+// ── JSON Schema (editor-consumable) ──────────────────────────────────────────
+// Generated from the resolved schema in Zod input mode so optional-with-default
+// fields carry a `default` keyword. Consumed by editors (Taplo, VS Code) via
+// `GET /schema.json` — see `src/main.ts`.
+
+const JSON_SCHEMA_ID =
+	"https://xmtplabs.github.io/coder-action/schema/repo-config.json";
+
+export const JSON_SCHEMA: Record<string, unknown> = {
+	...(z.toJSONSchema(RepoConfigSettingsSchema, {
+		io: "input",
+		target: "draft-2020-12",
+	}) as Record<string, unknown>),
+	$schema: "https://json-schema.org/draft/2020-12/schema",
+	$id: JSON_SCHEMA_ID,
+	title: "code-factory repo config",
+	description: "Schema for .code-factory/config.toml",
+};
+
+// Zod v4.3.6 workaround (Task 3): VolumeSizeSchema has a .transform() which
+// prevents z.toJSONSchema from emitting the `default` keyword for
+// `sandbox.volumes[].size`. Inject it narrowly after the spread.
+((JSON_SCHEMA as any).properties?.sandbox?.properties?.volumes?.items?.properties?.size ?? {}).default = "10Gi";
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 /** Sparse settings as stored in the DO (fields may be missing). */

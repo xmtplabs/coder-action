@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+	JSON_SCHEMA,
 	parseRepoConfigToml,
 	resolveRepoConfigSettings,
 } from "./repo-config-schema";
@@ -303,5 +304,81 @@ describe("volume size normalization → canonical Kubernetes binary-SI form", ()
 				`[[sandbox.volumes]]\npath = "/data"\nsize = "${input}"`,
 			),
 		).toThrow(/Invalid RepoConfig/);
+	});
+});
+
+describe("JSON_SCHEMA export", () => {
+	test("has required top-level metadata", () => {
+		expect(JSON_SCHEMA.$schema).toBe(
+			"https://json-schema.org/draft/2020-12/schema",
+		);
+		expect(JSON_SCHEMA.$id).toBeTypeOf("string");
+		expect(JSON_SCHEMA.title).toBe("code-factory repo config");
+		expect(typeof JSON_SCHEMA.description).toBe("string");
+	});
+
+	test("sandbox.size has default 'medium' and is optional", () => {
+		const s = JSON_SCHEMA as any;
+		const sandbox = s.properties.sandbox;
+		expect(sandbox.properties.size.default).toBe("medium");
+		expect(sandbox.required ?? []).not.toContain("size");
+	});
+
+	test("sandbox.volumes[].path is required; size has default '10Gi'", () => {
+		const s = JSON_SCHEMA as any;
+		const volItem = s.properties.sandbox.properties.volumes.items;
+		expect(volItem.required).toContain("path");
+		expect(volItem.properties.size.default).toBe("10Gi");
+	});
+
+	test("harness.provider has default 'claude_code' and is optional", () => {
+		const s = JSON_SCHEMA as any;
+		const harness = s.properties.harness;
+		expect(harness.properties.provider.default).toBe("claude_code");
+		expect(harness.required ?? []).not.toContain("provider");
+	});
+
+	test("scheduled_jobs default is []", () => {
+		const s = JSON_SCHEMA as any;
+		expect(s.properties.scheduled_jobs.default).toEqual([]);
+	});
+
+	test("scheduled_jobs[] requires name, branch, schedule, prompt", () => {
+		const s = JSON_SCHEMA as any;
+		const item = s.properties.scheduled_jobs.items;
+		expect(item.required).toEqual(
+			expect.arrayContaining(["name", "branch", "schedule", "prompt"]),
+		);
+	});
+
+	test("on_event.failed_run default is []", () => {
+		const s = JSON_SCHEMA as any;
+		const failedRun = s.properties.on_event.properties.failed_run;
+		expect(failedRun.default).toEqual([]);
+	});
+
+	test("on_event.failed_run[].workflows has minItems: 1", () => {
+		const s = JSON_SCHEMA as any;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.properties.workflows.minItems).toBe(1);
+	});
+
+	test("on_event.failed_run[].branches has minItems: 1", () => {
+		const s = JSON_SCHEMA as any;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.properties.branches.minItems).toBe(1);
+	});
+
+	test("on_event.failed_run[] requires workflows and branches but not prompt_additions", () => {
+		const s = JSON_SCHEMA as any;
+		const item = s.properties.on_event.properties.failed_run.items;
+		expect(item.required).toEqual(
+			expect.arrayContaining(["workflows", "branches"]),
+		);
+		expect(item.required ?? []).not.toContain("prompt_additions");
+	});
+
+	test("is JSON-serializable", () => {
+		expect(() => JSON.stringify(JSON_SCHEMA)).not.toThrow();
 	});
 });
