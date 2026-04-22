@@ -140,8 +140,7 @@ export const RepoConfigSettingsSchema = z.object({
 // fields carry a `default` keyword. Consumed by editors (Taplo, VS Code) via
 // `GET /schema.json` — see `src/main.ts`.
 
-const JSON_SCHEMA_ID =
-	"https://xmtplabs.github.io/coder-action/schema/repo-config.json";
+const JSON_SCHEMA_ID = "https://task-action.xmtp.team/schema.json";
 
 export const JSON_SCHEMA: Record<string, unknown> = {
 	...(z.toJSONSchema(RepoConfigSettingsSchema, {

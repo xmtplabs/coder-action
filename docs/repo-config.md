@@ -11,14 +11,14 @@ Point [Taplo](https://taplo.tamasfe.dev/) or the VS Code TOML extension at the s
 Top-of-file directive (no extra tooling required):
 
 ```toml
-#:schema https://<your-worker-host>/schema.json
+#:schema https://task-action.xmtp.team/schema.json
 ```
 
 Or add a `.taplo.toml` file at the repository root:
 
 ```toml
 [schema]
-path = "https://<your-worker-host>/schema.json"
+path = "https://task-action.xmtp.team/schema.json"
 include = [".code-factory/config.toml"]
 ```
 
