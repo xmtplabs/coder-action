@@ -38,15 +38,18 @@ describe("formatPRCommentMessage", () => {
 		expect(instrIdx).toBeLessThan(commentIdx);
 	});
 
-	test("instructs agent to react with 👍 for automated non-actionable comments", () => {
+	test("delegates handling to the /receiving-feedback skill", () => {
 		const msg = formatPRCommentMessage({
 			commentUrl: "https://github.com/org/repo/pull/1#comment-1",
 			commenter: "bot",
 			timestamp: "2026-03-17T12:00:00Z",
 			body: "Approvability check passed",
 		});
-		expect(msg).toContain("👍");
-		expect(msg).toContain("automated");
+		expect(msg).toContain(
+			"Use the /receiving-feedback skill to handle the following comment.",
+		);
+		expect(msg).not.toContain("👍");
+		expect(msg).not.toContain("automated");
 	});
 
 	test("includes file path and line number for review comments", () => {
@@ -114,15 +117,18 @@ describe("formatIssueCommentMessage", () => {
 		expect(instrIdx).toBeLessThan(commentIdx);
 	});
 
-	test("instructs agent to react with 👍 for automated non-actionable comments", () => {
+	test("delegates handling to the /receiving-feedback skill", () => {
 		const msg = formatIssueCommentMessage({
 			commentUrl: "https://github.com/org/repo/issues/42#comment-1",
 			commenter: "github-actions",
 			timestamp: "2026-03-17T12:00:00Z",
 			body: "Task created: https://coder.example.com/tasks/123",
 		});
-		expect(msg).toContain("👍");
-		expect(msg).toContain("automated");
+		expect(msg).toContain(
+			"Use the /receiving-feedback skill to handle the following comment.",
+		);
+		expect(msg).not.toContain("👍");
+		expect(msg).not.toContain("automated");
 	});
 });
 
