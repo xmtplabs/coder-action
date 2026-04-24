@@ -111,7 +111,7 @@ describe("runSyncRepoConfig", () => {
 		});
 	});
 
-	test("file absent — only runs fetch-config-file and makes no DO writes", async () => {
+	test("file absent — skips parse-and-validate and writes empty settings to DO", async () => {
 		const { step, calls } = makeStep();
 		const { REPO_CONFIG_DO, idFromName, get, setRepoConfig } = makeDO();
 		const github = {
@@ -127,10 +127,18 @@ describe("runSyncRepoConfig", () => {
 			logger: noopLogger,
 		});
 
-		expect(calls.map((c) => c.name)).toEqual(["fetch-config-file"]);
-		expect(idFromName).not.toHaveBeenCalled();
-		expect(get).not.toHaveBeenCalled();
-		expect(setRepoConfig).not.toHaveBeenCalled();
+		expect(calls.map((c) => c.name)).toEqual([
+			"fetch-config-file",
+			"store-repo-config",
+		]);
+		expect(idFromName).toHaveBeenCalledWith("acme/repo");
+		expect(get).toHaveBeenCalledTimes(1);
+		expect(setRepoConfig).toHaveBeenCalledWith({
+			repositoryId: 42,
+			repositoryFullName: "acme/repo",
+			installationId: 100,
+			settings: {},
+		});
 	});
 
 	test("TOML syntax invalid — parse-and-validate throws; store-repo-config not invoked", async () => {

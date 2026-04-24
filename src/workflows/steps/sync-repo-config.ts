@@ -49,21 +49,25 @@ export async function runSyncRepoConfig(
 		return { present: true as const, contentBase64: res.contentBase64 };
 	});
 
-	if (!fileResult.present) {
-		logger.info("No repo config file present; skipping DO write", {
+	let settings: StoredRepoConfig["settings"];
+	if (fileResult.present) {
+		const parseResult = await step.do("parse-and-validate", async () => {
+			const raw = Buffer.from(fileResult.contentBase64, "base64").toString(
+				"utf8",
+			);
+			return { settings: parseRepoConfigToml(raw) };
+		});
+		settings = parseResult.settings;
+	} else {
+		// No config file at head SHA: persist empty settings so downstream
+		// `getRepoConfig()` returns a defaulted `RepoConfig` instead of `null`,
+		// which would otherwise push the task onto the legacy template path.
+		logger.info("No repo config file present; storing empty settings", {
 			fullName,
 			sha: event.head.sha,
 		});
-		return;
+		settings = {};
 	}
-
-	const parseResult = await step.do("parse-and-validate", async () => {
-		const raw = Buffer.from(fileResult.contentBase64, "base64").toString(
-			"utf8",
-		);
-		const settings = parseRepoConfigToml(raw);
-		return { settings };
-	});
 
 	await step.do("store-repo-config", async () => {
 		const id = env.REPO_CONFIG_DO.idFromName(fullName);
@@ -72,7 +76,7 @@ export async function runSyncRepoConfig(
 			repositoryId,
 			repositoryFullName: fullName,
 			installationId,
-			settings: parseResult.settings,
+			settings,
 		};
 		await stub.setRepoConfig(cfg);
 		return { ok: true as const };
